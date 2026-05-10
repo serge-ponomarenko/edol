@@ -47,6 +47,7 @@ services:
       TZ: Europe/Kyiv
     env_file:
       - ../../.env_edol_notify
+      - ../../camera_snapshots:/app/camera_snapshots
     depends_on:
       mqtt:
         condition: service_healthy
