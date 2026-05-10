@@ -1,0 +1,45 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        env:
+          GITHUB_SERVER_URL: ${{ env.GITHUB_SERVER_URL }}
+          GITHUB_REPOSITORY: ${{ env.GITHUB_REPOSITORY }}
+          GITHUB_REF_NAME: ${{ env.GITHUB_REF_NAME }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          envs: GITHUB_SERVER_URL,GITHUB_REPOSITORY,GITHUB_REF_NAME
+          script: |
+            set -e
+
+            APP_DIR="${{ secrets.SERVER_WORKING_DIRECTORY }}"
+            BRANCH="$GITHUB_REF_NAME"
+            REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+
+            if [ ! -d ".git" ]; then
+              echo "Repository not found. Cloning..."
+              git clone -b "$BRANCH" "$REPO_URL" .
+            else
+              echo "Repository exists. Updating..."
+              git fetch origin
+              git reset --hard "origin/$BRANCH"
+              git clean -fd
+            fi
+
+            docker compose down || true
+            docker compose up --build -d

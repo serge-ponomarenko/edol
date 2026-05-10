@@ -1,0 +1,22 @@
+package org.spon.edolcore.event;
+
+public enum PrinterEventType {
+
+    PRINTER_ONLINE,
+    PRINTER_OFFLINE,
+
+    PRINT_STARTED,
+    PRINT_RUNNING,
+    PRINT_PAUSED,
+    PRINT_FINISHED,
+    PRINT_FAILED,
+
+    PRINT_ERROR,
+    AMS_STATUS_CHANGED,
+    LAYER_CHANGED,
+    PROGRESS_CHANGED,
+
+    AMS_SLOT_CHANGED,
+    FILAMENT_CHANGED
+
+}

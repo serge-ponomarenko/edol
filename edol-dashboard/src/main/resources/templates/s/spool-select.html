@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+
+    <title>Load Spool • Edol</title>
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet"/>
+
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+        }
+
+        .card {
+            border-radius: 20px;
+        }
+
+        .tray-btn {
+            font-size: 20px;
+            padding: 18px;
+            border-radius: 16px;
+        }
+
+        .spool-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+
+<body class="d-flex align-items-center justify-content-center min-vh-100">
+
+<div class="container">
+
+    <div class="card p-4 text-center shadow-lg">
+
+        <div class="row g-3 mt-2 align-items-center">
+            <div class="col-6">
+                <!-- 🎨 SVG Spool -->
+                <svg class="spool-icon" viewBox="0 0 100 100">
+                    <defs>
+                        <radialGradient cx="50%" cy="50%" id="spoolGradient" r="50%">
+                            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2"/>
+                            <stop offset="100%" stop-color="black" stop-opacity="0.2"/>
+                        </radialGradient>
+                    </defs>
+
+                    <circle cx="50" cy="50" r="45"
+                            stroke="#fff"
+                            stroke-width="2"
+                            th:attr="fill=${filament.colorHex}"/>
+
+                    <circle cx="50" cy="50" fill="url(#spoolGradient)"
+                            r="45"/>
+
+                    <circle cx="50" cy="50" fill="#111"
+                            r="15"
+                            stroke="#fff"
+                            stroke-width="2"/>
+                </svg>
+            </div>
+            <div class="col-6">
+                <h2 class="mt-3" th:text="${filament.vendor.name}">Vendor</h2>
+
+                <div class="text-muted">
+                    <span th:text="${filament.materialType.name}">Material</span> •
+                    <span th:text="${filament.brand}">Brand</span>
+                </div>
+
+                <div class="mt-2">
+                    Color:
+                    <span th:text="${filament.colorHex}">#FFFFFF</span>
+                    <span class="text-muted">
+                        (RGB:
+                        <span th:text="${filament.getRgbColor()}">255,255,255</span>)
+                    </span>
+                </div>
+
+                <!-- REMAINING -->
+                <div class="mt-2">
+                    <div class="progress progress-sm">
+                        <div class="progress-bar"
+                             th:classappend="${spool.weightRemaining < 200} ? ' bg-red' : ' bg-blue'"
+                             th:style="'width:' + (${spool.weightRemaining} * 100 / ${spool.weightTotal}) + '%'">
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-1">
+                        <span th:text="${spool.weightRemaining}"></span> /
+                        <span th:text="${spool.weightTotal}"></span> g
+                    </div>
+                </div>
+
+                <div class="mt-2">
+                    Opened: <b th:text="${spool.getFormattedOpenedTime()}"></b>
+                </div>
+            </div>
+
+        </div>
+
+        <hr class="my-4"/>
+
+        <h3>Select AMS tray</h3>
+
+        <div class="row g-3 mt-2">
+
+            <div class="col-3" th:each="i : ${#numbers.sequence(0,3)}">
+                <form method="post" th:action="@{/s/{spoolId}/{trayId}(spoolId=${spool.id}, trayId=${i})}">
+                    <button class="btn btn-primary w-100 tray-btn" type="submit">
+                        A[[${i}+1]]
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <div class="row g-3 mt-2">
+
+            <div class="col-12">
+                <form method="post" th:action="@{/s/{spoolId}/254(spoolId=${spool.id})}">
+                    <button class="btn btn-outline-primary w-100 tray-btn" type="submit">
+                        External spool
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3"
+     th:if="${toastMessage}">
+
+    <div aria-atomic="true"
+         aria-live="assertive"
+         class="toast show bg-green text-white"
+         role="alert">
+
+        <div class="toast-header">
+            <span class="avatar me-2"
+                  th:style="'background:' + ${toastColor}"></span>
+
+            <strong class="me-auto">Filament Loaded</strong>
+            <small>now</small>
+        </div>
+
+        <div class="toast-body">
+            <span th:text="${toastMessage}"></span>
+        </div>
+
+    </div>
+</div>
+</body>
+<script>
+    const redirectDelay = 1500; // time before redirect (ms)
+
+    setTimeout(() => {
+        const toast = document.querySelector('.toast');
+        if (toast) {
+            toast.classList.remove('show');
+        }
+    }, redirectDelay);
+
+    setTimeout(() => {
+        window.location.href = '/filament-spools';
+    }, redirectDelay + 500); // small extra delay after toast hides
+</script>
+</html>

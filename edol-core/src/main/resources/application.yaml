@@ -1,0 +1,31 @@
+server:
+  port: ${SERVER_PORT}
+
+logging:
+  file.name: ./logs/edol_core_application.log
+
+app:
+  zone-id: Europe/Kiev
+
+mqttServer:
+  url: tcp://mqtt:1883
+
+bot:
+  webAdminName: ${WEB_ADMIN_NAME}
+  webAdminPassword: ${WEB_ADMIN_PASSWORD}
+
+bambu:
+  host: ${BAMBU_CONNECT_URL}
+  ftp-url: ${BAMBU_FTP_URL}
+  model-directory: ${BAMBU_MODEL_DIRECTORY:""}   # In some cases it's root and in some cases it is "cache"
+  camera-url: ${CAMERA_URL}
+  serial: ${BAMBU_SERIAL}
+  access-code: ${BAMBU_ACCESS_CODE}
+  connection-timeout: 5  # seconds
+  show-raw-mqtt: ${BAMBU_SHOW_RAW_MQTT:false}
+
+camera:
+  snapshot-dir: ./camera_snapshots
+  store-snapshots: ${STORE_CAMERA_SNAPSHOTS:true}
+
+

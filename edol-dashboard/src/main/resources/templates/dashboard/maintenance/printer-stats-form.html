@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <title>Printer Statistics • Edol</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+
+</head>
+
+<body class="layout-fluid">
+
+<div class="page">
+
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark"
+           th:fragment="sidebar">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl mt-4">
+
+                <div class="card">
+
+                    <div class="card-header">
+                        <h3 class="card-title">Maintenance Definition</h3>
+                    </div>
+
+                    <div class="card-body">
+
+                        <form method="post" th:action="@{/maintenance/config/printer-stats-form}"
+                              th:object="${stats}">
+
+                            <input th:field="*{id}" type="hidden">
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Printer Start Printing Date
+                                </label>
+
+                                <input class="form-control"
+                                       th:field="*{printerStartedPrintingDate}"
+                                       type="datetime-local">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Total Print Time (hours)
+                                </label>
+
+                                <input class="form-control"
+                                       min="0"
+                                       step="1"
+                                       th:field="*{totalPrintHours}"
+                                       type="number">
+                            </div>
+
+                            <div class="mb-3">
+
+                                <label class="form-label">
+                                    Total Jobs
+                                </label>
+
+                                <input class="form-control"
+                                       th:field="*{totalJobs}"
+                                       type="number">
+
+                            </div>
+
+                            <div class="mb-3">
+
+                                <label class="form-label">
+                                    Total Filament Used (grams)
+                                </label>
+
+                                <input class="form-control"
+                                       th:field="*{totalFilamentUsedGrams}"
+                                       type="number">
+
+                            </div>
+
+                            <button class="btn btn-primary">
+                                Save
+                            </button>
+
+                        </form>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

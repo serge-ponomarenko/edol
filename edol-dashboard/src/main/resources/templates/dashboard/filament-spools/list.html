@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <title>Filament Spools • Edol</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+
+    <style>
+        .arrow {
+            transition: transform 0.25s ease;
+        }
+
+        .arrow.rotated {
+            transform: rotate(90deg);
+        }
+
+        .page-wrapper {
+            margin-left: 15rem;
+        }
+    </style>
+
+</head>
+
+<body class="layout-fluid">
+
+<div class="page">
+
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark"
+           th:fragment="sidebar">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl mt-4">
+
+                <div class="card">
+
+                    <div class="card-header">
+
+                        <h3 class="card-title">Filament Spools</h3>
+
+                        <div class="card-actions">
+                            <a class="btn btn-primary" href="/filament-spools/new">
+                                Add Spool
+                            </a>
+                        </div>
+
+                    </div>
+
+                    <div class="card-body border-bottom">
+
+                        <form class="d-flex justify-content-between align-items-center flex-wrap gap-2" method="get">
+
+                            <!-- LEFT: Filters -->
+                            <div class="d-flex gap-2">
+
+                                <select class="form-select w-auto" name="vendor" onchange="this.form.submit()">
+                                    <option value="">All Vendors</option>
+                                    <option th:each="v : ${vendors}"
+                                            th:selected="${v.name == selectedVendor}"
+                                            th:text="${v.name}"
+                                            th:value="${v.name}">
+                                    </option>
+                                </select>
+
+                                <div class="btn-group align-items-center gap-2">
+
+                                    <!-- ALL -->
+                                    <a class="btn"
+                                       th:classappend="${selectedMaterial == null or selectedMaterial == ''} ? 'btn-primary' : 'btn-outline-primary'"
+                                       th:href="@{/filament-spools(vendor=${selectedVendor})}">
+                                        All
+                                    </a>
+
+                                    <!-- MATERIAL BUTTONS -->
+                                    <a class="btn"
+                                       th:classappend="${m.name == selectedMaterial} ? 'btn-primary' : 'btn-outline-primary'"
+                                       th:each="m : ${materials}"
+                                       th:href="@{/filament-spools(vendor=${selectedVendor}, material=${m.name})}"
+                                       th:text="${m.name}">
+                                    </a>
+
+                                </div>
+
+                                <div class="btn-group gap-2" id="status-filters">
+
+                                    <button class="btn btn-outline-info status-btn" data-status="NEW"
+                                            type="button">
+                                        NEW
+                                    </button>
+
+                                    <button class="btn btn-outline-info status-btn" data-status="ACTIVE"
+                                            type="button">
+                                        ACTIVE
+                                    </button>
+
+                                    <button class="btn btn-outline-info status-btn" data-status="EMPTY"
+                                            type="button">
+                                        EMPTY
+                                    </button>
+
+                                    <button class="btn btn-outline-info status-btn" data-status="ARCHIVED"
+                                            type="button">
+                                        ARCHIVED
+                                    </button>
+
+                                </div>
+
+                                <a class="btn btn-outline-secondary" href="/filament-spools"
+                                   title="Reset filters">
+                                    <i class="ti ti-restore"></i>
+                                </a>
+                            </div>
+
+                            <!-- RIGHT: future controls -->
+                            <div class="d-flex gap-2">
+
+                            </div>
+
+                        </form>
+
+                    </div>
+
+                    <div class="table-responsive">
+
+                        <table class="table">
+
+                            <thead>
+                            <tr>
+                                <th></th>
+                                <th>ID</th>
+                                <th>Vendor</th>
+                                <th>Material</th>
+                                <th>Brand</th>
+                                <th>Color</th>
+                                <th>Remaining</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+
+                            <th:block th:each="s : ${spools}">
+
+                                <tr>
+
+                                    <!-- collapse -->
+                                    <td>
+                                        <button class="btn btn-sm btn-icon spool-toggle"
+                                                data-bs-toggle="collapse"
+                                                th:attr="data-bs-target=|#details-${s.id}|">
+                                            <i class="ti ti-chevron-right arrow"></i>
+                                        </button>
+                                    </td>
+
+                                    <td th:text="${s.id}"></td>
+
+                                    <!-- Vendor -->
+                                    <td th:text="${s.filament.vendor.name}"></td>
+
+                                    <!-- MATERIAL -->
+                                    <td>
+                                    <span class="badge bg-teal text-teal-fg"
+                                          th:text="${s.filament.materialType.name}">
+                                    </span>
+                                    </td>
+
+
+                                    <!-- BRAND -->
+                                    <td th:text="${s.filament.brand}"></td>
+
+                                    <!-- COLOR -->
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                        <span
+                                                th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;background:' + ${s.filament.colorHex}">
+                                        </span>
+                                            <span th:text="${s.filament.colorHex}"></span>
+                                        </div>
+                                    </td>
+
+                                    <!-- REMAINING -->
+                                    <td style="min-width:180px">
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar"
+                                                 th:classappend="${s.weightRemaining < 200} ? ' bg-red' : ' bg-blue'"
+                                                 th:style="'width:' + (${s.weightRemaining} * 100 / ${s.weightTotal}) + '%'">
+                                            </div>
+                                        </div>
+                                        <div class="text-muted small mt-1">
+                                            <span th:text="${s.weightRemaining}"></span> /
+                                            <span th:text="${s.weightTotal}"></span> g
+                                        </div>
+                                    </td>
+
+                                    <td th:text="${#numbers.formatDecimal(s.price,1,2)} + ' ₴'"></td>
+
+                                    <td>
+                                    <span class="badge"
+                                          th:classappend="${s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).NEW ? 'bg-green text-green-fg' : s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).ACTIVE ? 'bg-blue text-blue-fg' : s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).EMPTY ? 'bg-yellow text-yellow-fg' : 'bg-secondary text-secondary-fg'}"
+                                          th:text="${s.status}">
+                                    </span>
+                                    </td>
+
+                                    <td>
+                                        <div class="btn-list">
+                                            <a class="btn btn-sm btn-outline-info" th:href="@{/s/{id}(id=${s.id})}"
+                                               title="Load spool in the AMS">
+                                                <i class="ti ti-status-change"></i>
+                                            </a>
+                                            <a class="btn btn-sm btn-outline-secondary"
+                                               th:href="@{/filament-spools/label/{id}(id=${s.id})}"
+                                               title="Generate QR Label">
+                                                <i class="ti ti-qrcode"></i>
+                                            </a>
+                                            <a class="btn btn-sm btn-warning"
+                                               th:href="@{/filament-spools/edit/{id}(id=${s.id})}"
+                                               title="Edit spool">
+                                                <i class="ti ti-edit"></i>
+                                            </a>
+                                            <a class="btn btn-sm btn-danger" onclick="return confirmDelete(this)"
+                                               th:attr="data-name=${s.filament.fullId}"
+                                               th:href="@{/filament-spools/delete/{id}(id=${s.id})}"
+                                               title="Delete spool">
+                                                <i class="ti ti-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+
+                                </tr>
+
+                                <!-- DETAILS -->
+                                <tr class="collapse" th:id="|details-${s.id}|">
+                                    <td colspan="8">
+                                        <div class="p-3">
+                                            <div class="row">
+
+                                                <div class="row g-3">
+
+                                                    <div class="col-md-4">
+                                                        <div class="text-muted small">Opened</div>
+                                                        <div th:text="${s.openedAt != null ? #temporals.format(s.openedAt, 'dd.MM.yyyy HH:mm') : '—'}"></div>
+                                                    </div>
+
+                                                    <div class="col-md-4">
+                                                        <div class="text-muted small">Last used</div>
+                                                        <div th:text="${s.lastUsedAt != null ? #temporals.format(s.lastUsedAt, 'dd.MM.yyyy HH:mm') : '—'}"></div>
+                                                    </div>
+
+                                                    <div class="col-md-4">
+                                                        <div class="d-flex justify-content-between align-items-start">
+                                                            <div>
+                                                                <div class="text-muted small">Last dried</div>
+                                                                <div th:id="|dried-date-${s.id}|"
+                                                                     th:text="${s.lastDriedAt != null
+                                                                    ? #temporals.format(s.lastDriedAt, 'dd.MM.yyyy HH:mm')
+                                                                    : '—'}">
+                                                                </div>
+                                                            </div>
+                                                            <button class="btn btn-sm btn-outline-orange"
+                                                                    th:onclick="|markDried(${s.id})|">
+                                                                <i class="ti ti-wind me-1"></i>
+                                                                Dried
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row g-3">
+                                                    <div class="col-md-4">
+                                                        <div class="text-muted small">Store</div>
+                                                        <a target="_blank"
+                                                           th:href="${s.storeUrl}"
+                                                           th:if="${s.storeUrl}"
+                                                           th:text="${s.storeUrl}">
+                                                        </a>
+                                                        <span th:unless="${s.storeUrl}">—</span>
+
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <div class="text-muted small">Comment</div>
+                                                        <div th:text="${s.comment ?: '—'}"></div>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                            </th:block>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+
+</body>
+
+<script>
+    function confirmDelete(el) {
+        const name = el.dataset.name;
+        return confirm("Delete spool: " + name + "?");
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        document.querySelectorAll('.spool-toggle').forEach(button => {
+
+            const arrow = button.querySelector('.arrow');
+            const target = document.querySelector(button.getAttribute('data-bs-target'));
+
+            target.addEventListener('show.bs.collapse', () => {
+                arrow.classList.add('rotated');
+            });
+
+            target.addEventListener('hide.bs.collapse', () => {
+                arrow.classList.remove('rotated');
+            });
+
+        });
+
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const buttons = document.querySelectorAll('.status-btn');
+        const url = new URL(window.location.href);
+        const params = url.searchParams;
+
+        // Get current statuses
+        let selected = params.getAll('status');
+
+        // Default behavior (NEW + ACTIVE)
+        if (selected.length === 0) {
+            selected = ['NEW', 'ACTIVE'];
+        }
+
+        // Highlight active buttons
+        buttons.forEach(btn => {
+            const status = btn.dataset.status;
+            if (selected.includes(status)) {
+                btn.classList.remove('btn-outline-info');
+                btn.classList.add('btn-info');
+            }
+        });
+
+        // Click handler
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const status = btn.dataset.status;
+                let current = params.getAll('status');
+
+                if (current.length === 0) {
+                    current = ['NEW', 'ACTIVE'];
+                }
+
+                const ORDER = ['NEW', 'ACTIVE', 'EMPTY', 'ARCHIVED'];
+                current.sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+
+                // toggle logic
+                if (current.includes(status)) {
+                    current = current.filter(s => s !== status);
+                } else {
+                    current.push(status);
+                }
+
+                // clear old params
+                params.delete('status');
+
+                // apply new ones
+                current.forEach(s => params.append('status', s));
+
+                // redirect
+                window.location.href = url.toString();
+            });
+        });
+
+    });
+
+    async function markDried(spoolId) {
+        const response = await fetch(
+            `/filament-spools/dry/${spoolId}`,
+            {
+                method: "POST"
+            }
+        );
+
+        if (!response.ok)
+            return;
+
+        const now = new Date();
+
+        const formatted =
+            now.toLocaleDateString('uk-UA') +
+            ' ' +
+            now.toLocaleTimeString('uk-UA', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+        document.getElementById(
+            `dried-date-${spoolId}`
+        ).textContent = formatted;
+    }
+</script>
+
+</html>

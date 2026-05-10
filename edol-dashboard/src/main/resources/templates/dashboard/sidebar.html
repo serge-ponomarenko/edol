@@ -1,0 +1,163 @@
+<div th:fragment="sidebar"
+     xmlns:th="http://www.thymeleaf.org">
+
+    <div class="container-fluid">
+
+        <div class="navbar-brand d-flex align-items-center">
+            <a href="/">
+                <img class="p-3" src="/logo-edol-small.svg">
+                <!--                <span class="navbar-brand">Edol</span>-->
+            </a>
+        </div>
+
+        <div class="collapse navbar-collapse show">
+
+            <ul class="navbar-nav pt-lg-3">
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="/"
+                       th:classappend="${currentPath.endsWith('/')} ? ' active'">
+
+                            <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                <i class="ti ti-home"></i>
+                            </span>
+                        <span class="nav-link-title">
+                                Home
+                            </span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="/filament-spools"
+                       th:classappend="${currentPath.contains('/filament-spools')} ? ' active'">
+
+                            <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                <i class="ti ti-sport-billard"></i>
+                            </span>
+                        <span class="nav-link-title">
+                                Spools
+                            </span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="/print-jobs"
+                       th:classappend="${currentPath.contains('/print-jobs')} ? ' active'">
+
+                            <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                <i class="ti ti-printer"></i>
+                            </span>
+                        <span class="nav-link-title">
+                                Print Jobs
+                            </span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="/maintenance"
+                       th:classappend="${currentPath.endsWith('/maintenance')} ? ' active'">
+                            <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                <i class="ti ti-clock-cog"></i>
+                            </span>
+                        <span class="nav-link-title">
+                                Printer Maintenance
+                            </span>
+                    </a>
+                </li>
+
+                <li class="nav-item"
+                    th:with="
+                        isMaintenance=${currentPath.contains('/maintenance/config')},
+                        isFilaments=${currentPath.contains('/filaments')},
+                        isVendors=${currentPath.contains('/vendors')},
+                        isMaterials=${currentPath.contains('/materials')},
+                        isConfigActive=${isMaintenance or isFilaments or isVendors or isMaterials}
+                    ">
+
+                    <a class="nav-link d-flex justify-content-between align-items-center"
+                       data-bs-toggle="collapse"
+                       href="#configMenu"
+                       role="button"
+                       th:attr="aria-expanded=${isConfigActive}">
+
+                            <span>
+                                <i class="ti ti-settings me-2"></i>
+                                Configuration
+                            </span>
+
+                        <i class="ti ti-chevron-down"></i>
+                    </a>
+
+                    <div class="collapse"
+                         id="configMenu"
+                         th:classappend="${isConfigActive} ? ' show'">
+
+                        <ul class="nav nav-sm flex-column ms-3">
+
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   href="/maintenance/config"
+                                   th:classappend="${isMaintenance} ? ' active'">
+                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                            <i class="ti ti-device-ipad-cog"></i>
+                                        </span>
+                                    <span class="nav-link-title">
+                                            Maintenance Definitions
+                                        </span>
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   href="/filaments"
+                                   th:classappend="${isFilaments} ? ' active'">
+                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                            <i class="ti ti-brand-bunpo"></i>
+                                        </span>
+                                    <span class="nav-link-title">
+                                            Filaments
+                                        </span>
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   href="/vendors"
+                                   th:classappend="${isVendors} ? ' active'">
+                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                            <i class="ti ti-building-factory"></i>
+                                        </span>
+                                    <span class="nav-link-title">
+                                            Vendors
+                                        </span>
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   href="/materials"
+                                   th:classappend="${isMaterials} ? ' active'">
+                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                            <i class="ti ti-flask"></i>
+                                        </span>
+                                    <span class="nav-link-title">
+                                            Materials
+                                        </span>
+                                </a>
+                            </li>
+
+                        </ul>
+                    </div>
+                </li>
+
+            </ul>
+
+        </div>
+
+    </div>
+
+</div>

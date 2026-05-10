@@ -1,0 +1,71 @@
+services:
+  edolcore:
+    build:
+      context: ..
+      dockerfile: docker/edol-core.Dockerfile
+    container_name: edol-core
+    environment:
+      TZ: Europe/Kyiv
+    env_file:
+      - ../../.env_edol_core
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    ports:
+      - "8091:8080"
+    volumes:
+      - ../../models:/app/models
+      - ../../camera_snapshots:/app/camera_snapshots
+      - ../../logs:/app/logs
+    restart: unless-stopped
+
+  edoldashboard:
+    build:
+      context: ..
+      dockerfile: docker/edol-dashboard.Dockerfile
+    container_name: edol-dashboard
+    environment:
+      TZ: Europe/Kyiv
+    env_file:
+      - ../../.env_edol_dashboard
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    ports:
+      - "8090:8090"
+    volumes:
+      - ../../db-files:/app/db-files
+      - ../../logs:/app/logs
+    restart: unless-stopped
+
+  edolnotify:
+    build:
+      context: ..
+      dockerfile: docker/edol-notify.Dockerfile
+    container_name: edol-notify
+    environment:
+      TZ: Europe/Kyiv
+    env_file:
+      - ../../.env_edol_notify
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    volumes:
+      - ../../logs:/app/logs
+    restart: unless-stopped
+
+  mqtt:
+    image: emqx/emqx:latest
+    container_name: emqx
+    ports:
+      - "1884:1883"
+      - "18083:18083"
+      - "8083:8083"
+    environment:
+      - EMQX_NAME=emqx
+    healthcheck:
+      test: [ "CMD", "emqx_ctl", "status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped

@@ -1,0 +1,18 @@
+spring:
+  main:
+    web-application-type: none
+
+logging:
+  file.name: ./logs/edol_notify_application.log
+
+edol-core:
+  url: http://edolcore:8080
+
+mqttServer:
+  url: tcp://mqtt:1883
+
+telegram:
+  enable: ${TELEGRAM_ENABLE:true}
+  bot-token: ${TELEGRAM_BOT_TOKEN}
+  admin-id: ${TELEGRAM_ADMIN_ID}
+  progress-message-step: ${PROGRESS_MESSAGE_STEP:20}

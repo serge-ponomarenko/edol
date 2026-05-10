@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <title>Dashboard • Edol</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+
+    <style>
+        /* Plate frame */
+        .plate-frame {
+            background: var(--tblr-bg-surface-secondary);
+            border: 1px solid var(--tblr-border-color);
+            border-radius: var(--tblr-border-radius-lg);
+            padding: 12px;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            background-image: linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Image */
+        #plate-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: var(--tblr-border-radius);
+        }
+
+        /* Overlay */
+        #overlay {
+            position: absolute;
+            inset: 0;
+        }
+
+        /* Objects */
+        .object-box {
+            position: absolute;
+            border: 2px solid rgba(0, 140, 255, 0.9);
+            background: rgba(0, 140, 255, 0.15);
+            border-radius: 6px;
+
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        /* Hover */
+        .object-box:hover {
+            background: rgba(0, 140, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        /* Selected */
+        .object-box.selected {
+            border-color: #e03131;
+            background: rgba(224, 49, 49, 0.25);
+        }
+
+        /* Disabled (already skipped) */
+        .object-box.disabled {
+            border-color: #adb5bd;
+            background: rgba(173, 181, 189, 0.2);
+            cursor: not-allowed;
+        }
+
+        .object-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .object-item.selected {
+            background: rgba(224, 49, 49, 0.08);
+        }
+
+        .object-item.skipped {
+            opacity: 0.6;
+        }
+
+        .object-badge {
+            min-width: 90px;
+            text-align: right;
+        }
+
+        /* Make plate nicely centered */
+        #plate-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+        }
+
+        /* Improve list scrolling feel */
+        #objectList {
+            scrollbar-width: thin;
+        }
+
+        /* Highlight on hover (list) */
+        .object-item:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .object-box.hovered {
+            outline: 3px solid #ffd43b;
+            z-index: 10;
+        }
+
+        .object-item,
+        .object-box {
+            transition: all 0.15s ease;
+        }
+
+    </style>
+
+</head>
+
+<body class="layout-fluid">
+
+<div class="page">
+
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark"
+           th:fragment="sidebar">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl mt-4">
+
+                <div class="card shadow-sm">
+                    <div class="card-header">
+                        <h3 class="card-title">Skip Objects</h3>
+                    </div>
+
+                    <div class="card-body">
+
+                        <div class="row">
+
+                            <!-- LEFT: PLATE -->
+                            <div class="col-lg-8">
+
+                                <div class="plate-frame mb-3">
+                                    <div id="plate-container">
+                                        <img id="plate-image"
+                                             src="/api/proxy/modeltopimage"/>
+                                        <div id="overlay"></div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="text-muted small">
+                                        Click objects to exclude them from printing
+                                    </div>
+
+                                    <button class="btn btn-danger" disabled id="skipBtn">
+                                        <i class="ti ti-player-skip-forward me-1"></i>
+                                        Skip (<span id="selectedCount">0</span>)
+                                    </button>
+                                </div>
+
+                            </div>
+
+                            <!-- RIGHT: LIST -->
+                            <div class="col-lg-4">
+
+                                <div class="card card-sm h-100">
+                                    <div class="card-header">
+                                        <h4 class="card-title">Objects</h4>
+                                    </div>
+
+                                    <div class="list-group list-group-flush overflow-auto"
+                                         id="objectList"
+                                         style="max-height: 520px;">
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="modal modal-blur fade" id="confirmSkipModal" tabindex="-1">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content">
+
+                    <div class="modal-body text-center py-4">
+                        <i class="ti ti-alert-triangle text-warning mb-2" style="font-size: 2rem;"></i>
+                        <h3>Skip selected objects?</h3>
+                        <div class="text-muted">
+                            This will stop printing selected objects.
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <div class="w-100">
+                            <div class="row">
+                                <div class="col">
+                                    <button class="btn w-100" data-bs-dismiss="modal">
+                                        Cancel
+                                    </button>
+                                </div>
+                                <div class="col">
+                                    <button class="btn btn-danger w-100" id="confirmSkipBtn">
+                                        Skip
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+
+<script>
+    const selected = new Set();
+    const boxMap = new Map();
+    const listMap = new Map();
+
+    const img = document.getElementById("plate-image");
+
+    let currentObjects = [];
+
+    img.onload = async () => {
+        const res = await fetch("/api/printer/state");
+        const state = await res.json();
+
+        currentObjects = state.printerState.printObjects;
+
+        renderAll();
+    };
+
+
+    function renderAll() {
+        disposeTooltips();
+
+        boxMap.clear();
+        listMap.clear();
+
+        renderObjects(currentObjects, img.clientWidth, img.clientHeight);
+        renderObjectList(currentObjects);
+        updateButton();
+
+        initTooltips();
+    }
+
+    function renderObjects(objects, imageWidth, imageHeight) {
+        const overlay = document.getElementById("overlay");
+        overlay.innerHTML = "";
+
+        const bedSize = 256; // mm
+
+        const scaleX = imageWidth / bedSize;
+        const scaleY = imageHeight / bedSize;
+
+        objects.forEach(obj => {
+            const box = document.createElement("div");
+            box.className = "object-box";
+
+            const left = obj.boundingBox.x1 * scaleX;
+            const top = imageHeight - (obj.boundingBox.y2 * scaleY);
+            const width = (obj.boundingBox.x2 - obj.boundingBox.x1) * scaleX;
+            const height = (obj.boundingBox.y2 - obj.boundingBox.y1) * scaleY;
+
+            box.style.left = `${left}px`;
+            box.style.top = `${top}px`;
+            box.style.width = `${width}px`;
+            box.style.height = `${height}px`;
+
+            // box.title = `${obj.name} (#${obj.id})`;
+
+            box.setAttribute("data-bs-toggle", "tooltip");
+            box.setAttribute("title", `${obj.name} (#${obj.id})`);
+
+            box.onmouseenter = () => highlightList(obj.id, true);
+            box.onmouseleave = () => highlightList(obj.id, false);
+
+            box.dataset.boxId = obj.id;
+            boxMap.set(obj.id, box);
+
+            if (obj.skipped) {
+                box.classList.add("disabled");
+                box.style.pointerEvents = "none";
+            }
+
+            box.onclick = () => {
+                toggleObject(obj.id);
+            };
+
+            if (selected.has(obj.id)) {
+                box.classList.add("selected");
+            } else {
+                box.classList.remove("selected");
+            }
+
+            overlay.appendChild(box);
+        });
+    }
+
+    const skipBtn = document.getElementById("skipBtn");
+    const confirmModal = new bootstrap.Modal(document.getElementById("confirmSkipModal"));
+
+    skipBtn.onclick = () => {
+        if (selected.size === 0) return;
+
+        confirmModal.show();
+    };
+
+    document.getElementById("confirmSkipBtn").onclick = async () => {
+        confirmModal.hide();
+
+        skipBtn.disabled = true;
+        skipBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Skipping...`;
+
+        await fetch("/api/proxy/request/skip-objects", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                objectIds: Array.from(selected)
+            })
+        });
+
+        // small delay for printer to process
+        setTimeout(() => {
+            location.reload();
+        }, 3000);
+    };
+
+
+    function updateButton() {
+        document.getElementById("selectedCount").innerText = selected.size;
+        skipBtn.disabled = selected.size === 0;
+    }
+
+    function renderObjectList(objects) {
+        const list = document.getElementById("objectList");
+        list.innerHTML = "";
+
+        objects.forEach(obj => {
+            const item = document.createElement("div");
+            item.className = "list-group-item object-item";
+
+            if (selected.has(obj.id)) {
+                item.classList.add("selected");
+            }
+
+            if (obj.skipped) {
+                item.classList.add("skipped");
+            }
+
+            item.innerHTML = `
+            <div>
+                <strong>${obj.name}</strong>
+                <div class="text-muted small">ID: ${obj.id}</div>
+            </div>
+
+            <div class="object-badge">
+                ${renderStatusBadge(obj)}
+            </div>
+        `;
+
+            item.onmouseenter = () => highlightBox(obj.id, true);
+            item.onmouseleave = () => highlightBox(obj.id, false);
+
+            item.dataset.listId = obj.id;
+            listMap.set(obj.id, item);
+
+            // click from list = toggle selection (if not skipped)
+            if (!obj.skipped) {
+                item.style.cursor = "pointer";
+
+                item.onclick = () => {
+                    toggleObject(obj.id);
+                };
+            }
+
+            list.appendChild(item);
+        });
+    }
+
+    function initTooltips() {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]')
+            .forEach(el => new bootstrap.Tooltip(el));
+    }
+
+    function disposeTooltips() {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+            const instance = bootstrap.Tooltip.getInstance(el);
+            if (instance) {
+                instance.dispose();
+            }
+        });
+    }
+
+    function renderStatusBadge(obj) {
+        if (obj.skipped) {
+            return `<span class="badge bg-secondary">Skipped</span>`;
+        }
+
+        if (selected.has(obj.id)) {
+            return `<span class="badge bg-red text-red-fg">Will skip</span>`;
+        }
+
+        return `<span class="badge bg-blue-lt">Active</span>`;
+    }
+
+    function toggleObject(objectId) {
+        const obj = currentObjects.find(o => o.id === objectId);
+        if (!obj || obj.skipped) return;
+
+        if (selected.has(objectId)) {
+            selected.delete(objectId);
+        } else {
+            selected.add(objectId);
+        }
+
+        renderAll();
+    }
+
+    function highlightBox(id, on) {
+        const el = boxMap.get(id);
+        if (el) el.classList.toggle("hovered", on);
+    }
+
+    function highlightList(id, on) {
+        const el = listMap.get(id);
+        if (el) el.classList.toggle("bg-yellow-lt", on);
+    }
+
+
+</script>
+
+
+</html>

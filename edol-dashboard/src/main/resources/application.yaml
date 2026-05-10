@@ -1,0 +1,40 @@
+server:
+  port: 8090
+
+logging:
+  file.name: ./logs/edol_dashboard_application.log
+
+edol-core:
+  url: http://edolcore:8080
+
+edol-dashboard:
+  qr-url: ${QR_URL}
+
+mqttServer:
+  url: tcp://mqtt:1883
+
+spring:
+  datasource:
+    url: jdbc:h2:file:./db-files/edol-dashboard-db;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  properties:
+    hibernate:
+      dialect: org.hibernate.dialect.H2Dialect
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+
+  thymeleaf:
+    cache: false
