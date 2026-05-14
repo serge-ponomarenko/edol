@@ -12,20 +12,22 @@ COPY edol-ams/pom.xml edol-ams/
 
 # preload deps
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -pl edol-notify -am dependency:go-offline -B
+    mvn -pl edol-ams -am dependency:go-offline -B
 
 # sources
 COPY edol-core-api/src edol-core-api/src
-COPY edol-notify/src edol-notify/src
+COPY edol-ams/src edol-ams/src
 
-# build notify + required modules
+# build dashboard + required modules
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -pl edol-notify -am clean package -DskipTests
+    mvn -pl edol-ams -am clean package -DskipTests
 
 FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=build /app/edol-notify/target/*.jar app.jar
+COPY --from=build /app/edol-ams/target/*.jar app.jar
+
+EXPOSE 8099
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

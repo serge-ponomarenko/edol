@@ -55,6 +55,24 @@ services:
       - ../../camera_snapshots:/app/camera_snapshots
     restart: unless-stopped
 
+  edolams:
+    build:
+      context: ..
+      dockerfile: docker/edol-ams.Dockerfile
+    container_name: edol-ams
+    environment:
+      TZ: Europe/Kyiv
+    env_file:
+      - ../../.env_edol_ams
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    ports:
+      - "8099:8099"
+    volumes:
+      - ../../logs:/app/logs
+    restart: unless-stopped
+
   mqtt:
     image: emqx/emqx:latest
     container_name: emqx

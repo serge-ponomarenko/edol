@@ -12,4 +12,9 @@ public interface FilamentRepository extends JpaRepository<Filament, Long> {
             String colorHex
     );
 
+    Optional<Filament> findFirstByPrinterFilamentProfileIdAndColorHex(
+            String printerFilamentProfileId,
+            String colorHex
+    );
+
 }

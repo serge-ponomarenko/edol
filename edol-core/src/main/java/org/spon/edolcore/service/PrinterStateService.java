@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.spon.edolcore.event.PrinterEvent;
-import org.spon.edolcore.event.PrinterEventType;
 import org.spon.edol.model.AmsSlot;
 import org.spon.edol.model.AmsState;
 import org.spon.edol.model.ExtTray;
 import org.spon.edol.model.PrinterState;
+import org.spon.edolcore.event.AmsEvent;
+import org.spon.edolcore.event.AmsEventType;
+import org.spon.edolcore.event.PrinterEvent;
+import org.spon.edolcore.event.PrinterEventType;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +38,7 @@ public class PrinterStateService {
     public synchronized void update(JsonNode print) {
 
         List<PrinterEvent> pendingEvents = new ArrayList<>();
+        List<AmsEvent> pendingAmsEvents = new ArrayList<>();
 
         // ---------- gcode_state ----------
         if (print.has("gcode_state")) {
@@ -136,7 +139,7 @@ public class PrinterStateService {
         }
 
         if (print.has("ams")) {
-            updateAms(print.get("ams"));
+            updateAms(print.get("ams"), pendingAmsEvents);
         }
 
         if (print.has("ams_mapping")) {
@@ -208,10 +211,11 @@ public class PrinterStateService {
             state.setSpeed(print.get("spd_mag").asInt());
 
         pendingEvents.forEach(events::publishEvent);
+        pendingAmsEvents.forEach(events::publishEvent);
 
     }
 
-    private void updateAms(JsonNode amsNode) {
+    private void updateAms(JsonNode amsNode, List<AmsEvent> pendingAmsEvents) {
 
         if (!amsNode.has("ams"))
             return;
@@ -268,9 +272,21 @@ public class PrinterStateService {
             previousAmsSlots.forEach(previousSlot -> {
                 if (previousSlot.isEmpty() && !slots.get(previousSlot.getId()).isEmpty()) {
                     log.warn("[AMS] New Spool has been loaded into slot {}", previousSlot.getId());
+                    pendingAmsEvents.add(
+                            new AmsEvent(
+                                    AmsEventType.AMS_SLOT_LOADED,
+                                    previousSlot.getId()
+                            )
+                    );
                 }
                 if (!previousSlot.isEmpty() && slots.get(previousSlot.getId()).isEmpty()) {
                     log.warn("[AMS] Spool has been unloaded from slot {}", previousSlot.getId());
+                    pendingAmsEvents.add(
+                            new AmsEvent(
+                                    AmsEventType.AMS_SLOT_UNLOADED,
+                                    previousSlot.getId()
+                            )
+                    );
                 }
             });
         }

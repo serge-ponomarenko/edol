@@ -8,6 +8,7 @@ COPY edol-core-api/pom.xml edol-core-api/
 COPY edol-core/pom.xml edol-core/
 COPY edol-dashboard/pom.xml edol-dashboard/
 COPY edol-notify/pom.xml edol-notify/
+COPY edol-ams/pom.xml edol-ams/
 
 # preload deps
 RUN --mount=type=cache,target=/root/.m2 \

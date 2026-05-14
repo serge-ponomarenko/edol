@@ -1,0 +1,15 @@
+server:
+  port: 8099
+
+logging:
+  file.name: ./logs/edol_ams_application.log
+
+edol-core:
+  url: http://edolcore:8080
+
+edol-dashboard:
+  url: http://edoldashboard:8090
+
+mqttServer:
+  url: tcp://mqtt:1883
+

@@ -23,6 +23,7 @@
         <module>edol-core</module>
         <module>edol-dashboard</module>
         <module>edol-notify</module>
+        <module>edol-ams</module>
     </modules>
 
     <properties>
