@@ -6,7 +6,7 @@ import org.spon.edol.model.AmsState;
 import org.spon.edol.model.ExtTray;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolams.model.AmsStatus;
-import org.spon.edoldashboard.model.entity.FilamentSpool;
+import org.spon.edolams.model.FilamentSpool;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

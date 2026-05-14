@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 COPY edol-core-api/src edol-core-api/src
 COPY edol-ams/src edol-ams/src
 
-# build dashboard + required modules
+# build ams + required modules
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -pl edol-ams -am clean package -DskipTests
 

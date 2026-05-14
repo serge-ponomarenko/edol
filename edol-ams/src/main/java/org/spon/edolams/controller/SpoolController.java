@@ -1,9 +1,9 @@
 package org.spon.edolams.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import org.spon.edolams.model.FilamentSpool;
 import org.spon.edolams.model.Spool;
 import org.spon.edolams.service.AmsSpoolChangerService;
-import org.spon.edoldashboard.model.entity.FilamentSpool;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
