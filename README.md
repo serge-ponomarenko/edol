@@ -6,6 +6,8 @@ The system connects directly to printers using MQTT, FTP, and camera streaming A
 
 Edol is designed for makers, print farms, educational labs, and automation enthusiasts who want deeper control over their printing environment and a centralized platform for managing printers, filament, maintenance, and production workflows.
 
+![Demo](edol_demo.gif)
+
 ## Features
 
 - Real-time printer monitoring via MQTT
@@ -32,6 +34,35 @@ Edol currently supports Bambu Lab printers with LAN mode enabled, including:
 - Bambu Lab X1 Series
 - Bambu Lab P1 Series
 - Bambu Lab A1 Series
+
+---
+
+## Bambulab Firmware Versions
+
+Throughout 2025, Bambulab released firmware updates that introduced a software mechanism called **“Authorization Control”**, which restricts certain MQTT communications while the printer is in **Cloud Connected** mode. These MQTT messages remain available in **LAN Only** mode when **Developer Mode** is enabled.
+
+### To use the EDOL, you have two options
+
+ 1. Use an older firmware version released before the Authorization change.
+This allows EDOL to work fully while keeping **Cloud Connected** mode enabled.
+
+ 2. Use a newer firmware version and switch the printer to LAN Only mode with Developer Mode enabled.
+This allows to continue working on newer firmware versions.
+
+### Compatible Firmware Versions
+
+Below are the latest firmware versions for each Bambulab printer line that do **not** include the Authorization restrictions. Using versions up to (and including) these will allow you to fully enjoy all EDOL features and Cloud Connected mode without switching to LAN Only mode with Developer Mode enabled.
+
+| Printer Line | Latest Compatible Firmware |
+|---|---|
+| A1 | `01.04.00.00` |
+| P1 | `01.08.01.00` |
+| X1 | `01.08.02.00` |
+| H2 | All H2 printers include Authorization Control |
+| P2 | All P2 printers include Authorization Control |
+
+---
+
 
 ## Use Cases
 
@@ -71,7 +102,8 @@ The project consists of the following services:
 * `edolcore` — Bambu printer integration service
 * `edoldashboard` — main backend service
 * `edolnotify` — Notifying service (Telegram Bot)
-* `mqtt` (`EMQX`) — MQTT broker used for communication
+* `edolams` — AMS controlling service for EDOL RFID Reader
+* `mqtt` (`nanoMQ`) — MQTT broker used for communication
 
 ---
 
@@ -108,6 +140,7 @@ Create (or copy) the following files in the project root directory:
 ../.env_edol_core
 ../.env_edol_dashboard
 ../.env_edol_notify
+../.env_edol_ams
 ```
 These files are mounted into containers by Docker Compose and will remain safe during repository updates or re-cloning.
 
@@ -119,13 +152,18 @@ edol-project/
 ├── .env_edol_core
 ├── .env_edol_dashboard
 ├── .env_edol_notify
+├── .env_edol_ams
 │
 ├── edol/
+│   ├── docker/
+│   │   ├── compose.yaml
+│   │   └── *.Dockerfile
+│   │   
 │   ├── edol-core-api/
 │   ├── edol-core/
 │   ├── edol-dashboard/
 │   ├── edol-notify/
-│   └── docker-compose.yaml
+│   └── edol-ams/
 │
 ├── db-files/
 ├── logs/
@@ -182,14 +220,13 @@ This command will:
 
 ## Services and Ports
 
-| Service       | Port Mapping  | Description               |
-|---------------|---------------|---------------------------|
-| edolcore      | `8091:8080`   | Bambu integration service |
-| edoldashboard | `8090:8090`   | Main backend API          |
-| edolnotify    | `-:-`         | Notify service            |
-| mqtt/emqx     | `1884:1883`   | MQTT broker               |
-| mqtt/emqx     | `18083:18083` | EMQX Web Dashboard        |
-| mqtt/emqx     | `8083:8083`   | MQTT WebSocket            |
+| Service       | Port Mapping | Description               |
+|---------------|--------------|---------------------------|
+| edolcore      | `8091:8080`  | Bambu integration service |
+| edoldashboard | `8090:8090`  | Main backend API          |
+| edolams       | `8099:8099`  | AMS Service               |
+| edolnotify    | `-:-`        | Notify service            |
+| mqtt/nanomq   | `-:1883`     | MQTT broker               |
 
 ---
 

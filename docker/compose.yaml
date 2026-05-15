@@ -74,16 +74,10 @@ services:
     restart: unless-stopped
 
   mqtt:
-    image: emqx/emqx:latest
-    container_name: emqx
-    ports:
-      - "1884:1883"
-      - "18083:18083"
-      - "8083:8083"
-    environment:
-      - EMQX_NAME=emqx
+    image: emqx/nanomq:latest
+    container_name: nanomq
     healthcheck:
-      test: [ "CMD", "emqx_ctl", "status" ]
+      test: [ "CMD", "nanomq", "--help" ]
       interval: 10s
       timeout: 5s
       retries: 10
