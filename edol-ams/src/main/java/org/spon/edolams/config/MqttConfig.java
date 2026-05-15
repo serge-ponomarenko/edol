@@ -38,7 +38,7 @@ public class MqttConfig {
     public MessageProducer inbound() {
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(
-                        "edoldashboard-subscriber",
+                        "edolams-subscriber",
                         mqttClientFactory(),
                         "edolcore/#"
                 );
