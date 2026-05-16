@@ -122,12 +122,14 @@
                                             >
                                                 Replace
                                             </button>
-                                            <a class="btn btn-sm btn-danger"
-                                               onclick="return confirmDelete(this)"
-                                               th:attr="data-name=${f.fullId}"
-                                               th:href="@{/filaments/delete/{id}(id=${f.id})}">
+                                            <button class="btn btn-sm btn-danger"
+                                                    onclick="openDeleteModal(this)"
+                                                    th:attr="
+                                                        data-id=${f.id},
+                                                        data-name=${f.fullId},
+                                                        data-color=${f.colorHex}">
                                                 Delete
-                                            </a>
+                                            </button>
                                         </div>
                                     </td>
 
@@ -275,16 +277,87 @@
 
     </div>
 
+    <div class="modal fade" id="deleteFilamentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        Delete Filament
+                    </h5>
+                    <button class="btn-close"
+                            data-bs-dismiss="modal"
+                            type="button"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p id="deleteDescription"></p>
+                    <div id="deleteAllowedBlock"
+                         style="display:none;">
+                        <div class="alert alert-success">
+                            This filament is not used anywhere.
+                        </div>
+                    </div>
+
+                    <div id="deleteBlockedBlock"
+                         style="display:none;">
+                        <div class="alert alert-danger">
+                            This filament is still used by other entities. Consider to delete them first.
+                        </div>
+                        <!-- SPOOLS -->
+                        <div class="mb-4">
+                            <h4>Spools</h4>
+                            <table class="table table-sm">
+                                <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Remaining</th>
+                                    <th>Status</th>
+                                </tr>
+                                </thead>
+                                <tbody id="deleteSpoolsTable"></tbody>
+                            </table>
+                        </div>
+
+                        <!-- JOBS -->
+                        <div>
+                            <h4>Jobs</h4>
+                            <table class="table table-sm">
+                                <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Task</th>
+                                    <th class="text-end">Used</th>
+                                </tr>
+                                </thead>
+                                <tbody id="deleteJobsTable"></tbody>
+                            </table>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                        Close
+                    </button>
+                    <a class="btn btn-danger"
+                       id="confirmDeleteButton">
+                        Delete
+                    </a>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
 </div>
 
 </body>
 
 <script>
-    function confirmDelete(el) {
-        const name = el.dataset.name;
-        return confirm("Delete filament: " + name + "?");
-    }
-
     document.addEventListener("DOMContentLoaded", function () {
 
         document.querySelectorAll('.filament-toggle').forEach(button => {
@@ -386,7 +459,6 @@
     }
 
     function loadPreview(sourceId) {
-
         fetch(`/filaments/preview-replace/${sourceId}`)
             .then(r => r.json())
             .then(data => {
@@ -412,6 +484,115 @@
                 });
 
             });
+    }
+
+    function openDeleteModal(button) {
+        const id = button.getAttribute("data-id");
+        const name = button.getAttribute("data-name");
+        const color = button.getAttribute("data-color");
+
+        document.getElementById("deleteDescription").innerHTML = `
+        Delete filament [
+            <span>
+                <span class="avatar avatar-xs me-2"
+                      style="background-color:${color || '#ccc'}"></span>
+
+                ${name}
+
+                <small class="text-muted ms-2 font-monospace">
+                    ${color || '#N/A'}
+                </small>
+            </span>
+        ] ?
+    `;
+
+        document.getElementById("deleteAllowedBlock").style.display = "none";
+        document.getElementById("deleteBlockedBlock").style.display = "none";
+
+        document.getElementById("deleteSpoolsTable").innerHTML = "";
+        document.getElementById("deleteJobsTable").innerHTML = "";
+
+        const confirmButton =
+            document.getElementById("confirmDeleteButton");
+
+        confirmButton.classList.remove("disabled");
+
+        fetch(`/filaments/preview-delete/${id}`)
+            .then(r => r.json())
+            .then(data => {
+
+                const hasSpools =
+                    data.spools && data.spools.length > 0;
+
+                const hasJobs =
+                    data.jobs && data.jobs.length > 0;
+
+                if (!hasSpools && !hasJobs) {
+
+                    document.getElementById(
+                        "deleteAllowedBlock"
+                    ).style.display = "block";
+
+                    confirmButton.href = `/filaments/delete/${id}`;
+
+                } else {
+
+                    document.getElementById(
+                        "deleteBlockedBlock"
+                    ).style.display = "block";
+
+                    confirmButton.removeAttribute("href");
+                    confirmButton.classList.add("disabled");
+
+                    // SPOOLS
+
+                    const spoolsTable =
+                        document.getElementById("deleteSpoolsTable");
+
+                    data.spools.forEach(spool => {
+
+                        const row = document.createElement("tr");
+
+                        row.innerHTML = `
+                        <td>#${spool.id}</td>
+                        <td>${spool.weightRemaining ?? '-'} g</td>
+                        <td>${spool.status}</td>
+                    `;
+
+                        spoolsTable.appendChild(row);
+
+                    });
+
+                    // JOBS
+
+                    const jobsTable =
+                        document.getElementById("deleteJobsTable");
+
+                    data.jobs.forEach(job => {
+
+                        const row = document.createElement("tr");
+
+                        row.innerHTML = `
+                        <td>#${job.id}</td>
+                        <td>${job.taskName}</td>
+                        <td class="text-end">
+                            ${job.usedGrams.toFixed(2)} g
+                        </td>
+                    `;
+
+                        jobsTable.appendChild(row);
+
+                    });
+
+                }
+
+            });
+
+        const modal = new bootstrap.Modal(
+            document.getElementById("deleteFilamentModal")
+        );
+
+        modal.show();
     }
 
 </script>

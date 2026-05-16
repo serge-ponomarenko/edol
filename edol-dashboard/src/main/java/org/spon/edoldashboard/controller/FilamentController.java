@@ -1,15 +1,18 @@
 package org.spon.edoldashboard.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.spon.edoldashboard.model.dto.FilamentDeletePreviewDto;
 import org.spon.edoldashboard.model.dto.FilamentReplacePreviewDto;
 import org.spon.edoldashboard.model.entity.Filament;
 import org.spon.edoldashboard.repository.FilamentRepository;
 import org.spon.edoldashboard.repository.MaterialTypeRepository;
 import org.spon.edoldashboard.repository.VendorRepository;
+import org.spon.edoldashboard.service.FilamentDeleteService;
 import org.spon.edoldashboard.service.FilamentReplaceService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ public class FilamentController {
     private final VendorRepository vendorRepository;
     private final MaterialTypeRepository materialTypeRepository;
     private final FilamentReplaceService filamentReplaceService;
+    private final FilamentDeleteService filamentDeleteService;
 
     @GetMapping
     public String list(Model model) {
@@ -55,8 +59,24 @@ public class FilamentController {
         return "dashboard/filaments/form";
     }
 
+    @GetMapping("/preview-delete/{id}")
+    @ResponseBody
+    public FilamentDeletePreviewDto previewDelete(@PathVariable Long id) {
+        return filamentDeleteService.preview(id);
+    }
+
     @GetMapping("/delete/{id}")
-    public String delete(@PathVariable Long id) {
+    public String delete(@PathVariable Long id, RedirectAttributes ra) {
+        FilamentDeletePreviewDto preview = filamentDeleteService.preview(id);
+
+        if (preview.hasDependencies()) {
+            ra.addFlashAttribute(
+                    "deleteError",
+                    "Filament is used by other entities"
+            );
+            return "redirect:/filaments";
+        }
+
         filamentRepository.deleteById(id);
 
         return "redirect:/filaments";
