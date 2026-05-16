@@ -220,6 +220,13 @@ public class PrintJobService {
                 filamentDto.getFilamentBrandIndex()
         );
 
+        log.info("[Filament Usage] Job ID: {}, Filament Full ID: {}, Color: {}, Usage: {}g",
+                job.getId(),
+                filament.getFullId(),
+                filament.getColorHex(),
+                usedGrams
+                );
+
         int remainingToConsume = (int) Math.ceil(usedGrams);
 
         FilamentSpool initialSpool = null;

@@ -2,6 +2,7 @@ package org.spon.edoldashboard.service;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.spon.edoldashboard.model.entity.Filament;
 import org.spon.edoldashboard.model.entity.MaterialType;
 import org.spon.edoldashboard.model.entity.Vendor;
@@ -16,6 +17,7 @@ import java.util.Optional;
 
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class FilamentService {
 
     private final FilamentRepository filamentRepository;
@@ -87,6 +89,10 @@ public class FilamentService {
         filament.setVendor(vendor);
         filament.setMaterialType(material);
         filament.setDiameter(1.75);
+
+        log.info("+ New Filament has been created. Full ID: {}, Color: {}",
+                filament.getFullId(),
+                filament.getColorHex());
 
         return filamentRepository.save(filament);
     }

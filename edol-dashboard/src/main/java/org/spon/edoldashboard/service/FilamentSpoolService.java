@@ -2,6 +2,7 @@ package org.spon.edoldashboard.service;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.spon.edoldashboard.model.entity.Filament;
 import org.spon.edoldashboard.model.entity.FilamentSpool;
 import org.spon.edoldashboard.model.entity.JobFilamentUsage;
@@ -18,6 +19,7 @@ import java.util.Optional;
 
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class FilamentSpoolService {
 
     private final FilamentSpoolRepository filamentSpoolRepository;
@@ -36,6 +38,10 @@ public class FilamentSpoolService {
                             .openedAt(LocalDateTime.now())
                             .status(FilamentSpool.FilamentSpoolStatus.NEW)
                             .build();
+
+                    log.info("+ New Spool has been created. Filament full ID: {}, Color: {}",
+                            filament.getFullId(),
+                            filament.getColorHex());
 
                     return filamentSpoolRepository.save(spool);
                 });
