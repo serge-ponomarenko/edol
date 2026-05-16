@@ -220,7 +220,7 @@ public class PrintJobService {
                 filamentDto.getFilamentBrandIndex()
         );
 
-        int remainingToConsume = (int) usedGrams;
+        int remainingToConsume = (int) Math.ceil(usedGrams);
 
         FilamentSpool initialSpool = null;
 

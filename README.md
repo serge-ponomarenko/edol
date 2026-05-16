@@ -313,4 +313,11 @@ TLS: implicit
 
 **Password:** `dev_access_code` from a `Device` object (aka the LAN access code).
 
+---
+
+# Useful links
+* https://github.com/Doridian/OpenBambuAPI
+* https://synman.github.io/bambu-printer-manager/
+* https://www.spoolease.io/index.html
+* https://github.com/yanshay/spoolease
 

@@ -30,7 +30,7 @@ public class FilamentService {
 
         if (existing.isPresent()) {
             Filament filament = existing.get();
-            filament.setPrinterFilamentProfileId(filamentBrandIndex);  // Update filamentBrandIndex (it may be change in Bambu studio)
+            filament.setPrinterFilamentProfileId(filamentBrandIndex);  // Update filamentBrandIndex (it may be changed in Bambu studio)
             filamentRepository.save(filament);
             return existing.get();
         }

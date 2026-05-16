@@ -1,3 +1,5 @@
+name: edol
+
 services:
   edolcore:
     build:
