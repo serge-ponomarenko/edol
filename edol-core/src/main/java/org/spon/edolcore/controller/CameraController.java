@@ -5,6 +5,7 @@ import org.spon.edol.model.CameraSnapshot;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.spon.edolcore.service.camera.PrinterStatusImageService;
 import org.spon.edolcore.service.camera.TimelapseService;
+import org.spon.edolcore.service.printmetadata.ModelService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +21,7 @@ public class CameraController {
     private final CameraSnapshotStore store;
     private final TimelapseService timelapseService;
     private final PrinterStatusImageService printerStatusImageService;
+    private final ModelService modelService;
 
     @GetMapping(value = "/camera/latest", produces = MediaType.IMAGE_JPEG_VALUE)
     public byte[] latest() {
@@ -33,9 +35,11 @@ public class CameraController {
 
     @GetMapping(value = "/camera/status-image")
     public Path getLatestStatusImagePath() {
-        File statusImage = printerStatusImageService.getStatusImage();
-        if (statusImage != null) {
-            return statusImage.toPath().toAbsolutePath();
+        if (modelService.isMetadataLoaded()) {
+            File statusImage = printerStatusImageService.getStatusImage();
+            if (statusImage != null) {
+                return statusImage.toPath().toAbsolutePath();
+            }
         }
         return null;
     }

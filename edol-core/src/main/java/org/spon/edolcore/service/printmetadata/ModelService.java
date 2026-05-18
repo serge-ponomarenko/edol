@@ -1,6 +1,8 @@
 package org.spon.edolcore.service.printmetadata;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.BoundingBox;
 import org.spon.edol.model.Filament;
@@ -22,6 +24,10 @@ public class ModelService {
     private final PrinterStateService printerStateService;
     private final ProjectSettingsParserService projectSettingsParserService;
     private final PlateParserService plateParserService;
+
+    @Setter
+    @Getter
+    private boolean metadataLoaded = false;
 
     public Path fetchMetadata() throws Exception {
         Path model = downloadService.downloadCurrentModel();
@@ -67,6 +73,8 @@ public class ModelService {
         printerStateService.getState().setPrintObjects(printObjects);
 
         log.info("Metadata has been parsed successfully");
+
+        metadataLoaded = true;
 
         return path;
     }
