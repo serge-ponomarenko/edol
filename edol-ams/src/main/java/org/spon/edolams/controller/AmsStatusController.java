@@ -52,6 +52,11 @@ public class AmsStatusController {
                 amsStatus.setTemperature(ams.getTemperature());
                 amsStatus.setActiveSlot(ams.getActiveSlot());
 
+                if (printerState.isPrinting()) {
+                    amsStatus.setCurrentLayer(printerState.getLayer());
+                    amsStatus.setTotalLayers(printerState.getTotalLayers());
+                }
+
                 List<AmsStatus.Slot> slots = new ArrayList<>();
 
                 for (AmsSlot amsSlot : ams.getSlots()) {

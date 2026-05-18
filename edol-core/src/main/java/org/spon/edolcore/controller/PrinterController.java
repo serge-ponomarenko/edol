@@ -133,7 +133,7 @@ public class PrinterController {
                 imageName + "_" + service.getState().getPlateIndex() + ".png"
         );
 
-        if (!Files.exists(platePath)) {
+        if (!Files.exists(platePath) || !modelService.isMetadataLoaded()) {
             return ResponseEntity.notFound().build();
         }
 
