@@ -76,6 +76,7 @@ public class PrinterEventListener {
                 cameraSnapshotStore.setCurrentSessionId(sessionId);
                 cameraBackgroundService.capture();  // Refresh image
                 modelService.setMetadataLoaded(false);
+                printerStateService.getState().setProgress(0);
 
                 CompletableFuture.runAsync(() ->
                         mqttEventPublisher.publish(

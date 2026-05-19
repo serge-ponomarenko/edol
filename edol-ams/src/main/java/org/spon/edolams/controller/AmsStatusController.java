@@ -52,6 +52,8 @@ public class AmsStatusController {
                 amsStatus.setTemperature(ams.getTemperature());
                 amsStatus.setActiveSlot(ams.getActiveSlot());
 
+                amsStatus.setPrinting(printerState.isPrinting());
+
                 if (printerState.isPrinting()) {
                     amsStatus.setCurrentLayer(printerState.getLayer());
                     amsStatus.setTotalLayers(printerState.getTotalLayers());

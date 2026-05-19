@@ -15,6 +15,8 @@ public class AmsStatus {
     private int humidityRaw;
     private double temperature;
 
+    private boolean isPrinting;
+
     private int currentLayer;
     private int totalLayers;
 
