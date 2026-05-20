@@ -76,6 +76,9 @@ public class TelegramMessageFormatterService {
                 msg.append("(EXT) ");
             } else {
                 Integer amsSlot = f.getAmsSlot();
+                if (state.getAms().getActiveSlot().equals(amsSlot)) {
+                    msg.append(">");
+                }
                 if (amsSlot != null) {
                     msg.append("(AMS ").append(amsSlot + 1).append(") ");
                 }
