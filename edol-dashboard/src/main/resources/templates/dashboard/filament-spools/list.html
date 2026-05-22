@@ -11,6 +11,14 @@
     <link href="/favicon.svg" rel="icon" type="image/svg+xml">
 
     <style>
+        .container-xl {
+            max-width: 1600px !important;
+        }
+        .table td,
+        .table th {
+            vertical-align: middle;
+        }
+
         .arrow {
             transition: transform 0.25s ease;
         }
@@ -64,6 +72,43 @@
 
         .custom-dropdown-menu .dropdown-item:hover {
             background: #f5f7fb;
+        }
+
+        .spool-mini-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+
+            height: 42px;
+        }
+
+        .spool-mini-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 18px;
+        }
+
+        .spool-mini-bar {
+            width: 10px;
+            min-height: 4px;
+
+            border-radius: 4px;
+
+            background: #206bc4;
+        }
+
+        .spool-mini-bar.low {
+            background: #d63939;
+        }
+
+        .spool-mini-label {
+            margin-top: 3px;
+
+            font-size: 10px;
+            line-height: 1;
+
+            color: #6c757d;
         }
     </style>
 
@@ -217,13 +262,34 @@
 
                                     <!-- Remaining -->
                                     <td>
-                                        <div class="text-muted small">
-                                            <strong th:text="${entry.value.size()}"></strong>
-                                            spool(s)
+
+                                        <div class="d-flex gap-3">
+                                            <div class="w-40">
+                                                <div class="text-muted small">
+                                                    <strong th:text="${entry.value.size()}"></strong>
+                                                    spool(s)
+                                                </div>
+
+                                                <div class="text-muted small"
+                                                     th:text="${#aggregates.sum(entry.value.![weightRemaining]) + ' g total'}">
+                                                </div>
+                                            </div>
+
+                                            <div class="spool-mini-bars">
+                                                <div class="spool-mini-item"
+                                                     th:each="spool : ${entry.value}">
+                                                    <div class="spool-mini-bar"
+                                                         th:classappend="${spool.weightRemaining < 200} ? ' low' : ''"
+                                                         th:style="'height:' + (${spool.weightRemaining} * 29 / ${spool.weightTotal}) + 'px'">
+                                                    </div>
+                                                    <div class="spool-mini-label"
+                                                         th:text="${spool.id}">
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                         </div>
-                                        <div class="text-muted small"
-                                             th:text="${#aggregates.sum(entry.value.![weightRemaining]) + ' g total'}">
-                                        </div>
+
                                     </td>
 
                                     <!-- Price -->

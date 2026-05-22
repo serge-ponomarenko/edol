@@ -265,6 +265,35 @@ To stop and remove volumes:
 ```bash
 docker compose down -v
 ```
+---
+
+## Update program
+
+Navigate into the project docker directory:
+
+```bash
+cd ~/edol-project/edol/docker
+```
+
+Stop running containers:
+
+```bash
+docker compose down
+```
+
+Pull the latest changes:
+
+```bash
+cd ..
+git pull
+```
+
+Build and start all services:
+
+```bash
+cd docker
+docker compose up --build -d
+```
 
 ---
 ## Printer Connection Settings
