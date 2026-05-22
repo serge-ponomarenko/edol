@@ -58,6 +58,23 @@ public class PrintJobDto {
                             f.setColorHex(u.getFilament().getColorHex());
                             f.setUsedGrams(u.getUsedGrams());
                             f.setCost(u.getCost().doubleValue());
+
+                            f.setSpoolUsages(
+                                    job.getJobSpoolUsages().stream()
+                                            .filter(su ->
+                                                    su.getFilamentSpool() != null
+                                                            && su.getFilamentSpool().getFilament() != null
+                                                            && su.getFilamentSpool().getFilament().getId()
+                                                            .equals(u.getFilament().getId())
+                                            )
+                                            .map(su -> {
+                                                SpoolUsageDto spoolUsage = new SpoolUsageDto();
+                                                spoolUsage.setSpoolId(su.getFilamentSpool().getId());
+                                                spoolUsage.setUsedGrams(su.getUsedGrams());
+                                                return spoolUsage;
+                                            })
+                                            .toList()
+                            );
                             return f;
                         })
                         .toList()

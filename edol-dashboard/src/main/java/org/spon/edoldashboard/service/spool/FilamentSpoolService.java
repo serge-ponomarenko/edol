@@ -1,4 +1,4 @@
-package org.spon.edoldashboard.service;
+package org.spon.edoldashboard.service.spool;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,7 @@ public class FilamentSpoolService {
                             .weightRemaining(1000)
                             .price(BigDecimal.valueOf(500))
                             .openedAt(LocalDateTime.now())
-                            .status(FilamentSpool.FilamentSpoolStatus.NEW)
+                            .status(FilamentSpool.FilamentSpoolStatus.SEALED)
                             .build();
 
                     log.info("+ New Spool has been created. Filament full ID: {}, Color: {}",

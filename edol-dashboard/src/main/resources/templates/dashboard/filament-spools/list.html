@@ -8,8 +8,6 @@
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
     <link href="/favicon.svg" rel="icon" type="image/svg+xml">
 
     <style>
@@ -23,6 +21,49 @@
 
         .page-wrapper {
             margin-left: 15rem;
+        }
+
+        .table-secondary td {
+            vertical-align: middle;
+            padding-top: 0.65rem;
+            padding-bottom: 0.65rem;
+        }
+
+        .group-row td {
+            vertical-align: middle;
+        }
+
+        .custom-dropdown-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 4px);
+
+            min-width: 180px;
+
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+
+            padding: 0.5rem 0;
+
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+
+            z-index: 9999;
+        }
+
+        .custom-dropdown-menu .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+
+            padding: 0.5rem 1rem;
+
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .custom-dropdown-menu .dropdown-item:hover {
+            background: #f5f7fb;
         }
     </style>
 
@@ -42,26 +83,19 @@
             <div class="container-xl mt-4">
 
                 <div class="card">
-
                     <div class="card-header">
-
                         <h3 class="card-title">Filament Spools</h3>
-
                         <div class="card-actions">
                             <a class="btn btn-primary" href="/filament-spools/new">
                                 Add Spool
                             </a>
                         </div>
-
                     </div>
 
                     <div class="card-body border-bottom">
-
                         <form class="d-flex justify-content-between align-items-center flex-wrap gap-2" method="get">
-
                             <!-- LEFT: Filters -->
                             <div class="d-flex gap-2">
-
                                 <select class="form-select w-auto" name="vendor" onchange="this.form.submit()">
                                     <option value="">All Vendors</option>
                                     <option th:each="v : ${vendors}"
@@ -70,16 +104,13 @@
                                             th:value="${v.name}">
                                     </option>
                                 </select>
-
                                 <div class="btn-group align-items-center gap-2">
-
                                     <!-- ALL -->
                                     <a class="btn"
                                        th:classappend="${selectedMaterial == null or selectedMaterial == ''} ? 'btn-primary' : 'btn-outline-primary'"
                                        th:href="@{/filament-spools(vendor=${selectedVendor})}">
                                         All
                                     </a>
-
                                     <!-- MATERIAL BUTTONS -->
                                     <a class="btn"
                                        th:classappend="${m.name == selectedMaterial} ? 'btn-primary' : 'btn-outline-primary'"
@@ -87,31 +118,25 @@
                                        th:href="@{/filament-spools(vendor=${selectedVendor}, material=${m.name})}"
                                        th:text="${m.name}">
                                     </a>
-
                                 </div>
 
                                 <div class="btn-group gap-2" id="status-filters">
-
-                                    <button class="btn btn-outline-info status-btn" data-status="NEW"
+                                    <button class="btn btn-outline-info status-btn" data-status="SEALED"
                                             type="button">
-                                        NEW
+                                        SEALED
                                     </button>
-
                                     <button class="btn btn-outline-info status-btn" data-status="ACTIVE"
                                             type="button">
                                         ACTIVE
                                     </button>
-
                                     <button class="btn btn-outline-info status-btn" data-status="EMPTY"
                                             type="button">
                                         EMPTY
                                     </button>
-
                                     <button class="btn btn-outline-info status-btn" data-status="ARCHIVED"
                                             type="button">
                                         ARCHIVED
                                     </button>
-
                                 </div>
 
                                 <a class="btn btn-outline-secondary" href="/filament-spools"
@@ -135,169 +160,287 @@
 
                             <thead>
                             <tr>
-                                <th></th>
-                                <th>ID</th>
+                                <th style="width:48px"></th>
+                                <th style="width:80px">ID</th>
                                 <th>Vendor</th>
-                                <th>Material</th>
+                                <th style="width:120px">Material</th>
                                 <th>Brand</th>
-                                <th>Color</th>
-                                <th>Remaining</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th style="width:180px">Color</th>
+                                <th style="width:320px">Remaining</th>
+                                <th style="width:140px">Price</th>
+                                <th style="width:140px">Status</th>
+                                <th style="width:140px">Actions</th>
                             </tr>
                             </thead>
 
                             <tbody>
 
-                            <th:block th:each="s : ${spools}">
-
-                                <tr>
-
+                            <th:block th:each="entry : ${groupedSpools}">
+                                <!-- PARENT FILAMENT -->
+                                <tr class="table-secondary">
                                     <!-- collapse -->
                                     <td>
-                                        <button class="btn btn-sm btn-icon spool-toggle"
-                                                data-bs-toggle="collapse"
-                                                th:attr="data-bs-target=|#details-${s.id}|">
+                                        <button class="btn btn-sm btn-icon group-toggle"
+                                                th:attr="
+                                                    data-bs-target=|#group-${entry.key.id}|,
+                                                    aria-controls=|group-${entry.key.id}|,
+                                                    aria-expanded=false"
+                                                type="button">
                                             <i class="ti ti-chevron-right arrow"></i>
                                         </button>
                                     </td>
 
-                                    <td th:text="${s.id}"></td>
+                                    <!-- ID -->
+                                    <td><!--<strong th:text="${entry.key.id}"></strong>--></td>
 
                                     <!-- Vendor -->
-                                    <td th:text="${s.filament.vendor.name}"></td>
+                                    <td th:text="${entry.key.vendor.name}"></td>
 
-                                    <!-- MATERIAL -->
+                                    <!-- Material -->
                                     <td>
-                                    <span class="badge bg-teal text-teal-fg"
-                                          th:text="${s.filament.materialType.name}">
-                                    </span>
+                                        <span class="badge bg-teal text-teal-fg"
+                                              th:text="${entry.key.materialType.name}">
+                                        </span>
                                     </td>
 
+                                    <!-- Brand -->
+                                    <td th:text="${entry.key.brand}"></td>
 
-                                    <!-- BRAND -->
-                                    <td th:text="${s.filament.brand}"></td>
-
-                                    <!-- COLOR -->
+                                    <!-- Color -->
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
-                                        <span
-                                                th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;background:' + ${s.filament.colorHex}">
+                                            <span th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;background:' + ${entry.key.colorHex}">
+                                            </span>
+                                            <span th:text="${entry.key.colorHex}"></span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Remaining -->
+                                    <td>
+                                        <div class="text-muted small">
+                                            <strong th:text="${entry.value.size()}"></strong>
+                                            spool(s)
+                                        </div>
+                                        <div class="text-muted small"
+                                             th:text="${#aggregates.sum(entry.value.![weightRemaining]) + ' g total'}">
+                                        </div>
+                                    </td>
+
+                                    <!-- Price -->
+                                    <td>
+                                        —
+                                    </td>
+
+                                    <!-- Status -->
+                                    <td>
+                                        <span class="badge bg-blue text-blue-fg">
+                                            GROUP
                                         </span>
-                                            <span th:text="${s.filament.colorHex}"></span>
-                                        </div>
                                     </td>
-
-                                    <!-- REMAINING -->
-                                    <td style="min-width:180px">
-                                        <div class="progress progress-sm">
-                                            <div class="progress-bar"
-                                                 th:classappend="${s.weightRemaining < 200} ? ' bg-red' : ' bg-blue'"
-                                                 th:style="'width:' + (${s.weightRemaining} * 100 / ${s.weightTotal}) + '%'">
-                                            </div>
-                                        </div>
-                                        <div class="text-muted small mt-1">
-                                            <span th:text="${s.weightRemaining}"></span> /
-                                            <span th:text="${s.weightTotal}"></span> g
-                                        </div>
-                                    </td>
-
-                                    <td th:text="${#numbers.formatDecimal(s.price,1,2)} + ' ₴'"></td>
-
-                                    <td>
-                                    <span class="badge"
-                                          th:classappend="${s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).NEW ? 'bg-green text-green-fg' : s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).ACTIVE ? 'bg-blue text-blue-fg' : s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).EMPTY ? 'bg-yellow text-yellow-fg' : 'bg-secondary text-secondary-fg'}"
-                                          th:text="${s.status}">
-                                    </span>
-                                    </td>
-
-                                    <td>
-                                        <div class="btn-list">
-                                            <a class="btn btn-sm btn-outline-info" th:href="@{/s/{id}(id=${s.id})}"
-                                               title="Load spool in the AMS">
-                                                <i class="ti ti-status-change"></i>
-                                            </a>
-                                            <a class="btn btn-sm btn-outline-secondary"
-                                               th:href="@{/filament-spools/label/{id}(id=${s.id})}"
-                                               title="Generate QR Label">
-                                                <i class="ti ti-qrcode"></i>
-                                            </a>
-                                            <a class="btn btn-sm btn-warning"
-                                               th:href="@{/filament-spools/edit/{id}(id=${s.id})}"
-                                               title="Edit spool">
-                                                <i class="ti ti-edit"></i>
-                                            </a>
-                                            <a class="btn btn-sm btn-danger" onclick="return confirmDelete(this)"
-                                               th:attr="data-name=${s.filament.fullId}"
-                                               th:href="@{/filament-spools/delete/{id}(id=${s.id})}"
-                                               title="Delete spool">
-                                                <i class="ti ti-trash"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-
+                                    <!-- Actions -->
+                                    <td></td>
                                 </tr>
 
-                                <!-- DETAILS -->
-                                <tr class="collapse" th:id="|details-${s.id}|">
-                                    <td colspan="8">
-                                        <div class="p-3">
-                                            <div class="row">
 
-                                                <div class="row g-3">
+                                <th:block th:each="s : ${entry.value}">
+                                    <!-- existing spool row -->
+                                    <tr class="group-row d-none"
+                                        th:attr="data-group=|group-${entry.key.id}|">
+                                        <!-- collapse -->
+                                        <td>
+                                            <button class="btn btn-sm btn-icon spool-toggle"
+                                                    th:attr="
+                                                                        data-bs-target=|#details-${s.id}|,
+                                                                        aria-controls=|details-${s.id}|,
+                                                                        aria-expanded=false"
+                                                    type="button">
+                                                <i class="ti ti-chevron-right arrow"></i>
+                                            </button>
+                                        </td>
 
-                                                    <div class="col-md-4">
-                                                        <div class="text-muted small">Opened</div>
-                                                        <div th:text="${s.openedAt != null ? #temporals.format(s.openedAt, 'dd.MM.yyyy HH:mm') : '—'}"></div>
+                                        <td th:text="${s.id}"></td>
+
+                                        <!-- Vendor -->
+                                        <td th:text="${s.filament.vendor.name}"></td>
+
+                                        <!-- MATERIAL -->
+                                        <td>
+                                            <span class="badge bg-teal text-teal-fg"
+                                                  th:text="${s.filament.materialType.name}">
+                                            </span>
+                                        </td>
+
+                                        <!-- BRAND -->
+                                        <td th:text="${s.filament.brand}"></td>
+
+                                        <!-- COLOR -->
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                                <span
+                                                                        th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;background:' + ${s.filament.colorHex}">
+                                                                </span>
+                                                <span th:text="${s.filament.colorHex}"></span>
+                                            </div>
+                                        </td>
+
+                                        <!-- REMAINING -->
+                                        <td style="min-width:180px">
+                                            <div class="progress progress-sm">
+                                                <div class="progress-bar"
+                                                     th:classappend="${s.weightRemaining < 200} ? ' bg-red' : ' bg-blue'"
+                                                     th:style="'width:' + (${s.weightRemaining} * 100 / ${s.weightTotal}) + '%'">
+                                                </div>
+                                            </div>
+                                            <div class="text-muted small mt-1">
+                                                <span th:text="${s.weightRemaining}"></span> /
+                                                <span th:text="${s.weightTotal}"></span> g
+                                            </div>
+                                        </td>
+
+                                        <td th:text="${#numbers.formatDecimal(s.price,1,2)} + ' ₴'"></td>
+
+                                        <td>
+                                                            <span class="badge"
+                                                                  th:classappend="${s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).SEALED ? 'bg-green text-green-fg' : s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).ACTIVE ? 'bg-blue text-blue-fg' : s.status == T(org.spon.edoldashboard.model.entity.FilamentSpool.FilamentSpoolStatus).EMPTY ? 'bg-yellow text-yellow-fg' : 'bg-secondary text-secondary-fg'}"
+                                                                  th:text="${s.status}">
+                                                            </span>
+                                        </td>
+
+                                        <td>
+
+
+                                            <div class="d-flex align-items-center gap-2 overflow-visible">
+
+                                                <a class="btn btn-sm btn-outline-info"
+                                                   th:href="@{/s/{id}(id=${s.id})}"
+                                                   title="Load spool in the AMS">
+                                                    <i class="ti ti-status-change"></i>
+                                                </a>
+
+                                                <div class="position-relative">
+
+                                                    <button class="btn btn-sm btn-outline-secondary actions-toggle"
+                                                            type="button">
+                                                        <i class="ti ti-settings"></i>
+                                                    </button>
+
+                                                    <div class="custom-dropdown-menu d-none">
+
+                                                        <a class="dropdown-item"
+                                                           th:href="@{/filament-spools/label/{id}(id=${s.id})}">
+                                                            <i class="ti ti-qrcode me-2"></i>
+                                                            QR Label
+                                                        </a>
+
+                                                        <a class="dropdown-item"
+                                                           th:href="@{/filament-spools/duplicate/{id}(id=${s.id})}">
+                                                            <i class="ti ti-copy me-2"></i>
+                                                            Duplicate
+                                                        </a>
+
+                                                        <a class="dropdown-item"
+                                                           th:href="@{/filament-spools/edit/{id}(id=${s.id})}">
+                                                            <i class="ti ti-edit me-2"></i>
+                                                            Edit
+                                                        </a>
+
+                                                        <a class="dropdown-item text-danger"
+                                                           onclick="return confirmDelete(this)"
+                                                           th:attr="data-name=${s.filament.fullId}"
+                                                           th:href="@{/filament-spools/delete/{id}(id=${s.id})}">
+                                                            <i class="ti ti-trash me-2"></i>
+                                                            Delete
+                                                        </a>
+
                                                     </div>
 
-                                                    <div class="col-md-4">
-                                                        <div class="text-muted small">Last used</div>
-                                                        <div th:text="${s.lastUsedAt != null ? #temporals.format(s.lastUsedAt, 'dd.MM.yyyy HH:mm') : '—'}"></div>
-                                                    </div>
+                                                </div>
 
-                                                    <div class="col-md-4">
-                                                        <div class="d-flex justify-content-between align-items-start">
-                                                            <div>
-                                                                <div class="text-muted small">Last dried</div>
-                                                                <div th:id="|dried-date-${s.id}|"
-                                                                     th:text="${s.lastDriedAt != null
-                                                                    ? #temporals.format(s.lastDriedAt, 'dd.MM.yyyy HH:mm')
-                                                                    : '—'}">
+                                            </div>
+                                        </td>
+
+                                    </tr>
+
+                                    <!-- DETAILS -->
+                                    <tr class="details-row d-none"
+                                        th:attr="data-group=|group-${entry.key.id}|">
+
+                                        <td class="p-0 border-0" colspan="10">
+
+                                            <div class="custom-collapse d-none"
+                                                 th:id="|details-${s.id}|">
+
+                                                <div class="p-3">
+
+                                                    <div class="row">
+
+                                                        <div class="row g-3">
+
+                                                            <div class="col-md-4">
+                                                                <div class="text-muted small">Opened
+                                                                </div>
+                                                                <div th:text="${s.openedAt != null ? #temporals.format(s.openedAt, 'dd.MM.yyyy HH:mm') : '—'}"></div>
+                                                            </div>
+
+                                                            <div class="col-md-4">
+                                                                <div class="text-muted small">Last
+                                                                    used
+                                                                </div>
+                                                                <div th:text="${s.lastUsedAt != null ? #temporals.format(s.lastUsedAt, 'dd.MM.yyyy HH:mm') : '—'}"></div>
+                                                            </div>
+
+                                                            <div class="col-md-4">
+                                                                <div class="d-flex justify-content-between align-items-start">
+                                                                    <div>
+                                                                        <div class="text-muted small">
+                                                                            Last dried
+                                                                        </div>
+                                                                        <div th:id="|dried-date-${s.id}|"
+                                                                             th:text="${s.lastDriedAt != null
+                                                                                                ? #temporals.format(s.lastDriedAt, 'dd.MM.yyyy HH:mm')
+                                                                                                : '—'}">
+                                                                        </div>
+                                                                    </div>
+                                                                    <button class="btn btn-sm btn-outline-orange"
+                                                                            th:onclick="|markDried(${s.id})|">
+                                                                        <i class="ti ti-wind me-1"></i>
+                                                                        Dried
+                                                                    </button>
                                                                 </div>
                                                             </div>
-                                                            <button class="btn btn-sm btn-outline-orange"
-                                                                    th:onclick="|markDried(${s.id})|">
-                                                                <i class="ti ti-wind me-1"></i>
-                                                                Dried
-                                                            </button>
                                                         </div>
-                                                    </div>
-                                                </div>
 
-                                                <div class="row g-3">
-                                                    <div class="col-md-4">
-                                                        <div class="text-muted small">Store</div>
-                                                        <a target="_blank"
-                                                           th:href="${s.storeUrl}"
-                                                           th:if="${s.storeUrl}"
-                                                           th:text="${s.storeUrl}">
-                                                        </a>
-                                                        <span th:unless="${s.storeUrl}">—</span>
+                                                        <div class="row g-3">
+                                                            <div class="col-md-4">
+                                                                <div class="text-muted small">Store
+                                                                </div>
+                                                                <a target="_blank"
+                                                                   th:href="${s.storeUrl}"
+                                                                   th:if="${s.storeUrl}"
+                                                                   th:text="${s.storeUrl}">
+                                                                </a>
+                                                                <span th:unless="${s.storeUrl}">—</span>
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+                                                                <div class="text-muted small">Comment
+                                                                </div>
+                                                                <div th:text="${s.comment ?: '—'}"></div>
+                                                            </div>
+                                                        </div>
 
                                                     </div>
 
-                                                    <div class="col-md-6">
-                                                        <div class="text-muted small">Comment</div>
-                                                        <div th:text="${s.comment ?: '—'}"></div>
-                                                    </div>
                                                 </div>
 
                                             </div>
-                                        </div>
-                                    </td>
-                                </tr>
+
+                                        </td>
+                                    </tr>
+
+                                </th:block>
+
 
                             </th:block>
 
@@ -317,6 +460,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
 
@@ -328,20 +472,58 @@
 
     document.addEventListener("DOMContentLoaded", function () {
 
-        document.querySelectorAll('.spool-toggle').forEach(button => {
+        // GROUP TOGGLES
+        document.querySelectorAll('.group-toggle')
+            .forEach(button => {
 
-            const arrow = button.querySelector('.arrow');
-            const target = document.querySelector(button.getAttribute('data-bs-target'));
+                const targetSelector =
+                    button.getAttribute('data-bs-target');
 
-            target.addEventListener('show.bs.collapse', () => {
-                arrow.classList.add('rotated');
+                const groupName =
+                    targetSelector.replace('#', '');
+
+                const arrow =
+                    button.querySelector('.arrow');
+
+                button.addEventListener('click', () => {
+
+                    document.querySelectorAll(
+                        `[data-group="${groupName}"]`
+                    ).forEach(row => {
+                        row.classList.toggle('d-none');
+                    });
+
+                    arrow.classList.toggle('rotated');
+
+                });
+
             });
 
-            target.addEventListener('hide.bs.collapse', () => {
-                arrow.classList.remove('rotated');
-            });
+        // DETAILS TOGGLES
+        document.querySelectorAll('.spool-toggle')
+            .forEach(button => {
 
-        });
+                const targetSelector =
+                    button.getAttribute('data-bs-target');
+
+                const target =
+                    document.querySelector(targetSelector);
+
+                const arrow =
+                    button.querySelector('.arrow');
+
+                if (!target)
+                    return;
+
+                button.addEventListener('click', () => {
+
+                    target.classList.toggle('d-none');
+
+                    arrow.classList.toggle('rotated');
+
+                });
+
+            });
 
     });
 </script>
@@ -356,9 +538,9 @@
         // Get current statuses
         let selected = params.getAll('status');
 
-        // Default behavior (NEW + ACTIVE)
+        // Default behavior (SEALED + ACTIVE)
         if (selected.length === 0) {
-            selected = ['NEW', 'ACTIVE'];
+            selected = ['SEALED', 'ACTIVE'];
         }
 
         // Highlight active buttons
@@ -377,10 +559,10 @@
                 let current = params.getAll('status');
 
                 if (current.length === 0) {
-                    current = ['NEW', 'ACTIVE'];
+                    current = ['SEALED', 'ACTIVE'];
                 }
 
-                const ORDER = ['NEW', 'ACTIVE', 'EMPTY', 'ARCHIVED'];
+                const ORDER = ['SEALED', 'ACTIVE', 'EMPTY', 'ARCHIVED'];
                 current.sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
 
                 // toggle logic
@@ -399,6 +581,37 @@
                 // redirect
                 window.location.href = url.toString();
             });
+        });
+
+        document.querySelectorAll('.actions-toggle')
+            .forEach(button => {
+
+                const menu =
+                    button.parentElement.querySelector('.custom-dropdown-menu');
+
+                if (!menu)
+                    return;
+
+                button.addEventListener('click', (e) => {
+
+                    e.stopPropagation();
+
+                    // close others
+                    document.querySelectorAll('.custom-dropdown-menu')
+                        .forEach(m => {
+                            if (m !== menu)
+                                m.classList.add('d-none');
+                        });
+
+                    menu.classList.toggle('d-none');
+
+                });
+
+            });
+
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.custom-dropdown-menu')
+                .forEach(menu => menu.classList.add('d-none'));
         });
 
     });

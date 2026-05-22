@@ -4,12 +4,17 @@ import jakarta.transaction.Transactional;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.spon.edol.model.ExtTray;
 import org.spon.edol.model.PrinterState;
 import org.spon.edoldashboard.model.entity.*;
 import org.spon.edoldashboard.repository.FilamentSpoolRepository;
 import org.spon.edoldashboard.repository.JobFilamentUsageRepository;
 import org.spon.edoldashboard.repository.PrintJobRepository;
+import org.spon.edoldashboard.service.filament.FilamentMatchingService;
+import org.spon.edoldashboard.service.filament.FilamentService;
+import org.spon.edoldashboard.service.spool.FilamentSpoolService;
+import org.spon.edoldashboard.service.spool.SpoolAllocationService;
+import org.spon.edoldashboard.service.spool.SpoolConsumptionService;
+import org.spon.edoldashboard.service.spool.SpoolResolverService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +26,8 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -33,8 +40,15 @@ public class PrintJobService {
     private final FilamentService filamentService;
     private final FilamentSpoolService filamentSpoolService;
     private final FilamentSpoolRepository filamentSpoolRepository;
+
+    private final SpoolResolverService spoolResolverService;
+
     private final JobFilamentUsageRepository jobFilamentUsageRepository;
+    private final JobSpoolUsageService jobSpoolUsageService;
     private final RestTemplate restTemplate;
+    private final FilamentMatchingService filamentMatchingService;
+    private final SpoolAllocationService spoolAllocationService;
+    private final SpoolConsumptionService spoolConsumptionService;
 
     @Value("${edol-core.url}")
     private String edolCoreUrl;
@@ -70,16 +84,12 @@ public class PrintJobService {
                 .orElseThrow();
 
         for (org.spon.edol.model.Filament filamentDto : printerState.getFilaments()) {
-
             double usedGrams = filamentDto.getUsedGrams();
-            org.spon.edol.model.AmsSlot amsSlot = printerState.isExternalSpoolUsed() ? null : printerState.getAms().getSlots().get(filamentDto.getAmsSlot());
-            ExtTray extTray = printerState.isExternalSpoolUsed() ? printerState.getExtTray() : null;
-
-            calculateJobFilamentUsage(filamentDto, usedGrams, job, amsSlot, extTray);
-
+            calculateJobFilamentUsage(filamentDto, usedGrams, job, printerState);
         }
 
         job.setStatus(PrintJobStatus.FINISHED);
+        job.setCurrentLayer(printerState.getTotalLayers());
         job.setProgress(100);
         job.setFinishedAt(LocalDateTime.now());
 
@@ -107,11 +117,8 @@ public class PrintJobService {
         int currentLayer = printerState.getLayer();
 
         for (org.spon.edol.model.Filament filamentDto : printerState.getFilaments()) {
-
-            double usedGrams = filamentDto.getUsedGrams() * ((double) currentLayer / totalLayers);
-            org.spon.edol.model.AmsSlot amsSlot = printerState.isExternalSpoolUsed() ? null : printerState.getAms().getSlots().get(filamentDto.getAmsSlot());
-            ExtTray extTray = printerState.isExternalSpoolUsed() ? printerState.getExtTray() : null;
-            calculateJobFilamentUsage(filamentDto, usedGrams, job, amsSlot, extTray);
+            double usedGrams = Math.round(filamentDto.getUsedGrams() * ((double) currentLayer / totalLayers) * 100.0) / 100.0;
+            calculateJobFilamentUsage(filamentDto, usedGrams, job, printerState);
         }
 
         job.setProgress(progress);
@@ -190,96 +197,40 @@ public class PrintJobService {
     }
 
     private void calculateJobFilamentUsage(org.spon.edol.model.Filament filamentDto,
-                                           double usedGrams, PrintJob job, org.spon.edol.model.AmsSlot amsSlot, ExtTray extTray) {
-        String filamentColor = filamentDto.getColor();
-
-        if (amsSlot != null && !amsSlot.getColor().substring(0, 6).equals(filamentDto.getColor().substring(1))) {
-            log.warn("Filament {}, #{} -> AMS: #{} has color mismatch with AMS mapping! AMS color will be used.",
-                    filamentDto.getFullId(),
-                    filamentDto.getColor().substring(1),
-                    amsSlot.getColor().substring(0, 6)
-            );
-            filamentColor = "#" + amsSlot.getColor().substring(0, 6);
-
-        }
-        if (extTray != null) {
-            if (!extTray.getColor().substring(0, 6).equals(filamentDto.getColor().substring(1))) {
-                log.warn("Filament {}, #{} -> EXT: #{} has color mismatch with EXT Tray mapping! EXT Tray color will be used.",
-                        filamentDto.getFullId(),
-                        filamentDto.getColor().substring(1),
-                        extTray.getColor().substring(0, 6)
+                                           double usedGrams, PrintJob job, PrinterState printerState) {
+        Filament filament =
+                filamentMatchingService.match(
+                        printerState,
+                        filamentDto
                 );
-                filamentColor = "#" + extTray.getColor().substring(0, 6);
-            }
-        }
-
-        // 1. Find or create Filament
-        Filament filament = filamentService.findOrCreateFilament(
-                filamentDto.getFullId(),
-                filamentColor,
-                filamentDto.getFilamentBrandIndex()
-        );
 
         log.info("[Filament Usage] Job ID: {}, Filament Full ID: {}, Color: {}, Usage: {}g",
                 job.getId(),
                 filament.getFullId(),
                 filament.getColorHex(),
                 usedGrams
+        );
+
+        List<JobSpoolUsage> spoolUsages =
+                spoolAllocationService.allocate(
+                        job,
+                        filament,
+                        usedGrams
                 );
 
-        int remainingToConsume = (int) Math.ceil(usedGrams);
+        spoolConsumptionService.consume(
+                spoolUsages
+        );
 
-        FilamentSpool initialSpool = null;
-
-        while (remainingToConsume > 0) {
-            // Find current active spool or create new
-            FilamentSpool spool =
-                    filamentSpoolService.findOrCreateForFilament(filament);
-            if (initialSpool == null) {
-                initialSpool = spool;
-            }
-
-            int spoolRemaining =
-                    spool.getWeightRemaining() != null
-                            ? spool.getWeightRemaining()
-                            : 1000;
-
-            // How much we can consume from this spool
-            int consumed = Math.min(spoolRemaining, remainingToConsume);
-
-            int newRemaining = spoolRemaining - consumed;
-
-            spool.setWeightRemaining(newRemaining);
-            spool.setLastUsedAt(LocalDateTime.now());
-
-            if (newRemaining == 0) {
-                spool.setStatus(FilamentSpool.FilamentSpoolStatus.EMPTY);
-            } else {
-                spool.setStatus(FilamentSpool.FilamentSpoolStatus.ACTIVE);
-            }
-
-            filamentSpoolRepository.save(spool);
-
-            remainingToConsume -= consumed;
-        }
-
-        // 4. Calculate cost
-        BigDecimal cost = BigDecimal.ZERO;
-
-        if (initialSpool != null &&
-                initialSpool.getPrice() != null &&
-                initialSpool.getWeightTotal() != null &&
-                initialSpool.getWeightTotal() > 0) {
-
-            BigDecimal costPerGram =
-                    initialSpool.getPrice().divide(
-                            BigDecimal.valueOf(initialSpool.getWeightTotal()),
-                            4,
-                            RoundingMode.HALF_UP
-                    );
-
-            cost = costPerGram.multiply(BigDecimal.valueOf(usedGrams));
-        }
+        // 5. Aggregate filament cost from spool usage
+        BigDecimal cost =
+                spoolUsages.stream()
+                        .map(JobSpoolUsage::getCost)
+                        .filter(Objects::nonNull)
+                        .reduce(
+                                BigDecimal.ZERO,
+                                BigDecimal::add
+                        );
 
         // 5. Save usage
         JobFilamentUsage usage = JobFilamentUsage.builder()

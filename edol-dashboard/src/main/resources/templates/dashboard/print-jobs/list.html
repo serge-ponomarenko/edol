@@ -205,9 +205,28 @@
                 <div class="text-muted small">
                     ${f.usedGrams} g • ${f.cost} ₴
                 </div>
+                ${renderSpools(f)}
             </div>
         </div>
     `).join('');
+    }
+
+    function renderSpools(filament) {
+        if (!filament.spoolUsages || filament.spoolUsages.length === 0)
+            return '';
+
+        return `
+        <div class="text-muted small mt-1">
+            <b>Spools:</b>
+            ${
+            filament.spoolUsages
+                .map(su =>
+                    `#${su.spoolId} - ${su.usedGrams}g`
+                )
+                .join(', ')
+        }
+        </div>
+    `;
     }
 
     function renderProgress(job) {

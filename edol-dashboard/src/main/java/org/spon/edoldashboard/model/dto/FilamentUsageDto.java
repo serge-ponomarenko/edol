@@ -2,6 +2,8 @@ package org.spon.edoldashboard.model.dto;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class FilamentUsageDto {
 
@@ -12,5 +14,7 @@ public class FilamentUsageDto {
 
     private double usedGrams;
     private double cost;
+
+    private List<SpoolUsageDto> spoolUsages;
 
 }

@@ -27,7 +27,6 @@ public class PrinterService {
                 .body(Path.class);
     }
 
-
     public void sendStopCommand() {
         edolCoreClient.post()
                 .uri("/printer/request/stop")

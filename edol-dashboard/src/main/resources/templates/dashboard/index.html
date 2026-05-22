@@ -507,7 +507,6 @@
     }
 
     function updatePrinterStatus(data) {
-
         const conn = document.getElementById("printerConnection");
 
         if (data.online) {
@@ -547,14 +546,12 @@
     }
 
     function updateMaintenanceAlerts(data) {
-
         const container =
             document.getElementById("maintenanceAlerts");
 
         container.innerHTML = "";
 
         if (!data || data.length === 0) {
-
             container.innerHTML =
                 "<div class='text-muted small text-center'>No maintenance alerts</div>";
 
@@ -567,7 +564,6 @@
             "MAINTENANCE: " + data.length;
 
         data.forEach(m => {
-
             const row = document.createElement("div");
 
             row.className =
@@ -601,7 +597,6 @@
     }
 
     function wifiQuality(signal) {
-
         const value = parseInt(signal.replace("dBm", ""));
 
         if (value >= -55) return "Excellent (" + signal + ")";
@@ -630,7 +625,6 @@
     }
 
     function updateProgress(data) {
-
         const percent = data.progress || 0;
 
         document.getElementById("progressBar").style.width =
@@ -656,7 +650,6 @@
     }
 
     function formatMinutes(min) {
-
         if (!min) return "-";
 
         const h = Math.floor(min / 60);
@@ -669,7 +662,6 @@
     }
 
     function calculateFinishTime(remaining) {
-
         if (!remaining) return "-";
 
         const now = new Date();
@@ -683,7 +675,6 @@
     }
 
     function calculateElapsed(data) {
-
         if (!data.remainingTime || !data.progress)
             return "-";
 
@@ -697,7 +688,6 @@
     }
 
     function updateTemps(data) {
-
         document.getElementById("nozzleTemp").textContent =
             Math.round(data.nozzleTemp);
 
@@ -719,15 +709,13 @@
         const active = data.ams.activeSlot;
 
         slots.forEach((slot, index) => {
-
             const div = document.createElement("div");
             div.className = "ams-slot";
 
             const color = document.createElement("div");
             color.className = "ams-slot-color";
 
-            color.style.background =
-                "#" + slot.color.substring(0, 6);
+            color.style.background = slot.color;
 
             if (index === active)
                 color.classList.add("ams-slot-active");
@@ -762,8 +750,7 @@
         const color = document.createElement("div");
         color.className = "ams-slot-color";
 
-        color.style.background =
-            "#" + tray.color.substring(0, 6);
+        color.style.background = tray.color;
 
         if (active)
             color.classList.add("ams-slot-active");
@@ -819,7 +806,6 @@
         }
 
         data.printerState.filaments.forEach(f => {
-
             const row = document.createElement("div");
             row.className = "filament-row";
 
@@ -843,13 +829,36 @@
             const meta = document.createElement("div");
             meta.className = "filament-meta";
 
+            const usage =
+                data.filamentUsage[f.id];
+
             meta.innerHTML =
                 formatMeters(f.usedMeters) +
                 " • " +
                 formatGrams(f.usedGrams) +
                 " • " +
-                formatCost(data.filamentCosts[f.id]);
+                formatCost(usage?.totalCost);
 
+            if (
+                usage &&
+                usage.allocations &&
+                usage.allocations.length > 0
+            ) {
+
+                meta.innerHTML += `
+                    <div class="small text-muted mt-1">
+                        <b>Spools:</b>
+                        ${
+                    usage.allocations
+                        .map(a =>
+                            `#${a.spoolId} - ${a.allocatedGrams}g`
+                        )
+                        .join(", ")
+                }
+                    </div>
+                    `;
+
+            }
             row.appendChild(meta);
 
             container.appendChild(row);

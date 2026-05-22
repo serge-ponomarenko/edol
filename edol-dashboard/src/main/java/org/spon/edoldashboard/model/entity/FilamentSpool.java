@@ -79,7 +79,7 @@ public class FilamentSpool {
     private String comment;
 
     public enum FilamentSpoolStatus {
-        NEW,
+        SEALED,
         ACTIVE,
         EMPTY,
         ARCHIVED

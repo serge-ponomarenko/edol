@@ -260,7 +260,7 @@ public class PrinterStateService {
                 slot.setFilamentBrandIndex(tray.get("tray_info_idx").asText());
 
             if (tray.has("tray_color"))
-                slot.setColor(tray.get("tray_color").asText());
+                slot.setColor("#" + tray.get("tray_color").asText().substring(0, 6));
 
             if (tray.has("remain"))
                 slot.setRemaining(tray.get("remain").asInt());
@@ -316,7 +316,7 @@ public class PrinterStateService {
             extTray.setFilamentBrandIndex(vtTrayNode.get("tray_info_idx").asText());
 
         if (vtTrayNode.has("tray_color"))
-            extTray.setColor(vtTrayNode.get("tray_color").asText());
+            extTray.setColor("#" + vtTrayNode.get("tray_color").asText().substring(0, 6));
 
         if (vtTrayNode.has("remain"))
             extTray.setRemaining(vtTrayNode.get("remain").asInt());

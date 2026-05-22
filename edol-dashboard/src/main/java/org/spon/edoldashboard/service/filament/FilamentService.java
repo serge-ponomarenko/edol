@@ -1,4 +1,4 @@
-package org.spon.edoldashboard.service;
+package org.spon.edoldashboard.service.filament;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;

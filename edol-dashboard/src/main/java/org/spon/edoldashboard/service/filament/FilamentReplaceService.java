@@ -1,4 +1,4 @@
-package org.spon.edoldashboard.service;
+package org.spon.edoldashboard.service.filament;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +9,8 @@ import org.spon.edoldashboard.model.entity.JobFilamentUsage;
 import org.spon.edoldashboard.repository.FilamentRepository;
 import org.spon.edoldashboard.repository.FilamentSpoolRepository;
 import org.spon.edoldashboard.repository.JobFilamentUsageRepository;
+import org.spon.edoldashboard.service.PrintJobService;
+import org.spon.edoldashboard.service.spool.FilamentSpoolService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

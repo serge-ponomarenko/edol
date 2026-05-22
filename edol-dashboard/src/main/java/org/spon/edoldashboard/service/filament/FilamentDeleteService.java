@@ -1,4 +1,4 @@
-package org.spon.edoldashboard.service;
+package org.spon.edoldashboard.service.filament;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edoldashboard.model.dto.FilamentDeletePreviewDto;

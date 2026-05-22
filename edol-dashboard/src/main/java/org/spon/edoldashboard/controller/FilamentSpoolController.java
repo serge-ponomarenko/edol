@@ -1,13 +1,15 @@
 package org.spon.edoldashboard.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
+import org.spon.edoldashboard.model.entity.Filament;
 import org.spon.edoldashboard.model.entity.FilamentSpool;
 import org.spon.edoldashboard.repository.FilamentRepository;
 import org.spon.edoldashboard.repository.FilamentSpoolRepository;
 import org.spon.edoldashboard.repository.MaterialTypeRepository;
 import org.spon.edoldashboard.repository.VendorRepository;
-import org.spon.edoldashboard.service.FilamentSpoolService;
 import org.spon.edoldashboard.service.LabelService;
+import org.spon.edoldashboard.service.spool.FilamentSpoolService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,7 +20,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -40,10 +45,10 @@ public class FilamentSpoolController {
             @RequestParam(required = false) List<FilamentSpool.FilamentSpoolStatus> status,
             Model model
     ) {
-        // default: NEW + ACTIVE
+        // default: SEALED + ACTIVE
         if (status == null || status.isEmpty()) {
             status = List.of(
-                    FilamentSpool.FilamentSpoolStatus.NEW,
+                    FilamentSpool.FilamentSpoolStatus.SEALED,
                     FilamentSpool.FilamentSpoolStatus.ACTIVE
             );
         }
@@ -51,7 +56,16 @@ public class FilamentSpoolController {
         List<FilamentSpool> spools =
                 filamentSpoolService.findFiltered(vendor, material, status);
 
-        model.addAttribute("spools", spools);
+        Map<Filament, List<FilamentSpool>>
+                groupedSpools =
+                spools.stream()
+                        .collect(Collectors.groupingBy(
+                                FilamentSpool::getFilament,
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+
+        model.addAttribute("groupedSpools", groupedSpools);
         model.addAttribute("selectedVendor", vendor);
         model.addAttribute("selectedMaterial", material);
         model.addAttribute("selectedStatus", status);
@@ -65,26 +79,78 @@ public class FilamentSpoolController {
     @GetMapping("/new")
     public String createForm(Model model) {
         FilamentSpool spool = new FilamentSpool();
-        spool.setOpenedAt(LocalDateTime.now());
 
         model.addAttribute("spool", spool);
         model.addAttribute("filaments", filamentRepository.findAll());
         return "dashboard/filament-spools/form";
     }
 
+    @GetMapping("/duplicate/{id}")
+    public String duplicate(
+            @PathVariable Long id,
+            Model model
+    ) {
+        FilamentSpool source = filamentSpoolRepository.findById(id).orElseThrow();
+
+        FilamentSpool spool = copyFilamentSpool(source);
+
+        spool.setId(null);
+
+        spool.setWeightRemaining(spool.getWeightTotal());
+
+        spool.setStatus(FilamentSpool.FilamentSpoolStatus.SEALED);
+
+        spool.setOpenedAt(null);
+        spool.setLastUsedAt(null);
+        spool.setLastDriedAt(null);
+
+        model.addAttribute("spool", spool);
+        model.addAttribute("filaments", filamentRepository.findAll());
+
+        return "dashboard/filament-spools/form";
+    }
+
     @PostMapping
-    public String save(@ModelAttribute FilamentSpool spool) {
+    public String save(
+            @ModelAttribute FilamentSpool spool,
+            @RequestParam(defaultValue = "1") Integer quantity
+    ) {
         if (spool.getWeightRemaining() == null) {
             spool.setWeightRemaining(spool.getWeightTotal());
         }
 
-        if (spool.getOpenedAt() == null) {
-            spool.setOpenedAt(LocalDateTime.now());
+        if (spool.getId() != null) {
+            filamentSpoolRepository.save(spool);
+        } else {
+            for (int i = 0; i < quantity; i++) {
+                FilamentSpool copy = copyFilamentSpool(spool);
+                filamentSpoolRepository.save(copy);
+            }
         }
 
-        filamentSpoolRepository.save(spool);
-
         return "redirect:/filament-spools";
+    }
+
+    private static @NonNull FilamentSpool copyFilamentSpool(FilamentSpool spool) {
+        FilamentSpool copy = new FilamentSpool();
+
+        copy.setFilament(spool.getFilament());
+
+        copy.setWeightTotal(spool.getWeightTotal());
+        copy.setWeightRemaining(spool.getWeightRemaining());
+
+        copy.setPrice(spool.getPrice());
+
+        copy.setStoreUrl(spool.getStoreUrl());
+
+        copy.setOpenedAt(spool.getOpenedAt());
+        copy.setLastUsedAt(spool.getLastUsedAt());
+        copy.setLastDriedAt(spool.getLastDriedAt());
+
+        copy.setStatus(spool.getStatus());
+
+        copy.setComment(spool.getComment());
+        return copy;
     }
 
     @GetMapping("/edit/{id}")

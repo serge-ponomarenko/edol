@@ -71,7 +71,7 @@ public class AmsStatusController {
                         continue;
                     }
                     slot.setMaterial(amsSlot.getFilamentType());
-                    String colorHex = "#" + amsSlot.getColor().substring(0, 6);
+                    String colorHex = amsSlot.getColor();
                     slot.setColor(colorHex);
 
                     String printerFilamentProfileId = amsSlot.getFilamentBrandIndex();
@@ -95,7 +95,7 @@ public class AmsStatusController {
                 extTray.setActive(printerState.isExternalSpoolUsed());
                 extTray.setMaterial(ext.getFilamentType());
                 String extColor = ext.getColor();
-                String colorHex = extColor.isEmpty() ? "" : ("#" + extColor.substring(0, 6));
+                String colorHex = extColor.isEmpty() ? "" : extColor;
                 extTray.setColor(colorHex);
 
                 String printerFilamentProfileId = ext.getFilamentBrandIndex();

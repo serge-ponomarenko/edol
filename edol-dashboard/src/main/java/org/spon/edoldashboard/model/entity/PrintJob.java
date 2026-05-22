@@ -56,6 +56,9 @@ public class PrintJob {
     @OneToMany(mappedBy = "printJob", cascade = CascadeType.ALL)
     private List<JobFilamentUsage> jobFilamentUsages;
 
+    @OneToMany(mappedBy = "printJob", cascade = CascadeType.ALL)
+    private List<JobSpoolUsage> jobSpoolUsages;
+
     @Column
     private Integer currentLayer;
 

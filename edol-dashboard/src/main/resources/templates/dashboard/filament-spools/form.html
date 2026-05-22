@@ -103,6 +103,17 @@
                                        type="number">
                             </div>
 
+                            <!-- QUANTITY -->
+                            <div class="mb-3" th:if="${spool.id == null}">
+                                <label class="form-label">Quantity</label>
+
+                                <input class="form-control"
+                                       min="1"
+                                       name="quantity"
+                                       type="number"
+                                       value="1">
+                            </div>
+
                             <!-- PRICE -->
                             <div class="mb-3">
                                 <label class="form-label">Price (₴)</label>
