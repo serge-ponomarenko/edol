@@ -7,8 +7,8 @@ logging:
 edol-core:
   url: http://edolcore:8080
 
-edol-dashboard:
-  url: http://edoldashboard:8090
+edol-hub:
+  url: http://edolhub:8090
 
 mqttServer:
   url: tcp://mqtt:1883

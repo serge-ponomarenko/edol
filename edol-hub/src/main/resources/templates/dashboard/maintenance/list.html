@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <title>Printer Maintenance • Edol Hub</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+
+    <style>
+        .container-xl {
+            max-width: 1600px !important;
+        }
+        .table td,
+        .table th {
+            vertical-align: middle;
+        }
+
+        tr[data-bs-toggle="collapse"]:hover {
+            background: #cae5ff;
+        }
+
+        .arrow {
+            transition: transform 0.25s ease;
+        }
+
+        .arrow.rotated {
+            transform: rotate(90deg);
+        }
+
+    </style>
+
+</head>
+
+<body class="layout-fluid">
+
+<div class="page">
+
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark"
+           th:fragment="sidebar">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl mt-4">
+
+                <div class="row row-cards mb-3">
+
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div>
+                                    <div class="text-muted">
+                                        Printer Hours
+                                    </div>
+                                    <div class="h2">
+                                        <span th:text="${stats.totalPrintHours}"></span> h
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="text-muted">
+                                    Total Jobs
+                                </div>
+                                <div class="h2"
+                                     th:text="${stats.totalJobs}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="text-muted">
+                                    Filament Used
+                                </div>
+                                <div class="h2">
+                                    <span th:text="${stats.totalFilamentUsedGrams / 1000}"></span> kg
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="text-muted">
+                                    Printer Lifetime
+                                </div>
+                                <div class="h2">
+                                    <span th:text="${stats.totalPrintHours / 24}"></span>d
+                                    <span th:text="${stats.totalPrintHours % 24}"></span>h
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="text-muted">
+                                    Maintenance Due
+                                </div>
+                                <div class="h2 text-red" th:text="${dueCount}"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="card">
+
+                    <div class="card-header">
+
+                        <h3 class="card-title">Printer Maintenance</h3>
+
+                    </div>
+
+
+                    <div th:if="${#lists.isEmpty(maintenances)}">
+                        <div class="empty">
+                            <p>No maintenance tasks configured.</p>
+                            <a class="btn btn-primary" href="/maintenance/config">
+                                Add Maintenance
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+
+                        <table class="table table-hover">
+
+                            <thead>
+                            <tr>
+                                <th></th>
+                                <th>Maintenance</th>
+                                <th>Progress</th>
+                                <th>Next</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+
+                            <tbody>
+
+                            <th:block th:each="m : ${maintenances}">
+
+                                <tr th:classappend="${m.due} ? 'table-warning'">
+
+                                    <td>
+                                        <button class="btn btn-sm btn-icon maintenance-toggle"
+                                                data-bs-toggle="collapse"
+                                                th:attr="data-bs-target=|#m-details-${m.id}|">
+                                            <i class="ti ti-chevron-right arrow"></i>
+                                        </button>
+                                    </td>
+
+                                    <td th:text="${m.name}"></td>
+
+                                    <td>
+                                        <div th:if="${m.intervalHours != null}">
+
+                                            <span th:text="${m.hoursSinceLast}"></span>h /
+                                            <span th:text="${m.intervalHours}"></span>h
+
+                                            <div class="progress mt-1">
+                                                <div class="progress-bar"
+                                                     th:classappend="${m.due} ? ' bg-red' : ' bg-green'"
+                                                     th:style="'width:' + ${m.progressPercent} + '%'">
+                                                </div>
+                                            </div>
+
+                                        </div>
+
+                                        <div th:if="${m.intervalHours == null}">
+                                            —
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <span th:if="${m.nextHour != null}">
+                                            <span th:text="${m.nextHour - m.currentPrinterHours}"></span>h left
+                                        </span>
+                                        <span th:if="${m.nextDate != null}">
+                                            <span th:text="${#temporals.format(m.nextDate,'yyyy-MM-dd')}"></span>
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <span class="badge"
+                                              th:classappend="${m.due} ? 'bg-red text-red-fg' : 'bg-green text-green-fg'"
+                                              th:text="${m.due} ? 'DUE' : 'OK'">
+                                        </span>
+                                    </td>
+
+                                    <td class="text-end">
+                                        <form method="post"
+                                              th:action="@{/maintenance/{id}/complete(id=${m.id})}">
+                                            <button class="btn btn-sm btn-primary">
+                                                Mark done
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+
+                                <tr class="collapse"
+                                    th:id="|m-details-${m.id}|">
+                                    <td colspan="6">
+                                        <div class="p-3">
+                                            <div class="row">
+
+                                                <!-- DESCRIPTION -->
+                                                <div class="col-md-8">
+                                                    <div class="text-muted small">Description</div>
+                                                    <div style="white-space: pre;"
+                                                         th:text="${m.description ?: '—'}"></div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                            </th:block>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+</body>
+
+<script>
+    function confirmDelete(el) {
+        const name = el.dataset.name;
+        return confirm("Delete material: " + name + "?");
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        document.querySelectorAll('.maintenance-toggle').forEach(button => {
+
+            const arrow = button.querySelector('.arrow');
+
+            const targetSelector = button.getAttribute('data-bs-target');
+            const target = document.querySelector(targetSelector);
+
+            target.addEventListener('show.bs.collapse', () => {
+                arrow.classList.add('rotated');
+            });
+
+            target.addEventListener('hide.bs.collapse', () => {
+                arrow.classList.remove('rotated');
+            });
+
+        });
+
+    });
+</script>
+
+</html>

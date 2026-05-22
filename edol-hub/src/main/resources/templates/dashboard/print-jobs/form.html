@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <title>Print Job • Edol Hub</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+
+</head>
+
+<body class="layout-fluid">
+
+<div class="page">
+
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark"
+           th:fragment="sidebar">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl mt-4">
+
+                <div class="card">
+
+                    <div class="card-header">
+                        <h3 class="card-title">Print Job</h3>
+                    </div>
+
+                    <div class="card-body">
+
+                        <form method="post" th:action="@{/print-jobs}" th:object="${printjob}">
+
+                            <input th:field="*{id}" type="hidden"/>
+
+                            <div class="mb-4">
+
+                                <label class="form-label">Filament Usage</label>
+
+                                <table class="table table-sm table-hover card-table">
+
+                                    <thead>
+                                    <tr>
+                                        <th>Filament</th>
+                                        <th>Used (g)</th>
+                                        <th>Cost (₴)</th>
+                                    </tr>
+                                    </thead>
+
+                                    <tbody>
+
+                                    <tr th:each="u, i : *{jobFilamentUsages}">
+
+                                        <td style="min-width:260px">
+
+                                            <!-- HIDDEN INPUT (binding) -->
+                                            <input th:attr="data-original=${u.filament.id}"
+                                                   th:field="*{jobFilamentUsages[__${i.index}__].filament.id}"
+                                                   th:id="'filamentId_' + ${i.index}"
+                                                   type="hidden"/>
+
+                                            <!-- CUSTOM SELECT -->
+                                            <div class="dropdown">
+
+                                                <button class="btn btn-outline-secondary w-100 text-start"
+                                                        data-bs-toggle="dropdown"
+                                                        th:id="'filamentDropdown_' + ${i.index}"
+                                                        type="button">
+
+                                                        <span th:id="'selectedFilamentText_' + ${i.index}">
+                                                            Select filament...
+                                                        </span>
+
+                                                </button>
+
+                                                <div class="dropdown-menu w-100"
+                                                     style="max-height:300px;overflow:auto;">
+
+                                                    <button class="dropdown-item d-flex align-items-center gap-2"
+                                                            th:attr="
+                                                                    data-id=${f.id},
+                                                                    data-color=${f.colorHex},
+                                                                    data-text=${f.fullId},
+                                                                    data-index=${i.index}
+                                                                "
+                                                            th:each="f : ${filaments}"
+                                                            type="button">
+
+                                                        <!-- COLOR -->
+                                                        <span th:style="'width:16px;height:16px;border-radius:4px;border:1px solid #ccc;background:' + ${f.colorHex}">
+                                                            </span>
+
+                                                        <!-- TEXT -->
+                                                        <span th:text="${f.fullId}"></span>
+
+                                                        <!-- HEX -->
+                                                        <span class="text-muted small"
+                                                              th:text="'(' + ${f.colorHex} + ')'">
+                                                            </span>
+
+                                                    </button>
+
+                                                </div>
+
+                                            </div>
+
+                                        </td>
+
+                                        <!-- USED GRAMS (read-only) -->
+                                        <td>
+                                            <input class="form-control"
+                                                   readonly
+                                                   th:field="*{jobFilamentUsages[__${i.index}__].usedGrams}">
+                                        </td>
+
+                                        <!-- COST (read-only) -->
+                                        <td>
+                                            <div class="input-group input-group-flat">
+
+                                                <input autocomplete="off"
+                                                       class="form-control"
+                                                       readonly
+                                                       th:field="*{jobFilamentUsages[__${i.index}__].cost}"
+                                                       type="text"/>
+
+                                                <span class="input-group-text">
+                                                <a class="link-secondary recalc-btn"
+                                                   data-bs-toggle="tooltip"
+                                                   href="#"
+                                                   th:data-id="*{id}"
+                                                   title="Recalculate cost">
+
+                                                    <i class="ti ti-refresh"></i>
+
+                                                </a>
+                                            </span>
+
+                                            </div>
+                                        </td>
+
+                                    </tr>
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                            <div class="mb-4">
+                                <div class="text-muted small mt-3">
+                                    <i class="ti ti-calculator me-1"></i>
+                                    Filament usage cost will be recalculated after saving
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary" type="submit">
+                                Save
+                            </button>
+
+                            <a class="btn btn-secondary" href="/print-jobs">
+                                Cancel
+                            </a>
+
+                        </form>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+</body>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const items = document.querySelectorAll('.dropdown-item[data-id]');
+
+        items.forEach(item => {
+            item.addEventListener('click', () => selectFilament(item));
+        });
+
+        // 👉 ініціалізація вже вибраних значень
+        document.querySelectorAll('input[id^="filamentId_"]').forEach(input => {
+            if (input.value) {
+                const item = document.querySelector(
+                    `.dropdown-item[data-id="${input.value}"][data-index="${input.id.split('_')[1]}"]`
+                );
+                if (item) selectFilament(item);
+            }
+        });
+
+    });
+
+    function selectFilament(item) {
+
+        const id = item.getAttribute('data-id');
+        const text = item.getAttribute('data-text');
+        const color = item.getAttribute('data-color');
+        const index = item.getAttribute('data-index');
+
+        const hiddenInput = document.getElementById('filamentId_' + index);
+        const selectedText = document.getElementById('selectedFilamentText_' + index);
+
+        if (hiddenInput.dataset.original && hiddenInput.dataset.original !== id) {
+            selectedText.classList.add('text-warning');
+        }
+
+        hiddenInput.value = id;
+
+        selectedText.innerHTML = `
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+            <span style="
+                width:16px;
+                height:16px;
+                border-radius:4px;
+                border:1px solid #ccc;
+                background:${color};
+                display:inline-block;
+            "></span>
+            ${text}
+        </span>
+    `;
+    }
+
+    document.addEventListener("click", function (e) {
+        const btn = e.target.closest(".recalc-btn");
+        if (!btn) return;
+
+        e.preventDefault();
+
+        const jobId = btn.dataset.id;
+
+        // 🔹 UI feedback
+        btn.classList.add("disabled");
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        fetch('/print-jobs/recalculate-cost/' + jobId, {
+            method: "POST"
+        })
+            .then(() => {
+                location.reload(); // поки залишимо так
+            })
+            .catch(() => {
+                alert("Failed to recalculate cost");
+                btn.classList.remove("disabled");
+                btn.innerHTML = '<i class="ti ti-refresh"></i>';
+            });
+
+    });
+</script>
+</html>

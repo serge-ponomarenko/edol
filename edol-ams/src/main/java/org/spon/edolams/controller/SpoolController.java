@@ -20,23 +20,23 @@ import org.springframework.web.client.RestClient;
 public class SpoolController {
 
     private final RestClient edolCoreClient;
-    private final RestClient edolDashboardClient;
+    private final RestClient edolHubClient;
     private final AmsSpoolChangerService amsSpoolChangerService;
 
     public SpoolController(
             @Qualifier("edolCoreRestClient") RestClient edolCoreClient,
-            @Qualifier("edolDashboardRestClient") RestClient edolDashboardClient,
+            @Qualifier("edolHubRestClient") RestClient edolHubClient,
             AmsSpoolChangerService amsSpoolChangerService
     ) {
         this.edolCoreClient = edolCoreClient;
-        this.edolDashboardClient = edolDashboardClient;
+        this.edolHubClient = edolHubClient;
         this.amsSpoolChangerService = amsSpoolChangerService;
     }
 
     @GetMapping("/find")
     public ResponseEntity<Spool> findSpoolById(@RequestParam("id") Long id) {
         try {
-            FilamentSpool filamentSpool = edolDashboardClient.get()
+            FilamentSpool filamentSpool = edolHubClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/spools/find-by-id")
                             .queryParam("id", id)
@@ -72,7 +72,7 @@ public class SpoolController {
             @RequestParam("id") Long id,
             @RequestParam("slot") Integer slot
     ) {
-        edolDashboardClient.post()
+        edolHubClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/s/{id}/{slot}")
                         .build(id, slot))

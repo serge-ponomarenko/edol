@@ -24,14 +24,14 @@ import java.util.List;
 public class AmsStatusController {
 
     private final RestClient edolCoreClient;
-    private final RestClient edolDashboardClient;
+    private final RestClient edolHubClient;
 
     public AmsStatusController(
             @Qualifier("edolCoreRestClient") RestClient edolCoreClient,
-            @Qualifier("edolDashboardRestClient") RestClient edolDashboardClient
+            @Qualifier("edolHubRestClient") RestClient edolHubClient
     ) {
         this.edolCoreClient = edolCoreClient;
-        this.edolDashboardClient = edolDashboardClient;
+        this.edolHubClient = edolHubClient;
     }
 
     @GetMapping("/state")
@@ -121,7 +121,7 @@ public class AmsStatusController {
     }
 
     private FilamentSpool findSpool(String printerFilamentProfileId, String colorHex) {
-        return edolDashboardClient.get()
+        return edolHubClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/spools/find")
                         .queryParam("printerFilamentProfileId", printerFilamentProfileId)

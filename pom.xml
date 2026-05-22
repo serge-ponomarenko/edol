@@ -21,7 +21,7 @@
     <modules>
         <module>edol-core-api</module>
         <module>edol-core</module>
-        <module>edol-dashboard</module>
+        <module>edol-hub</module>
         <module>edol-notify</module>
         <module>edol-ams</module>
     </modules>

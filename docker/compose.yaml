@@ -21,15 +21,15 @@ services:
       - ../../logs:/app/logs
     restart: unless-stopped
 
-  edoldashboard:
+  edolhub:
     build:
       context: ..
-      dockerfile: docker/edol-dashboard.Dockerfile
-    container_name: edol-dashboard
+      dockerfile: docker/edol-hub.Dockerfile
+    container_name: edol-hub
     environment:
       TZ: Europe/Kyiv
     env_file:
-      - ../../.env_edol_dashboard
+      - ../../.env_edol_hub
     depends_on:
       mqtt:
         condition: service_healthy

@@ -100,7 +100,7 @@ The project consists of the following services:
 
 * `edolcore-api` — library with common model entities
 * `edolcore` — Bambu printer integration service
-* `edoldashboard` — main backend service
+* `edolhub` — main backend service
 * `edolnotify` — Notifying service (Telegram Bot)
 * `edolams` — AMS controlling service for EDOL RFID Reader
 * `mqtt` (`nanoMQ`) — MQTT broker used for communication
@@ -138,7 +138,7 @@ Create (or copy) the following files in the project root directory:
 
 ```text
 ../.env_edol_core
-../.env_edol_dashboard
+../.env_edol_hub
 ../.env_edol_notify
 ../.env_edol_ams
 ```
@@ -150,7 +150,7 @@ The resulting structure should look like this:
 edol-project/
 │
 ├── .env_edol_core
-├── .env_edol_dashboard
+├── .env_edol_hub
 ├── .env_edol_notify
 ├── .env_edol_ams
 │
@@ -161,7 +161,7 @@ edol-project/
 │   │   
 │   ├── edol-core-api/
 │   ├── edol-core/
-│   ├── edol-dashboard/
+│   ├── edol-hub/
 │   ├── edol-notify/
 │   └── edol-ams/
 │
@@ -187,9 +187,9 @@ Edit `.env_edol_core` and configure:
 
 For details see [section](#printer-connection-settings) below.
 
-### Edol Dashboard Configuration
+### Edol Hub Configuration
 
-Edit `.env_edol_dashboard` and configure:
+Edit `.env_edol_hub` and configure:
 
 * The URL that be added to QR code on the spool label
 
@@ -212,7 +212,7 @@ docker compose up --build -d
 
 This command will:
 
-* Build the `edolcore`, `edoldashboard` and `edolnotify` images
+* Build the `edolcore`, `edolhub`, `edolams` and `edolnotify` images
 * Start all containers in detached mode
 * Automatically restart containers unless stopped manually
 
@@ -220,13 +220,13 @@ This command will:
 
 ## Services and Ports
 
-| Service       | Port Mapping | Description               |
-|---------------|--------------|---------------------------|
-| edolcore      | `8091:8080`  | Bambu integration service |
-| edoldashboard | `8090:8090`  | Main backend API          |
-| edolams       | `8099:8099`  | AMS Service               |
-| edolnotify    | `-:-`        | Notify service            |
-| mqtt/nanomq   | `-:1883`     | MQTT broker               |
+| Service     | Port Mapping | Description               |
+|-------------|--------------|---------------------------|
+| edolcore    | `8091:8080`  | Bambu integration service |
+| edolhub     | `8090:8090`  | Main backend API          |
+| edolams     | `8099:8099`  | AMS Service               |
+| edolnotify  | `-:-`        | Notify service            |
+| mqtt/nanomq | `-:1883`     | MQTT broker               |
 
 ---
 
@@ -241,7 +241,7 @@ docker compose logs -f
 To view logs for a specific service:
 
 ```bash
-docker compose logs -f edoldashboard
+docker compose logs -f edolhub
 ```
 
 or

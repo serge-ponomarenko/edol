@@ -12,15 +12,15 @@ public class AmsSpoolChangerService {
 
     private static final long SPOOL_TIMEOUT_MS = 60_000;
 
-    private final RestClient edolDashboardClient;
+    private final RestClient edolHubClient;
 
     private Long spoolIdScanned = -1L;
     private Long timeSpoolScanned = -1L;
 
     public AmsSpoolChangerService(
-            @Qualifier("edolDashboardRestClient") RestClient edolDashboardClient
+            @Qualifier("edolHubRestClient") RestClient edolHubClient
     ) {
-        this.edolDashboardClient = edolDashboardClient;
+        this.edolHubClient = edolHubClient;
     }
 
     public void setSpoolScannedState(long spoolId) {
@@ -38,7 +38,7 @@ public class AmsSpoolChangerService {
         }
 
         if (spoolIdScanned != -1) {
-            edolDashboardClient.post()
+            edolHubClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/s/{id}/{slot}")
                             .build(spoolIdScanned, slot))
