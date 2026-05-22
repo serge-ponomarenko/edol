@@ -12,7 +12,7 @@ public class EdolCoreConfig {
     private String edolCoreUrl;
 
     @Bean
-    public RestClient edloCoreRestClient() {
+    public RestClient edolCoreClient() {
         return RestClient.builder()
                 .baseUrl(edolCoreUrl)
                 .build();

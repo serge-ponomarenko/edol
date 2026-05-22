@@ -30,30 +30,35 @@ public class PrinterService {
     public void sendStopCommand() {
         edolCoreClient.post()
                 .uri("/printer/request/stop")
-                .retrieve();
+                .retrieve()
+                .toBodilessEntity();;
     }
 
     public void sendResumeCommand() {
         edolCoreClient.post()
                 .uri("/printer/request/resume")
-                .retrieve();
+                .retrieve()
+                .toBodilessEntity();;
     }
 
     public void sendPauseCommand() {
         edolCoreClient.post()
                 .uri("/printer/request/pause")
-                .retrieve();
+                .retrieve()
+                .toBodilessEntity();;
     }
 
     public void sendFetchMetadataCommand() {
         edolCoreClient.post()
                 .uri("/printer/request/fetchmetadata")
-                .retrieve();
+                .retrieve()
+                .toBodilessEntity();;
     }
 
     public void sendPushAllCommand() {
         edolCoreClient.post()
                 .uri("/printer/request/pushall")
-                .retrieve();
+                .retrieve()
+                .toBodilessEntity();;
     }
 }
