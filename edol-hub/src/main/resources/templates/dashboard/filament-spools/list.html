@@ -86,19 +86,39 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 18px;
+            width: 22px;
         }
 
         .spool-mini-bar {
+            position: relative;
+
             width: 10px;
-            min-height: 4px;
+            height: 30px;
+
+            border-radius: 4px;
+
+            background: #abccfd;
+
+            overflow: hidden;
+        }
+
+        .spool-mini-bar.low {
+            background: #d63939;
+        }
+
+        .spool-mini-fill {
+            position: absolute;
+
+            bottom: 0;
+            left: 0;
+            right: 0;
 
             border-radius: 4px;
 
             background: #206bc4;
         }
 
-        .spool-mini-bar.low {
+        .spool-mini-fill.low {
             background: #d63939;
         }
 
@@ -107,6 +127,9 @@
 
             font-size: 10px;
             line-height: 1;
+
+            text-align: center;
+            white-space: nowrap;
 
             color: #6c757d;
         }
@@ -263,8 +286,8 @@
                                     <!-- Remaining -->
                                     <td>
 
-                                        <div class="d-flex gap-3">
-                                            <div class="w-40">
+                                        <div class="d-flex align-items-end">
+                                            <div style="width: 95px">
                                                 <div class="text-muted small">
                                                     <strong th:text="${entry.value.size()}"></strong>
                                                     spool(s)
@@ -275,12 +298,14 @@
                                                 </div>
                                             </div>
 
-                                            <div class="spool-mini-bars">
+                                            <div class="spool-mini-bars ms-3">
                                                 <div class="spool-mini-item"
                                                      th:each="spool : ${entry.value}">
-                                                    <div class="spool-mini-bar"
-                                                         th:classappend="${spool.weightRemaining < 200} ? ' low' : ''"
-                                                         th:style="'height:' + (${spool.weightRemaining} * 29 / ${spool.weightTotal}) + 'px'">
+                                                    <div class="spool-mini-bar">
+                                                        <div class="spool-mini-fill"
+                                                             th:classappend="${spool.weightRemaining < 200} ? ' low' : ''"
+                                                             th:style="'height:' + (${spool.weightRemaining} * 100 / ${spool.weightTotal}) + '%'">
+                                                        </div>
                                                     </div>
                                                     <div class="spool-mini-label"
                                                          th:text="${spool.id}">
@@ -366,10 +391,10 @@
                                         <td th:text="${#numbers.formatDecimal(s.price,1,2)} + ' ₴'"></td>
 
                                         <td>
-                                                            <span class="badge"
-                                                                  th:classappend="${s.status == T(org.spon.edolhub.model.entity.FilamentSpool.FilamentSpoolStatus).SEALED ? 'bg-green text-green-fg' : s.status == T(org.spon.edolhub.model.entity.FilamentSpool.FilamentSpoolStatus).ACTIVE ? 'bg-blue text-blue-fg' : s.status == T(org.spon.edolhub.model.entity.FilamentSpool.FilamentSpoolStatus).EMPTY ? 'bg-yellow text-yellow-fg' : 'bg-secondary text-secondary-fg'}"
-                                                                  th:text="${s.status}">
-                                                            </span>
+                                            <span class="badge"
+                                                  th:classappend="${s.status == T(org.spon.edolhub.model.entity.FilamentSpool.FilamentSpoolStatus).SEALED ? 'bg-green text-green-fg' : s.status == T(org.spon.edolhub.model.entity.FilamentSpool.FilamentSpoolStatus).ACTIVE ? 'bg-blue text-blue-fg' : s.status == T(org.spon.edolhub.model.entity.FilamentSpool.FilamentSpoolStatus).EMPTY ? 'bg-yellow text-yellow-fg' : 'bg-secondary text-secondary-fg'}"
+                                                  th:text="${s.status}">
+                                            </span>
                                         </td>
 
                                         <td>
