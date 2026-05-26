@@ -35,6 +35,12 @@ public class PrintAllocationFinalizeService {
             return false;
         }
 
+        if (Boolean.TRUE.equals(
+                preview.getFinalized()
+        )) {
+            return true;
+        }
+
         boolean unresolved =
                 preview.getGroups()
                         .stream()

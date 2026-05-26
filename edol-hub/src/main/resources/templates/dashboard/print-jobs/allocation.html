@@ -281,6 +281,7 @@
 
         if (
             preview.jobStatus !== 'RUNNING'
+            && !preview.finalized
         ) {
             finalizeBtn.style.display = 'inline-block';
             finalizeBtn.disabled = preview.reconciliationRequired;

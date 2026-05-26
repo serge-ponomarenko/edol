@@ -103,7 +103,7 @@ public class PrintJobService {
         PrintJob job = printJobRepository.findBySessionId(printerState.getSessionId())
                 .orElseThrow();
 
-        if (job.getStatus() == PrintJobStatus.FAILED)
+        if (isTerminalStatus(job))
             return; // may already be set by PRINT_ERROR or PRINT_FAILED events
 
         int progress = printerState.getProgress();
@@ -111,7 +111,13 @@ public class PrintJobService {
         int currentLayer = printerState.getLayer();
 
         for (org.spon.edol.model.Filament filamentDto : printerState.getFilaments()) {
-            double usedGrams = Math.round(filamentDto.getUsedGrams() * ((double) currentLayer / totalLayers) * 100.0) / 100.0;
+            double usedGrams =
+                    estimateInterruptedUsage(
+                            filamentDto.getUsedGrams(),
+                            currentLayer,
+                            totalLayers,
+                            progress
+                    );
 
             PrintAllocationGroup group =
                     resolveAllocationGroup(
@@ -258,6 +264,39 @@ public class PrintJobService {
                 totalFilamentUsage
         );
 
+    }
+
+    private boolean isTerminalStatus(
+            PrintJob job
+    ) {
+        return job.getStatus() == PrintJobStatus.FINISHED
+                || job.getStatus() == PrintJobStatus.FAILED
+                || job.getStatus() == PrintJobStatus.CANCELLED;
+    }
+
+    private double estimateInterruptedUsage(
+            double plannedGrams,
+            int currentLayer,
+            int totalLayers,
+            int progress
+    ) {
+        double ratio =
+                totalLayers > 0
+                        ? (double) currentLayer / totalLayers
+                        : progress / 100.0;
+
+        ratio =
+                Math.max(
+                        0,
+                        Math.min(
+                                1,
+                                ratio
+                        )
+                );
+
+        return Math.round(
+                plannedGrams * ratio * 100.0
+        ) / 100.0;
     }
 
 }
