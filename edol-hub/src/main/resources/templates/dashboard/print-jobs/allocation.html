@@ -91,6 +91,95 @@
 </div>
 
 <div class="modal fade"
+     id="spoolMutationModal"
+     tabindex="-1">
+
+    <div class="modal-dialog">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5 class="modal-title"
+                    id="spoolMutationTitle">
+                    Edit Spool Allocation
+                </h5>
+
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal">
+                </button>
+
+            </div>
+
+            <div class="modal-body">
+
+                <input type="hidden"
+                       id="spoolMutationMode">
+
+                <input type="hidden"
+                       id="spoolMutationFilamentId">
+
+                <input type="hidden"
+                       id="spoolMutationMaxJobGrams">
+
+                <input type="hidden"
+                       id="selectedSpoolId">
+
+                <label class="form-label">
+                    Spool
+                </label>
+
+                <div class="dropdown w-100 mb-3">
+                    <button class="btn w-100 text-start dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            type="button">
+                        <span id="selectedSpoolLabel">
+                            -- Select spool --
+                        </span>
+                    </button>
+                    <div class="dropdown-menu w-100"
+                         id="spoolDropdownMenu"
+                         style="
+                            max-height: 300px;
+                            overflow-y: auto;
+                         ">
+                    </div>
+                </div>
+
+                <label class="form-label">
+                    Grams
+                </label>
+
+                <input class="form-control"
+                       id="spoolMutationGrams"
+                       min="1"
+                       step="1"
+                       type="number">
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button class="btn btn-secondary"
+                        data-bs-dismiss="modal">
+                    Cancel
+                </button>
+
+                <button class="btn btn-primary"
+                        onclick="submitSpoolMutation()">
+                    Apply
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="modal fade"
      id="replaceFilamentModal"
      tabindex="-1">
 
@@ -167,6 +256,7 @@
 
 <script>
     const jobId = window.location.pathname.split('/').pop();
+    let currentPreview = null;
 
     loadAllocation();
 
@@ -178,6 +268,8 @@
         );
 
     function renderPreview(preview) {
+        currentPreview = preview;
+
         document.getElementById('jobId')
             .innerText = preview.printJobId;
 
@@ -333,6 +425,40 @@
                     <div class="d-flex align-items-center gap-2">
                         ${manual}
                         <button
+                            class="btn btn-sm btn-outline-primary"
+                            onclick="
+                openSpoolMutationModal(
+                                    'replace',
+                                    ${group.filamentId},
+                                    ${group.requestedGrams},
+                                    ${group.requestedGrams}
+                                )
+                            ">
+                            <i class="ti ti-replace"></i>
+                            Replace Spool
+                        </button>
+                        ${
+            group.missingGrams > 0
+                ? `
+                        <button
+                            class="btn btn-sm btn-outline-primary"
+                            onclick="
+                                openSpoolMutationModal(
+                                    'add',
+                                    ${group.filamentId},
+                                    ${group.missingGrams > 0
+                                        ? group.missingGrams
+                                        : 1},
+                                    ${group.missingGrams}
+                                )
+                            ">
+                            <i class="ti ti-plus"></i>
+                            Add Spool
+                        </button>
+                  `
+                : ''
+        }
+                        <button
                             class="btn btn-sm btn-outline-secondary"
                             onclick="
                                 openReplaceFilamentModal(
@@ -389,6 +515,12 @@
               `
                 : '';
 
+        const remaining =
+            item.spoolRemainingGrams ?? '-';
+
+        const cost =
+            item.estimatedCost ?? 0;
+
         return `
         <div class="border rounded p-3 mb-2">
 
@@ -399,19 +531,15 @@
                 <div>
 
                     <div class="fw-bold">
-
                         Spool #${item.spoolId}
-
                     </div>
 
                     <div class="text-muted small">
-
-                        ${item.allocatedGrams}g
-
+                        Available ${remaining}g
                         •
-
-                        ₴${item.estimatedCost}
-
+                        Allocated ${item.allocatedGrams}g
+                        •
+                        Cost ${cost} ₴
                     </div>
 
                 </div>
@@ -429,6 +557,12 @@
         filamentId
     ) {
         try {
+            if (
+                !confirmFinalizedMutation()
+            ) {
+                return;
+            }
+
             await fetch(
                 `/api/allocations/rerun?jobId=${jobId}&filamentId=${filamentId}`,
                 {
@@ -444,6 +578,7 @@
     }
 
     let replaceFilamentModal;
+    let spoolMutationModal;
 
     document.addEventListener(
         'DOMContentLoaded',
@@ -456,9 +591,296 @@
                     )
                 );
 
+            spoolMutationModal =
+                new bootstrap.Modal(
+                    document.getElementById(
+                        'spoolMutationModal'
+                    )
+                );
 
         }
     );
+
+    async function openSpoolMutationModal(
+        mode,
+        filamentId,
+        defaultGrams,
+        maxJobGrams
+    ) {
+        document.getElementById(
+            'spoolMutationMode'
+        ).value = mode;
+
+        document.getElementById(
+            'spoolMutationFilamentId'
+        ).value = filamentId;
+
+        document.getElementById(
+            'spoolMutationMaxJobGrams'
+        ).value = maxJobGrams || defaultGrams || 0;
+
+        document.getElementById(
+            'selectedSpoolId'
+        ).value = '';
+
+        document.getElementById(
+            'selectedSpoolLabel'
+        ).innerText = '-- Select spool --';
+
+        document.getElementById(
+            'spoolMutationGrams'
+        ).value = Math.max(
+            1,
+            defaultGrams || 1
+        );
+
+        document.getElementById(
+            'spoolMutationGrams'
+        ).removeAttribute('max');
+
+        document.getElementById(
+            'spoolMutationTitle'
+        ).innerText =
+            mode === 'replace'
+                ? 'Replace Spool Allocation'
+                : 'Add Spool Allocation';
+
+        await loadSpools(
+            filamentId,
+            mode
+        );
+
+        spoolMutationModal.show();
+    }
+
+    async function loadSpools(
+        filamentId,
+        mode
+    ) {
+        const response =
+            await fetch(
+                `/api/allocations/spools?filamentId=${filamentId}`
+            );
+
+        const spools =
+            filterSpoolOptions(
+                await response.json(),
+                filamentId,
+                mode
+            );
+
+        document.getElementById(
+            'spoolDropdownMenu'
+        ).innerHTML =
+            spools.length > 0
+                ? spools
+                    .map(renderSpoolOption)
+                    .join('')
+                : `
+                    <div class="dropdown-item text-muted">
+                        No available spools
+                    </div>
+                  `;
+    }
+
+    function filterSpoolOptions(
+        spools,
+        filamentId,
+        mode
+    ) {
+        if (mode !== 'add') {
+            return spools;
+        }
+
+        const usedSpoolIds =
+            new Set(
+                currentPreview.groups
+                    .filter(group =>
+                        group.filamentId == filamentId
+                    )
+                    .flatMap(group => group.items || [])
+                    .map(item => item.spoolId)
+                    .filter(Boolean)
+            );
+
+        return spools.filter(spool =>
+            !usedSpoolIds.has(spool.id)
+        );
+    }
+
+    function renderSpoolOption(spool) {
+        const remaining =
+            spool.weightRemaining ?? spool.weightTotal ?? 0;
+
+        return `
+            <a class="dropdown-item"
+               href="#"
+               onclick="
+                    event.preventDefault();
+                    selectSpool(
+                        ${spool.id},
+                        'Spool #${spool.id}',
+                        '${spool.status}',
+                        ${remaining}
+                    )
+               ">
+                <div class="d-flex justify-content-between">
+                    <span>
+                        Spool #${spool.id}
+                    </span>
+                    <span class="text-muted">
+                        &nbsp;- ${remaining}g
+                    </span>
+                </div>
+                <div class="small text-muted">
+                    ${spool.status}
+                </div>
+            </a>
+        `;
+    }
+
+    function selectSpool(
+        id,
+        label,
+        status,
+        remaining
+    ) {
+        document.getElementById(
+            'selectedSpoolId'
+        ).value = id;
+
+        document.getElementById(
+            'selectedSpoolLabel'
+        ).innerHTML = `
+            <span class="d-flex justify-content-between w-100">
+                <span>${label}</span>
+                <span class="text-muted">
+                    ${status} / ${remaining}g
+                </span>
+            </span>
+        `;
+
+        const gramsInput =
+            document.getElementById(
+                'spoolMutationGrams'
+            );
+
+        const maxJobGrams =
+            Number(
+                document.getElementById(
+                    'spoolMutationMaxJobGrams'
+                ).value
+            );
+
+        gramsInput.max =
+            Math.min(
+                remaining,
+                maxJobGrams
+            );
+
+        if (
+            Number(gramsInput.value)
+            > Number(gramsInput.max)
+        ) {
+            gramsInput.value = gramsInput.max;
+        }
+    }
+
+    async function submitSpoolMutation() {
+        const mode =
+            document.getElementById(
+                'spoolMutationMode'
+            ).value;
+
+        const filamentId =
+            document.getElementById(
+                'spoolMutationFilamentId'
+            ).value;
+
+        const spoolId =
+            document.getElementById(
+                'selectedSpoolId'
+            ).value;
+
+        const grams =
+            Number(
+                document.getElementById(
+                    'spoolMutationGrams'
+                ).value
+            );
+
+        if (!spoolId) {
+            alert('Please select spool');
+            return;
+        }
+
+        if (!grams || grams <= 0) {
+            alert('Grams must be greater than zero');
+            return;
+        }
+
+        const maxGrams =
+            Number(
+                document.getElementById(
+                    'spoolMutationGrams'
+                ).max
+            );
+
+        if (!maxGrams || maxGrams <= 0) {
+            alert(
+                'No grams left to allocate for this filament'
+            );
+            return;
+        }
+
+        if (
+            maxGrams
+            && grams > maxGrams
+        ) {
+            alert(
+                `Maximum allowed allocation is ${maxGrams}g`
+            );
+            return;
+        }
+
+        if (
+            !confirmFinalizedMutation()
+        ) {
+            return;
+        }
+
+        const endpoint =
+            mode === 'replace'
+                ? '/api/allocations/replace-spool'
+                : '/api/allocations/add-spool';
+
+        try {
+            const response =
+                await fetch(
+                endpoint
+                + `?jobId=${jobId}`
+                + `&filamentId=${filamentId}`
+                + `&spoolId=${spoolId}`
+                + `&grams=${grams}`,
+                {
+                    method: 'POST'
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    'Spool allocation update failed'
+                );
+            }
+
+            spoolMutationModal.hide();
+
+            await loadAllocation();
+
+        } catch (e) {
+            alert('Failed to update spool allocation');
+        }
+    }
 
     function openReplaceFilamentModal(
         filamentId
@@ -641,6 +1063,11 @@
         }
 
         try {
+            if (
+                !confirmFinalizedMutation()
+            ) {
+                return;
+            }
 
             await fetch(
                 `/api/allocations/replace-filament`
@@ -664,6 +1091,60 @@
 
         }
 
+    }
+
+    function confirmFinalizedMutation() {
+        if (
+            !currentPreview
+            || !currentPreview.finalized
+        ) {
+            return true;
+        }
+
+        const deltas =
+            buildRollbackDeltas(
+                currentPreview
+            );
+
+        const details =
+            deltas.length > 0
+                ? '\n\nRollback inventory changes:\n'
+                + deltas.join('\n')
+                : '';
+
+        return confirm(
+            'This allocation is already finalized.'
+            + '\nEditing it will rollback committed spool accounting before applying your changes.'
+            + details
+            + '\n\nContinue?'
+        );
+    }
+
+    function buildRollbackDeltas(preview) {
+        const gramsBySpool = new Map();
+
+        preview.groups
+            .flatMap(group => group.items || [])
+            .filter(item =>
+                item.spoolId
+                && item.allocatedGrams
+            )
+            .forEach(item => {
+                gramsBySpool.set(
+                    item.spoolId,
+                    (
+                        gramsBySpool.get(
+                            item.spoolId
+                        ) || 0
+                    ) + item.allocatedGrams
+                );
+            });
+
+        return Array.from(
+            gramsBySpool.entries()
+        ).map(([spoolId, grams]) =>
+            `Spool #${spoolId} +${grams}g`
+        );
     }
 
     async function finalizeReconciliation() {

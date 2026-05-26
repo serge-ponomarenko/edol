@@ -116,6 +116,13 @@ public class PrintAllocationPreviewMapper {
 
         dto.setAllocatedGrams(item.getAllocatedGrams());
 
+        dto.setSpoolRemainingGrams(
+                item.getSpool() != null
+                        ? item.getSpool()
+                          .getWeightRemaining()
+                        : null
+        );
+
         dto.setEstimatedCost(
                 item.getEstimatedCost() != null
                         ? item.getEstimatedCost()
