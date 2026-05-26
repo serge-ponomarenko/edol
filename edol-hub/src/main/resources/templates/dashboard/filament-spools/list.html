@@ -14,6 +14,7 @@
         .container-xl {
             max-width: 1600px !important;
         }
+
         .table td,
         .table th {
             vertical-align: middle;
@@ -130,6 +131,20 @@
 
             text-align: center;
             white-space: nowrap;
+
+            color: #6c757d;
+        }
+
+        .spool-mini-plus {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            width: 10px;
+            height: 30px;
+
+            font-size: 18px;
+            font-weight: 600;
 
             color: #6c757d;
         }
@@ -300,15 +315,29 @@
 
                                             <div class="spool-mini-bars ms-3">
                                                 <div class="spool-mini-item"
-                                                     th:each="spool : ${entry.value}">
-                                                    <div class="spool-mini-bar">
+                                                     th:each="spool, iter : ${entry.value}"
+                                                     th:if="${iter.index < 5}">
+
+                                                    <div class="spool-mini-bar"
+                                                         data-bs-toggle="tooltip"
+                                                         data-bs-placement="top"
+                                                         th:attr="title=${spool.weightRemaining + ' / ' + spool.weightTotal + ' g'}">
+
                                                         <div class="spool-mini-fill"
                                                              th:classappend="${spool.weightRemaining < 200} ? ' low' : ''"
                                                              th:style="'height:' + (${spool.weightRemaining} * 100 / ${spool.weightTotal}) + '%'">
                                                         </div>
                                                     </div>
+
                                                     <div class="spool-mini-label"
                                                          th:text="${spool.id}">
+                                                    </div>
+                                                </div>
+
+                                                <div class="spool-mini-item plus-item"
+                                                     th:if="${entry.value.size() > 5}">
+                                                    <div class="spool-mini-plus">
+                                                        +
                                                     </div>
                                                 </div>
                                             </div>
@@ -732,6 +761,15 @@
             `dried-date-${spoolId}`
         ).textContent = formatted;
     }
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    })
 </script>
 
 </html>

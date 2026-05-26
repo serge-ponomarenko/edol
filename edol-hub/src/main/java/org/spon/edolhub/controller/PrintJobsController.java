@@ -1,15 +1,12 @@
 package org.spon.edolhub.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.spon.edolhub.model.entity.JobFilamentUsage;
-import org.spon.edolhub.model.entity.PrintJob;
-import org.spon.edolhub.repository.FilamentRepository;
 import org.spon.edolhub.repository.PrintJobRepository;
-import org.spon.edolhub.service.PrintJobService;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequiredArgsConstructor
@@ -17,58 +14,16 @@ import org.springframework.web.bind.annotation.*;
 public class PrintJobsController {
 
     private final PrintJobRepository printJobRepository;
-    private final PrintJobService printJobService;
-    private final FilamentRepository filamentRepository;
 
     @GetMapping
     public String list(Model model) {
         return "dashboard/print-jobs/list";
     }
 
-    @PostMapping
-    public String save(@ModelAttribute PrintJob formJob) {
-        PrintJob existing = printJobRepository.findById(formJob.getId())
-                .orElseThrow();
-
-        for (int i = 0; i < existing.getJobFilamentUsages().size(); i++) {
-            JobFilamentUsage existingUsage = existing.getJobFilamentUsages().get(i);
-            JobFilamentUsage formUsage = formJob.getJobFilamentUsages().get(i);
-
-            boolean changed = !existingUsage.getFilament().getId()
-                    .equals(formUsage.getFilament().getId());
-
-            if (changed) {
-                existingUsage.setFilament(
-                        filamentRepository.findById(formUsage.getFilament().getId())
-                                .orElseThrow()
-                );
-                printJobService.recalculateCost(formJob.getId());
-            }
-        }
-
-        printJobRepository.save(existing);
-
-        return "redirect:/print-jobs";
-    }
-
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable Long id, Model model) {
-        PrintJob printJob = printJobRepository.findById(id).orElseThrow();
-        model.addAttribute("printjob", printJob);
-        model.addAttribute("filaments", filamentRepository.findAll());
-        return "dashboard/print-jobs/form";
-    }
-
     @GetMapping("/delete/{id}")
     public String delete(@PathVariable Long id) {
         printJobRepository.deleteById(id);
         return "redirect:/print-jobs";
-    }
-
-    @PostMapping("/recalculate-cost/{id}")
-    public ResponseEntity<Void> recalculateCost(@PathVariable Long id) {
-        printJobService.recalculateCost(id);
-        return ResponseEntity.ok().build();
     }
 
 }

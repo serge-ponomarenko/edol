@@ -130,9 +130,10 @@ public class SpoolAllocationService {
         if (remainingToAllocate > 0) {
             log.warn("""
                             Not enough filament for allocation!
-                            Filament: {},
+                            Filament: #{} {},
                             Missing: {}g
                             """,
+                    filament.getId(),
                     filament.getFullId(),
                     remainingToAllocate
             );

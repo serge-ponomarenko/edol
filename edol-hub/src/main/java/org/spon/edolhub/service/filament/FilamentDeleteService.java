@@ -2,8 +2,9 @@ package org.spon.edolhub.service.filament;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.dto.FilamentDeletePreviewDto;
+import org.spon.edolhub.model.entity.JobSpoolUsage;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
-import org.spon.edolhub.repository.JobFilamentUsageRepository;
+import org.spon.edolhub.repository.JobSpoolUsageRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,7 +14,7 @@ import java.util.List;
 public class FilamentDeleteService {
 
     private final FilamentSpoolRepository spoolRepository;
-    private final JobFilamentUsageRepository usageRepository;
+    private final JobSpoolUsageRepository spoolUsageRepository;
 
     public FilamentDeletePreviewDto preview(Long filamentId) {
         List<FilamentDeletePreviewDto.SpoolInfo> spools =
@@ -27,13 +28,39 @@ public class FilamentDeleteService {
                         .toList();
 
         List<FilamentDeletePreviewDto.JobInfo> jobs =
-                usageRepository.findByFilamentId(filamentId)
+                spoolUsageRepository.findAll()
                         .stream()
-                        .map(u -> new FilamentDeletePreviewDto.JobInfo(
-                                u.getPrintJob().getId(),
-                                u.getPrintJob().getTaskName(),
-                                u.getUsedGrams()
-                        ))
+                        .filter(su ->
+                                su.getFilamentSpool() != null
+                                        && su.getFilamentSpool()
+                                        .getFilament() != null
+                                        && su.getFilamentSpool()
+                                        .getFilament()
+                                        .getId()
+                                        .equals(filamentId)
+                        )
+                        .collect(
+                                java.util.stream.Collectors.groupingBy(
+                                        JobSpoolUsage::getPrintJob
+                                )
+                        )
+                        .entrySet()
+                        .stream()
+                        .map(entry -> {
+                            double usedGrams =
+                                    entry.getValue()
+                                            .stream()
+                                            .mapToDouble(
+                                                    org.spon.edolhub.model.entity.JobSpoolUsage::getUsedGrams
+                                            )
+                                            .sum();
+
+                            return new FilamentDeletePreviewDto.JobInfo(
+                                    entry.getKey().getId(),
+                                    entry.getKey().getTaskName(),
+                                    usedGrams
+                            );
+                        })
                         .toList();
 
         return new FilamentDeletePreviewDto(spools, jobs);

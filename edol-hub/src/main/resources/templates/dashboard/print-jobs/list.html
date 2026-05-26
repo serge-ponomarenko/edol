@@ -165,7 +165,7 @@
                 </span>
             </td>
 
-            <td>${renderFilament(job)}</td>
+            <td>${renderFilamentSection(job)}</td>
 
             <td>${renderProgress(job)}</td>
 
@@ -175,7 +175,7 @@
             <td>
                 <div class="btn-list">
                     <a class="btn btn-sm btn-warning"
-                       href="/print-jobs/edit/${job.id}">
+                       href="/print-jobs/allocation/${job.id}">
                         <i class="ti ti-edit"></i>
                     </a>
                     <a class="btn btn-sm btn-danger"
@@ -213,6 +213,127 @@
             </div>
         </div>
     `).join('');
+    }
+
+    function renderAllocationPreview(job) {
+        const preview = job.allocationPreview;
+
+        if (!preview || !preview.groups)
+            return '-';
+
+        const reconciliationBadge =
+            (
+                job.allocationPreview
+                && !job.allocationPreview.finalized
+                && job.status !== 'RUNNING'
+            )
+                ? `
+                    <div class="mb-2">
+                        <span class="badge bg-red text-red-fg">
+                            <i class="ti ti-alert-octagon"></i>
+                            Reconciliation Required
+                        </span>
+                    </div>
+                  `
+                : '';
+
+        const groupsHtml = preview.groups.map(group => {
+            const items = group.items
+                ?.map(item => `
+                <div class="small text-muted">
+                    Spool #${item.spoolId}
+                    - ${item.allocatedGrams}g
+
+                    ${
+                    item.userSelected
+                        ? '<span class="badge bg-blue-lt ms-1">Manual</span>'
+                        : ''
+                }
+                </div>
+            `)
+                .join('');
+
+            const warning =
+                group.missingGrams > 0
+                    ? `
+                        <div class="alert alert-danger py-1 px-2 mt-2 mb-0">
+                            <i class="ti ti-alert-triangle"></i>
+                            Missing ${group.missingGrams}g
+                        </div>
+                      `
+                    : '';
+
+            const manual =
+                group.userOverridden
+                    ? `
+                        <div class="text-blue small mt-1">
+                            <i class="ti ti-hand-click"></i>
+                            Manual allocation
+                        </div>
+                      `
+                    : '';
+
+            return `
+                <div class="mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="color-swatch"
+                              style="background:${group.colorHex}">
+                        </span>
+                        <b>${group.filamentName}</b>
+                    </div>
+
+                    <div class="small text-muted mt-1">
+                        Allocated:
+                        ${group.allocatedGrams}/${group.requestedGrams}g
+                        •
+                        ${
+                group.items
+                    ?.reduce(
+                        (sum, item) =>
+                            sum + (item.estimatedCost || 0),
+                        0
+                    )
+                    ?.toFixed(2)
+            }
+                         ₴
+                    </div>
+
+                    <div class="small text-muted">
+                        ${items}
+                    </div>
+
+                    ${manual}
+
+                    ${warning}
+
+                </div>
+            `;
+        }).join('');
+
+        const manageButton = `
+        <div class="mt-2">
+            <a class="btn btn-sm btn-outline-primary"
+               href="/print-jobs/allocation/${job.id}">
+                <i class="ti ti-adjustments"></i>
+                Manage Allocation
+            </a>
+        </div>
+    `;
+
+        return reconciliationBadge + groupsHtml + manageButton;
+    }
+
+    function renderFilamentSection(job) {
+        if (
+            job.status === 'RUNNING'
+            || (
+                job.allocationPreview
+                && !job.allocationPreview.finalized
+            )
+        ) {
+            return renderAllocationPreview(job);
+        }
+        return renderFilament(job);
     }
 
     function renderSpools(filament) {

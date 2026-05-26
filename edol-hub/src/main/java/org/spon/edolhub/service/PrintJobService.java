@@ -5,16 +5,14 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
+import org.spon.edolhub.model.dto.AllocationResult;
 import org.spon.edolhub.model.entity.*;
-import org.spon.edolhub.repository.FilamentSpoolRepository;
-import org.spon.edolhub.repository.JobFilamentUsageRepository;
+import org.spon.edolhub.repository.PrintAllocationPreviewRepository;
 import org.spon.edolhub.repository.PrintJobRepository;
-import org.spon.edolhub.service.filament.FilamentMatchingService;
-import org.spon.edolhub.service.filament.FilamentService;
-import org.spon.edolhub.service.spool.FilamentSpoolService;
+import org.spon.edolhub.service.spool.PrintAllocationFinalizeService;
+import org.spon.edolhub.service.spool.PrintAllocationPreviewService;
+import org.spon.edolhub.service.spool.PrintAllocationSnapshotService;
 import org.spon.edolhub.service.spool.SpoolAllocationService;
-import org.spon.edolhub.service.spool.SpoolConsumptionService;
-import org.spon.edolhub.service.spool.SpoolResolverService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,11 +21,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -35,20 +30,16 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class PrintJobService {
 
+    private final RestTemplate restTemplate;
+
     private final PrintJobRepository printJobRepository;
     private final PrinterStatsService printerStatsService;
-    private final FilamentService filamentService;
-    private final FilamentSpoolService filamentSpoolService;
-    private final FilamentSpoolRepository filamentSpoolRepository;
 
-    private final SpoolResolverService spoolResolverService;
-
-    private final JobFilamentUsageRepository jobFilamentUsageRepository;
-    private final JobSpoolUsageService jobSpoolUsageService;
-    private final RestTemplate restTemplate;
-    private final FilamentMatchingService filamentMatchingService;
+    private final PrintAllocationSnapshotService printAllocationSnapshotService;
+    private final PrintAllocationFinalizeService printAllocationFinalizeService;
+    private final PrintAllocationPreviewService printAllocationPreviewService;
     private final SpoolAllocationService spoolAllocationService;
-    private final SpoolConsumptionService spoolConsumptionService;
+    private final PrintAllocationPreviewRepository previewRepository;
 
     @Value("${edol-core.url}")
     private String edolCoreUrl;
@@ -76,6 +67,12 @@ public class PrintJobService {
         log.info("Print started. Session ID: {}, Job ID: {}",
                 printerState.getSessionId(),
                 currentJob.getId());
+
+        printAllocationSnapshotService.createSnapshot(
+                currentJob,
+                printerState
+        );
+
     }
 
     @Transactional
@@ -83,12 +80,9 @@ public class PrintJobService {
         PrintJob job = printJobRepository.findBySessionId(printerState.getSessionId())
                 .orElseThrow();
 
-        for (org.spon.edol.model.Filament filamentDto : printerState.getFilaments()) {
-            double usedGrams = filamentDto.getUsedGrams();
-            calculateJobFilamentUsage(filamentDto, usedGrams, job, printerState);
-        }
-
         job.setStatus(PrintJobStatus.FINISHED);
+        printAllocationFinalizeService.finalizeAllocation(job);
+
         job.setCurrentLayer(printerState.getTotalLayers());
         job.setProgress(100);
         job.setFinishedAt(LocalDateTime.now());
@@ -118,10 +112,35 @@ public class PrintJobService {
 
         for (org.spon.edol.model.Filament filamentDto : printerState.getFilaments()) {
             double usedGrams = Math.round(filamentDto.getUsedGrams() * ((double) currentLayer / totalLayers) * 100.0) / 100.0;
-            calculateJobFilamentUsage(filamentDto, usedGrams, job, printerState);
+
+            PrintAllocationGroup group =
+                    resolveAllocationGroup(
+                            job,
+                            filamentDto
+                    );
+
+            Filament filament = group.getFilament();
+
+            List<AllocationResult> allocations =
+                    spoolAllocationService
+                            .previewAllocation(
+                                    filament,
+                                    usedGrams
+                            );
+
+            printAllocationPreviewService
+                    .updateActualUsage(
+                            job,
+                            filament,
+                            usedGrams,
+                            allocations
+                    );
         }
 
+        printAllocationFinalizeService.finalizeAllocation(job);
+
         job.setProgress(progress);
+
         if (printerState.getError() != null && printerState.getError().getCode() == 50348044) {
             job.setStatus(PrintJobStatus.CANCELLED);
         } else {
@@ -196,88 +215,49 @@ public class PrintJobService {
         printJobRepository.save(job);
     }
 
-    private void calculateJobFilamentUsage(org.spon.edol.model.Filament filamentDto,
-                                           double usedGrams, PrintJob job, PrinterState printerState) {
-        Filament filament =
-                filamentMatchingService.match(
-                        printerState,
-                        filamentDto
-                );
+    private PrintAllocationGroup resolveAllocationGroup(
+            PrintJob job,
+            org.spon.edol.model.Filament filamentDto
+    ) {
+        PrintAllocationPreview preview =
+                previewRepository
+                        .findByPrintJobId(
+                                job.getId()
+                        )
+                        .orElseThrow();
 
-        log.info("[Filament Usage] Job ID: {}, Filament Full ID: {}, Color: {}, Usage: {}g",
-                job.getId(),
-                filament.getFullId(),
-                filament.getColorHex(),
-                usedGrams
-        );
-
-        List<JobSpoolUsage> spoolUsages =
-                spoolAllocationService.allocate(
-                        job,
-                        filament,
-                        usedGrams
-                );
-
-        spoolConsumptionService.consume(
-                spoolUsages
-        );
-
-        // 5. Aggregate filament cost from spool usage
-        BigDecimal cost =
-                spoolUsages.stream()
-                        .map(JobSpoolUsage::getCost)
-                        .filter(Objects::nonNull)
-                        .reduce(
-                                BigDecimal.ZERO,
-                                BigDecimal::add
-                        );
-
-        // 5. Save usage
-        JobFilamentUsage usage = JobFilamentUsage.builder()
-                .printJob(job)
-                .filament(filament)
-                .usedGrams(usedGrams)
-                .usedMeters(filamentDto.getUsedMeters())
-                .usedForObject(filamentDto.isUsedForObject())
-                .usedForSupport(filamentDto.isUsedForSupport())
-                .cost(cost)
-                .build();
-
-        jobFilamentUsageRepository.save(usage);
-    }
-
-    @Transactional
-    public void recalculateCost(Long jobId) {
-        PrintJob job = printJobRepository.findById(jobId)
-                .orElseThrow();
-
-        job.getJobFilamentUsages().forEach(filamentUsage -> {
-            FilamentSpool spool = filamentSpoolRepository
-                    .findFirstByFilamentIdAndStatus(filamentUsage.getFilament().getId(), FilamentSpool.FilamentSpoolStatus.ACTIVE)
-                    .orElseThrow();
-            Double usedGrams = filamentUsage.getUsedGrams();
-            BigDecimal pricePerGram = spool.getPrice().divide(
-                    BigDecimal.valueOf(spool.getWeightTotal()),
-                    4,
-                    RoundingMode.HALF_UP
-            );
-            filamentUsage.setCost(pricePerGram.multiply(BigDecimal.valueOf(usedGrams)));
-        });
-
-        printJobRepository.save(job);
-    }
-
-
-    private void updatePrinterStats(PrintJob job) {
-        long totalFilamentUsage = (long) job.getJobFilamentUsages()
+        return preview.getGroups()
                 .stream()
-                .mapToDouble(JobFilamentUsage::getUsedGrams)
-                .sum();
+                .filter(g ->
+                        g.getAmsSlot() != null
+                                && filamentDto.getAmsSlot() != null
+                                && g.getAmsSlot()
+                                .equals(
+                                        filamentDto.getAmsSlot()
+                                )
+                )
+                .findFirst()
+                .orElseThrow();
+    }
+
+
+    private void updatePrinterStats(
+            PrintJob job
+    ) {
+        long totalFilamentUsage =
+                (long) job.getJobSpoolUsages()
+                        .stream()
+                        .mapToDouble(
+                                JobSpoolUsage::getUsedGrams
+                        )
+                        .sum();
 
         printerStatsService.addPrintJob(
-                job.getPrintDuration().toSeconds(),
+                job.getPrintDuration()
+                        .toSeconds(),
                 totalFilamentUsage
         );
+
     }
 
 }

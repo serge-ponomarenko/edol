@@ -78,6 +78,10 @@ public class FilamentSpool {
     @Column(length = 2000)
     private String comment;
 
+    public String getDisplayName() {
+        return filament.getFullId();
+    }
+
     public enum FilamentSpoolStatus {
         SEALED,
         ACTIVE,

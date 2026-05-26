@@ -2,13 +2,11 @@ package org.spon.edolhub.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.dto.FilamentDeletePreviewDto;
-import org.spon.edolhub.model.dto.FilamentReplacePreviewDto;
 import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.repository.FilamentRepository;
 import org.spon.edolhub.repository.MaterialTypeRepository;
 import org.spon.edolhub.repository.VendorRepository;
 import org.spon.edolhub.service.filament.FilamentDeleteService;
-import org.spon.edolhub.service.filament.FilamentReplaceService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +20,6 @@ public class FilamentController {
     private final FilamentRepository filamentRepository;
     private final VendorRepository vendorRepository;
     private final MaterialTypeRepository materialTypeRepository;
-    private final FilamentReplaceService filamentReplaceService;
     private final FilamentDeleteService filamentDeleteService;
 
     @GetMapping
@@ -82,18 +79,4 @@ public class FilamentController {
         return "redirect:/filaments";
     }
 
-    @PostMapping("/replace/{sourceId}/{targetId}")
-    public String replaceFilament(
-            @PathVariable Long sourceId,
-            @PathVariable Long targetId
-    ) {
-        filamentReplaceService.replace(sourceId, targetId);
-        return "redirect:/filaments";
-    }
-
-    @GetMapping("/preview-replace/{id}")
-    @ResponseBody
-    public FilamentReplacePreviewDto preview(@PathVariable Long id) {
-        return filamentReplaceService.preview(id);
-    }
 }

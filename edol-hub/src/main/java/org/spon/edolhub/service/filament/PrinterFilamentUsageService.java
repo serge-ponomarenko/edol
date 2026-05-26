@@ -6,6 +6,9 @@ import org.spon.edolhub.model.dto.AllocationResult;
 import org.spon.edolhub.model.dto.AllocationResultDto;
 import org.spon.edolhub.model.dto.FilamentCostPreviewDto;
 import org.spon.edolhub.model.entity.Filament;
+import org.spon.edolhub.model.entity.PrintJob;
+import org.spon.edolhub.service.PrintJobService;
+import org.spon.edolhub.service.spool.PrintAllocationPreviewService;
 import org.spon.edolhub.service.spool.SpoolAllocationService;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +21,8 @@ public class PrinterFilamentUsageService {
 
     private final FilamentMatchingService filamentMatchingService;
     private final SpoolAllocationService spoolAllocationService;
+    private final PrintAllocationPreviewService printAllocationPreviewService;
+    private final PrintJobService printJobService;
 
     public FilamentCostPreviewDto preview(
             PrinterState printerState,
@@ -35,6 +40,19 @@ public class PrinterFilamentUsageService {
                         filament,
                         filamentDto.getUsedGrams()
                 );
+
+        PrintJob currentJob = printJobService.getCurrentJob();
+
+        if (currentJob != null) {
+            printAllocationPreviewService.createOrUpdate(
+                    currentJob,
+                    filament,
+                    filamentDto.getAmsSlot(),
+                    filamentDto.getUsedGrams(),
+                    allocations
+            );
+
+        }
 
         FilamentCostPreviewDto dto = new FilamentCostPreviewDto();
 

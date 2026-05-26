@@ -15,11 +15,13 @@ public record FilamentDeletePreviewDto(
             Long id,
             Integer weightRemaining,
             String status
-    ) {}
+    ) {
+    }
 
     public record JobInfo(
             Long id,
             String taskName,
             Double usedGrams
-    ) {}
+    ) {
+    }
 }

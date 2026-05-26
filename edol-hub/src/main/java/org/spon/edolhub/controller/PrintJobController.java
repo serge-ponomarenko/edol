@@ -5,6 +5,7 @@ import org.spon.edolhub.model.dto.PageResponse;
 import org.spon.edolhub.model.dto.PrintJobDto;
 import org.spon.edolhub.model.entity.PrintJob;
 import org.spon.edolhub.repository.PrintJobRepository;
+import org.spon.edolhub.service.PrintJobMapper;
 import org.spon.edolhub.service.PrintJobService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
@@ -21,6 +22,7 @@ public class PrintJobController {
 
     private final PrintJobService printJobService;
     private final PrintJobRepository printJobRepository;
+    private final PrintJobMapper printJobMapper;
 
     @GetMapping("/image/{jobId}")
     public ResponseEntity<byte[]> image(@PathVariable Long jobId) {
@@ -58,7 +60,7 @@ public class PrintJobController {
             @RequestParam int size
     ) {
         Page<PrintJobDto> result = printJobService.getJobs(page, size)
-                .map(PrintJobDto::toDto);
+                .map(printJobMapper::toDto);
 
         return new PageResponse<>(
                 result.getContent(),

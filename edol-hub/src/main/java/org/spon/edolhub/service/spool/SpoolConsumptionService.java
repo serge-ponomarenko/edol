@@ -71,4 +71,45 @@ public class SpoolConsumptionService {
 
     }
 
+    @Transactional
+    public void rollback(
+            List<JobSpoolUsage> spoolUsages
+    ) {
+        for (JobSpoolUsage usage
+                : spoolUsages) {
+            FilamentSpool spool = usage.getFilamentSpool();
+
+            int remaining =
+                    spool.getWeightRemaining() != null
+                            ? spool.getWeightRemaining()
+                            : spool.getWeightTotal();
+
+            int restored = usage.getUsedGrams().intValue();
+            int newRemaining = remaining + restored;
+
+            spool.setWeightRemaining(
+                    Math.min(
+                            newRemaining,
+                            spool.getWeightTotal()
+                    )
+            );
+
+            spool.setStatus(
+                    FilamentSpool
+                            .FilamentSpoolStatus
+                            .ACTIVE
+            );
+
+            filamentSpoolRepository.save(spool);
+
+            log.info("Spool {} rollback {}g, remaining {}g",
+                    spool.getId(),
+                    restored,
+                    spool.getWeightRemaining()
+            );
+
+        }
+
+    }
+
 }

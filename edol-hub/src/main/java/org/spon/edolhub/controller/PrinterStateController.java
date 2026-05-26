@@ -11,7 +11,7 @@ import org.spon.edolhub.model.entity.PrinterStats;
 import org.spon.edolhub.service.MaintenanceService;
 import org.spon.edolhub.service.PrintJobService;
 import org.spon.edolhub.service.PrinterStatsService;
-import org.spon.edolhub.service.filament.PrinterFilamentUsageService;
+import org.spon.edolhub.service.spool.PrintAllocationPreviewQueryService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,7 +33,7 @@ public class PrinterStateController {
     private final PrinterStatsService printerStatsService;
     private final MaintenanceService maintenanceService;
     private final PrintJobService printJobService;
-    private final PrinterFilamentUsageService printerFilamentUsageService;
+    private final PrintAllocationPreviewQueryService printAllocationPreviewQueryService;
 
     private PrinterStateEnriched printerStateEnriched;
 
@@ -52,26 +52,47 @@ public class PrinterStateController {
             printerStateEnriched.setPrinterState(printerState);
 
             if (
-                    printerState != null && printerState.getFilaments() != null
-                            && !printerStateEnriched.getSessionId().equals(printerState.getSessionId())
+                    printerState != null
+                            && printerState.getFilaments() != null
+                            && !printerStateEnriched
+                            .getSessionId()
+                            .equals(printerState.getSessionId())
             ) {
+
                 PrintJob currentJob = printJobService.getCurrentJob();
                 if (currentJob != null) {
-                    printerStateEnriched.setJobId(currentJob.getId());
-                }
-                printerStateEnriched.setSessionId(printerState.getSessionId());
+                    Map<Integer, FilamentCostPreviewDto> filamentUsage = new HashMap<>();
 
-                printerStateEnriched.setFilamentUsage(new HashMap<>());
+                    boolean previewReady = true;
 
-                printerState.getFilaments().forEach(filament ->
-                        printerStateEnriched.getFilamentUsage().put(
+                    for (org.spon.edol.model.Filament filament
+                            : printerState.getFilaments()) {
+                        FilamentCostPreviewDto preview =
+                                printAllocationPreviewQueryService
+                                        .getPreview(
+                                                currentJob.getId(),
+                                                (long) filament.getId()
+                                        );
+
+                        if (preview == null) {
+                            previewReady = false;
+                            break;
+                        }
+
+                        filamentUsage.put(
                                 filament.getId(),
-                                printerFilamentUsageService.preview(
-                                        printerState,
-                                        filament
-                                )
-                        )
-                );
+                                preview
+                        );
+
+                    }
+
+                    if (previewReady) {
+                        printerStateEnriched.setJobId(currentJob.getId());
+                        printerStateEnriched.setSessionId(printerState.getSessionId());
+                        printerStateEnriched.setFilamentUsage(filamentUsage);
+                    }
+
+                }
 
             }
 

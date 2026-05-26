@@ -5,9 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.FilamentSpool;
-import org.spon.edolhub.model.entity.JobFilamentUsage;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
-import org.spon.edolhub.repository.JobFilamentUsageRepository;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +21,6 @@ import java.util.Optional;
 public class FilamentSpoolService {
 
     private final FilamentSpoolRepository filamentSpoolRepository;
-    private final JobFilamentUsageRepository jobFilamentUsageRepository;
 
     public FilamentSpool findOrCreateForFilament(Filament filament) {
         return filamentSpoolRepository
@@ -50,35 +47,6 @@ public class FilamentSpoolService {
     @Cacheable("spools")
     public Optional<FilamentSpool> findSpool(Long filamentId, FilamentSpool.FilamentSpoolStatus status) {
         return filamentSpoolRepository.findFirstByFilamentIdAndStatus(filamentId, status);
-    }
-
-    public void recalculateSpoolsForJobs(Filament filament, List<Long> jobIds) {
-        // 🔹 Only usages from affected jobs
-        List<JobFilamentUsage> usages =
-                jobFilamentUsageRepository.findByFilamentIdAndPrintJobIdIn(
-                        filament.getId(), jobIds
-                );
-
-        double deltaUsed = usages.stream()
-                .mapToDouble(JobFilamentUsage::getUsedGrams)
-                .sum();
-
-        FilamentSpool spool = filamentSpoolRepository
-                .findFirstByFilamentIdAndStatus(
-                        filament.getId(),
-                        FilamentSpool.FilamentSpoolStatus.ACTIVE
-                )
-                .orElseThrow();
-
-        int remaining = spool.getWeightRemaining() != null
-                ? spool.getWeightRemaining() - (int) deltaUsed
-                : spool.getWeightTotal() - (int) deltaUsed;
-
-        spool.setWeightRemaining(Math.max(remaining, 0));
-
-        if (spool.getWeightRemaining() == 0) {
-            spool.setStatus(FilamentSpool.FilamentSpoolStatus.EMPTY);
-        }
     }
 
     public List<FilamentSpool> findFiltered(

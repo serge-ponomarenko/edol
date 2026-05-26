@@ -20,9 +20,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Controller
@@ -56,12 +57,11 @@ public class FilamentSpoolController {
         List<FilamentSpool> spools =
                 filamentSpoolService.findFiltered(vendor, material, status);
 
-        Map<Filament, List<FilamentSpool>>
-                groupedSpools =
+        Map<Filament, List<FilamentSpool>> groupedSpools =
                 spools.stream()
                         .collect(Collectors.groupingBy(
                                 FilamentSpool::getFilament,
-                                LinkedHashMap::new,
+                                () -> new TreeMap<>(Comparator.comparing(Filament::getId)),
                                 Collectors.toList()
                         ));
 

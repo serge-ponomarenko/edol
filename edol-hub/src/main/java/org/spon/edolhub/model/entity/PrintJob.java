@@ -54,10 +54,10 @@ public class PrintJob {
     private LocalDateTime finishedAt;
 
     @OneToMany(mappedBy = "printJob", cascade = CascadeType.ALL)
-    private List<JobFilamentUsage> jobFilamentUsages;
-
-    @OneToMany(mappedBy = "printJob", cascade = CascadeType.ALL)
     private List<JobSpoolUsage> jobSpoolUsages;
+
+    @OneToOne(mappedBy = "printJob", cascade = CascadeType.ALL)
+    private PrintAllocationPreview allocationPreview;
 
     @Column
     private Integer currentLayer;

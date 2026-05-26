@@ -1,9 +1,9 @@
 package org.spon.edolhub.service;
 
 import lombok.RequiredArgsConstructor;
+import org.spon.edol.model.PrinterState;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import org.spon.edol.model.PrinterState;
 
 @Service
 @RequiredArgsConstructor

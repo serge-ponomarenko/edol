@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <title>Print Job • Edol Hub</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+
+</head>
+
+<body class="layout-fluid">
+
+<div class="page">
+
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark"
+           th:fragment="sidebar">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl mt-4">
+
+                <div class="card">
+
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title mb-1">
+                                Manage Allocation
+                            </h3>
+                            <div class="text-muted small">
+                                Resolve filament allocation issues
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+
+                        <div class="mb-4">
+
+                            <div class="d-flex align-items-center justify-content-between">
+
+                                <div>
+                                    <h3 id="taskName"></h3>
+
+                                    <div class="text-muted">
+                                        Job #<span id="jobId"></span>
+                                    </div>
+                                </div>
+
+                                <div id="jobStatusBadge"></div>
+
+                            </div>
+
+                        </div>
+
+                        <div id="allocationWarnings"></div>
+
+                        <div id="allocationGroups"></div>
+
+                        <div class="mt-4 d-flex gap-2">
+
+                            <button class="btn btn-primary"
+                                    id="finalizeBtn">
+                                <i class="ti ti-check"></i>
+                                Finalize Reconciliation
+                            </button>
+
+                            <a class="btn btn-secondary"
+                               href="/print-jobs">
+                                Back
+                            </a>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<div class="modal fade"
+     id="replaceFilamentModal"
+     tabindex="-1">
+
+    <div class="modal-dialog">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5 class="modal-title">
+                    Replace Filament
+                </h5>
+
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal">
+                </button>
+
+            </div>
+
+            <div class="modal-body">
+
+                <input type="hidden"
+                       id="replaceSourceFilamentId">
+
+                <input type="hidden"
+                       id="targetFilamentId">
+
+                <label class="form-label">
+                    Select filament
+                </label>
+
+                <div class="dropdown w-100">
+                    <button class="btn w-100 text-start dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            type="button">
+
+                    <span id="selectedFilamentLabel">
+                        -- Select filament --
+                    </span>
+                    </button>
+                    <div class="dropdown-menu w-100"
+                         id="filamentDropdownMenu"
+                         style="
+                            max-height: 300px;
+                            overflow-y: auto;
+                         ">
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button class="btn btn-secondary"
+                        data-bs-dismiss="modal">
+                    Cancel
+                </button>
+
+                <button class="btn btn-primary"
+                        onclick="submitFilamentReplace()">
+                    Replace Filament
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+
+<script>
+    const jobId = window.location.pathname.split('/').pop();
+
+    loadAllocation();
+
+    document
+        .getElementById('finalizeBtn')
+        .addEventListener(
+            'click',
+            finalizeReconciliation
+        );
+
+    function renderPreview(preview) {
+        document.getElementById('jobId')
+            .innerText = preview.printJobId;
+
+        const warnings =
+            document.getElementById('allocationWarnings');
+
+        const finalizeBtn =
+            document.getElementById('finalizeBtn');
+
+        if (
+            preview.jobStatus !== 'RUNNING'
+        ) {
+            finalizeBtn.style.display = 'inline-block';
+            finalizeBtn.disabled = preview.reconciliationRequired;
+        } else {
+            finalizeBtn.style.display = 'none';
+        }
+
+        if (preview.reconciliationRequired) {
+            warnings.innerHTML = `
+                <div class="alert alert-danger">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="ti ti-alert-octagon"></i>
+                        <div>
+                            <b>User action required</b><br>
+                            Printing cannot be finalized
+                            until allocation issues
+                            are resolved.
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        } else {
+            warnings.innerHTML = `
+            <div class="alert alert-success">
+
+                <div class="d-flex align-items-center gap-2">
+
+                    <i class="ti ti-circle-check"></i>
+
+                    <div>
+                        Allocation fully resolved
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+
+        }
+
+        const container =
+            document.getElementById(
+                'allocationGroups'
+            );
+
+        container.innerHTML =
+            preview.groups
+                .map(renderGroup)
+                .join('');
+
+        const subtitle = document.querySelector('.text-muted.small');
+        if (preview.jobStatus === 'RUNNING') {
+            subtitle.innerText = 'Prepare filament allocation before print completion';
+        } else {
+            subtitle.innerText = 'Resolve filament allocation issues';
+        }
+
+    }
+
+    async function loadAllocation() {
+        const response =
+            await fetch(
+                `/api/allocations/job/${jobId}`
+            );
+
+        const preview =
+            await response.json();
+
+        renderPreview(preview);
+    }
+
+    function renderGroup(group) {
+        const items =
+            group.items
+                ?.map(renderItem)
+                .join('');
+
+        const warning =
+            group.missingGrams > 0
+                ? `
+                <div class="alert alert-danger mt-3 mb-0">
+
+                    <i class="ti ti-alert-triangle"></i>
+
+                    Missing
+                    ${group.missingGrams}g filament
+
+                </div>
+              `
+                : '';
+
+        const manual =
+            group.userOverridden
+                ? `
+                <span class="badge bg-blue-lt">
+                    Manual Allocation
+                </span>
+              `
+                : '';
+
+        return `
+        <div class="card mb-4">
+
+            <div class="card-header">
+
+                <div class="w-100 d-flex
+                            justify-content-between
+                            align-items-center">
+
+                    <div class="d-flex
+                                align-items-center
+                                gap-2">
+
+                        <span style="
+                            width:18px;
+                            height:18px;
+                            border-radius:4px;
+                            border:1px solid #ccc;
+                            background:${group.colorHex};
+                            display:inline-block;
+                        "></span>
+
+                        <div>
+
+                            <div class="fw-bold">
+                                ${group.filamentName}
+                            </div>
+
+                            <div class="text-muted small">
+
+                                ${group.allocatedGrams}g
+                                /
+                                ${group.requestedGrams}g
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        ${manual}
+                        <button
+                            class="btn btn-sm btn-outline-secondary"
+                            onclick="
+                                openReplaceFilamentModal(
+                                    ${group.filamentId}
+                                )
+                            ">
+                            <i class="ti ti-arrows-exchange"></i>
+                            Replace Filament
+                        </button>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                ${items}
+
+                ${warning}
+
+                ${
+            group.status !== 'RESOLVED'
+                ? `
+                <div class="mt-3">
+                    <button
+                        class="btn btn-outline-primary"
+                        onclick="
+                            rerunAllocation(
+                                ${group.filamentId}
+                            )
+                        ">
+                        <i class="ti ti-refresh"></i>
+                        Re-run Allocation
+                    </button>
+
+                </div>
+              `
+                : ''
+        }
+            </div>
+        </div>
+    `;
+
+    }
+
+    function renderItem(item) {
+        const manual =
+            item.userSelected
+                ? `
+                <span class="badge bg-blue-lt">
+                    Manual
+                </span>
+              `
+                : '';
+
+        return `
+        <div class="border rounded p-3 mb-2">
+
+            <div class="d-flex
+                        justify-content-between
+                        align-items-center">
+
+                <div>
+
+                    <div class="fw-bold">
+
+                        Spool #${item.spoolId}
+
+                    </div>
+
+                    <div class="text-muted small">
+
+                        ${item.allocatedGrams}g
+
+                        •
+
+                        ₴${item.estimatedCost}
+
+                    </div>
+
+                </div>
+
+                ${manual}
+
+            </div>
+
+        </div>
+    `;
+
+    }
+
+    async function rerunAllocation(
+        filamentId
+    ) {
+        try {
+            await fetch(
+                `/api/allocations/rerun?jobId=${jobId}&filamentId=${filamentId}`,
+                {
+                    method: 'POST'
+                }
+            );
+            await loadAllocation();
+        } catch (e) {
+            alert(
+                'Failed to rerun allocation'
+            );
+        }
+    }
+
+    let replaceFilamentModal;
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+
+            replaceFilamentModal =
+                new bootstrap.Modal(
+                    document.getElementById(
+                        'replaceFilamentModal'
+                    )
+                );
+
+
+        }
+    );
+
+    function openReplaceFilamentModal(
+        filamentId
+    ) {
+
+        document.getElementById(
+            'replaceSourceFilamentId'
+        ).value = filamentId;
+
+        loadFilaments(
+            filamentId
+        );
+
+        replaceFilamentModal.show();
+
+    }
+
+    async function loadFilaments(
+        sourceFilamentId
+    ) {
+
+        const response =
+            await fetch(
+                '/api/allocations/filaments?query='
+            );
+
+        const filaments =
+            await response.json();
+
+        document.getElementById(
+            'filamentDropdownMenu'
+        ).innerHTML =
+            filaments
+                .filter(
+                    f => f.id != sourceFilamentId
+                )
+                .map(f => `
+
+                <a class="
+                        dropdown-item
+                        d-flex
+                        align-items-center
+                        justify-content-between
+                   "
+                   href="#"
+                   onclick="
+                        event.preventDefault();
+                        selectFilament(
+                            ${f.id},
+                            '${f.fullId}',
+                            '${f.colorHex || "#ccc"}'
+                        )
+                   ">
+
+                    <div class="
+                                d-flex
+                                align-items-center
+                           ">
+
+                        <span class="
+                                    avatar
+                                    avatar-xs
+                                    me-2
+                              "
+                              style="
+                                background-color:
+                                ${f.colorHex || "#ccc"}
+                              ">
+                        </span>
+
+                        <span>
+                            ${f.fullId}
+                        </span>
+
+                    </div>
+
+                    <small class="
+                                text-muted
+                                ms-2
+                                font-monospace
+                           ">
+                        ${f.colorHex || '#N/A'}
+                    </small>
+
+                </a>
+
+            `)
+                .join('');
+
+    }
+
+    function selectFilament(
+        id,
+        name,
+        color
+    ) {
+
+        document.getElementById(
+            'targetFilamentId'
+        ).value = id;
+
+        document.getElementById(
+            'selectedFilamentLabel'
+        ).innerHTML = `
+
+        <span class="
+                    d-flex
+                    align-items-center
+                    justify-content-between
+                    w-100
+               ">
+
+            <span class="
+                        d-flex
+                        align-items-center
+                   ">
+
+                <span class="
+                            avatar
+                            avatar-xs
+                            me-2
+                       "
+                       style="
+                            background-color:
+                            ${color}
+                       ">
+                </span>
+
+                ${name}
+
+            </span>
+
+            <small class="
+                        text-muted
+                        ms-2
+                        font-monospace
+                   ">
+                ${color}
+            </small>
+
+        </span>
+
+    `;
+
+    }
+
+    async function submitFilamentReplace() {
+
+        const sourceFilamentId =
+            document.getElementById(
+                'replaceSourceFilamentId'
+            ).value;
+
+        const targetFilamentId =
+            document.getElementById(
+                'targetFilamentId'
+            ).value;
+
+        if (!targetFilamentId) {
+
+            alert(
+                'Please select filament'
+            );
+
+            return;
+
+        }
+
+        if (
+            sourceFilamentId
+            === targetFilamentId
+        ) {
+
+            alert(
+                'Cannot replace filament with itself'
+            );
+
+            return;
+
+        }
+
+        try {
+
+            await fetch(
+                `/api/allocations/replace-filament`
+                + `?jobId=${jobId}`
+                + `&sourceFilamentId=${sourceFilamentId}`
+                + `&targetFilamentId=${targetFilamentId}`,
+                {
+                    method: 'POST'
+                }
+            );
+
+            replaceFilamentModal.hide();
+
+            await loadAllocation();
+
+        } catch (e) {
+
+            alert(
+                'Failed to replace filament'
+            );
+
+        }
+
+    }
+
+    async function finalizeReconciliation() {
+        try {
+            const btn =
+                document.getElementById(
+                    'finalizeBtn'
+                );
+            btn.disabled = true;
+            btn.innerHTML = `
+                    <span class="spinner-border
+                                 spinner-border-sm
+                                 me-2">
+                    </span>
+                Finalizing...
+                `;
+
+            const response =
+                await fetch(
+                    `/api/allocations/finalize?jobId=${jobId}`,
+                    {
+                        method: 'POST'
+                    }
+                );
+
+            const finalized = await response.json();
+
+            if (!finalized) {
+                alert(
+                    'Allocation still unresolved'
+                );
+                return;
+            }
+
+            alert(
+                'Reconciliation finalized successfully'
+            );
+
+            window.location.href =
+                '/print-jobs';
+
+            await loadAllocation();
+
+        } catch (e) {
+            btn.disabled = false;
+            btn.innerHTML = `
+                <i class="ti ti-check"></i>
+                Finalize Reconciliation
+            `;
+            alert(
+                'Failed to finalize reconciliation'
+            );
+        }
+    }
+</script>
+</html>

@@ -33,6 +33,24 @@ public class FilamentSpoolStatusMigration {
 
         }
 
+        String type2 = jdbcTemplate.queryForObject("""
+                        SELECT DATA_TYPE
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = 'PRINT_JOBS'
+                          AND COLUMN_NAME = 'STATUS'
+                        """,
+                String.class
+        );
+
+        if ("ENUM".equalsIgnoreCase(type2)) {
+            // ENUM -> VARCHAR
+            jdbcTemplate.execute("""
+                    ALTER TABLE print_jobs
+                    ALTER COLUMN status VARCHAR(32)
+                    """);
+
+        }
+
         // NEW -> SEALED
         jdbcTemplate.update("""
                 UPDATE filament_spools
