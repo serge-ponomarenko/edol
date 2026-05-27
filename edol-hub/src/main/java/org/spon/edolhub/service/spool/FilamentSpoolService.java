@@ -22,33 +22,6 @@ public class FilamentSpoolService {
 
     private final FilamentSpoolRepository filamentSpoolRepository;
 
-    public FilamentSpool findOrCreateForFilament(Filament filament) {
-        return filamentSpoolRepository
-                .findFirstByFilamentIdAndStatus(filament.getId(), FilamentSpool.FilamentSpoolStatus.ACTIVE)
-                .orElseGet(() -> {
-
-                    FilamentSpool spool = FilamentSpool.builder()
-                            .filament(filament)
-                            .weightTotal(1000)
-                            .weightRemaining(1000)
-                            .price(BigDecimal.valueOf(500))
-                            .openedAt(LocalDateTime.now())
-                            .status(FilamentSpool.FilamentSpoolStatus.SEALED)
-                            .build();
-
-                    log.info("+ New Spool has been created. Filament full ID: {}, Color: {}",
-                            filament.getFullId(),
-                            filament.getColorHex());
-
-                    return filamentSpoolRepository.save(spool);
-                });
-    }
-
-    @Cacheable("spools")
-    public Optional<FilamentSpool> findSpool(Long filamentId, FilamentSpool.FilamentSpoolStatus status) {
-        return filamentSpoolRepository.findFirstByFilamentIdAndStatus(filamentId, status);
-    }
-
     public List<FilamentSpool> findFiltered(
             String vendor,
             String material,

@@ -18,7 +18,6 @@ import static org.spon.edolhub.model.entity.FilamentSpool.FilamentSpoolStatus.SE
 public class SpoolResolverService {
 
     private final FilamentSpoolRepository filamentSpoolRepository;
-    private final FilamentSpoolService filamentSpoolService;
 
     private final List<SpoolResolutionStrategy> strategies;
 
@@ -35,11 +34,7 @@ public class SpoolResolverService {
                 );
 
         if (candidates.isEmpty()) {
-            FilamentSpool spool =
-                    filamentSpoolService.findOrCreateForFilament(
-                            filament
-                    );
-            candidates = List.of(spool);
+            return List.of();
         }
 
         Comparator<FilamentSpool> comparator = (a, b) -> 0;
