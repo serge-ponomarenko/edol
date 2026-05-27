@@ -321,7 +321,7 @@
                                                     <div class="spool-mini-bar"
                                                          data-bs-toggle="tooltip"
                                                          data-bs-placement="top"
-                                                         th:attr="title=${spool.weightRemaining + ' / ' + spool.weightTotal + ' g'}">
+                                                         th:attr="title=${'Spool #' + spool.id + ' • Remaining: ' + spool.weightRemaining + ' / ' + spool.weightTotal + ' g'}">
 
                                                         <div class="spool-mini-fill"
                                                              th:classappend="${spool.weightRemaining < 200} ? ' low' : ''"
@@ -330,7 +330,7 @@
                                                     </div>
 
                                                     <div class="spool-mini-label"
-                                                         th:text="${spool.id}">
+                                                         th:text="${spool.weightRemaining}">
                                                     </div>
                                                 </div>
 
