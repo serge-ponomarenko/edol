@@ -80,7 +80,7 @@ public class MqttEventListener {
     }
 
     private void handlePrintMetadata(JsonNode json) {
-        printJobService.saveModelImage(printerState);
+        printJobService.metadataLoaded(printerState);
     }
 
     private void handleAmsStatus(JsonNode json) {

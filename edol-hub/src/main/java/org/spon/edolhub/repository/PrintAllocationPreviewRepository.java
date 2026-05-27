@@ -10,4 +10,6 @@ public interface PrintAllocationPreviewRepository
 
     Optional<PrintAllocationPreview> findByPrintJobId(Long printJobId);
 
+    boolean existsByPrintJobId(Long id);
+
 }

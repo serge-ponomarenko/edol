@@ -1,7 +1,6 @@
 package org.spon.edolhub.service;
 
 import jakarta.transaction.Transactional;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
@@ -9,10 +8,7 @@ import org.spon.edolhub.model.dto.AllocationResult;
 import org.spon.edolhub.model.entity.*;
 import org.spon.edolhub.repository.PrintAllocationPreviewRepository;
 import org.spon.edolhub.repository.PrintJobRepository;
-import org.spon.edolhub.service.spool.PrintAllocationFinalizeService;
-import org.spon.edolhub.service.spool.PrintAllocationPreviewService;
-import org.spon.edolhub.service.spool.PrintAllocationSnapshotService;
-import org.spon.edolhub.service.spool.SpoolAllocationService;
+import org.spon.edolhub.service.spool.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -35,17 +31,20 @@ public class PrintJobService {
     private final PrintJobRepository printJobRepository;
     private final PrinterStatsService printerStatsService;
 
+    private final PrintRuntimeStateService runtimeStateService;
+
     private final PrintAllocationSnapshotService printAllocationSnapshotService;
     private final PrintAllocationFinalizeService printAllocationFinalizeService;
     private final PrintAllocationPreviewService printAllocationPreviewService;
     private final SpoolAllocationService spoolAllocationService;
     private final PrintAllocationPreviewRepository previewRepository;
+    private final AllocationPreviewRuntimeCacheService runtimeCacheService;
+    private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
+
 
     @Value("${edol-core.url}")
     private String edolCoreUrl;
 
-    @Getter
-    private PrintJob currentJob;
 
     public Page<PrintJob> getJobs(int page, int size) {
         return printJobRepository.findAllByOrderByStartedAtDesc(PageRequest.of(page, size));
@@ -62,17 +61,55 @@ public class PrintJobService {
                 .startedAt(LocalDateTime.now())
                 .build();
 
-        currentJob = printJobRepository.save(job);
+        runtimeStateService.setCurrentJob(
+                printJobRepository.save(job)
+        );
+
+        runtimeStateService
+                .setAllocationPreviewReady(false);
 
         log.info("Print started. Session ID: {}, Job ID: {}",
                 printerState.getSessionId(),
-                currentJob.getId());
+                runtimeStateService
+                        .getCurrentJob()
+                        .getId());
+
+    }
+
+    @Transactional
+    public void metadataLoaded(
+            PrinterState printerState
+    ) {
+        PrintJob job =
+                printJobRepository
+                        .findBySessionId(
+                                printerState.getSessionId()
+                        )
+                        .orElseThrow();
+
+        if (previewRepository.existsByPrintJobId(
+                job.getId()
+        )) {
+            return;
+        }
 
         printAllocationSnapshotService.createSnapshot(
-                currentJob,
+                job,
                 printerState
         );
 
+        runtimeStateService
+                .setAllocationPreviewReady(true);
+
+        allocationPreviewRuntimeSyncService.refresh(job.getId());
+
+        log.info(
+                "Allocation snapshot created. Session ID: {}, Job ID: {}",
+                printerState.getSessionId(),
+                job.getId()
+        );
+
+        saveModelImage(printerState);
     }
 
     @Transactional
@@ -89,7 +126,11 @@ public class PrintJobService {
 
         updatePrinterStats(job);
 
-        currentJob = null;
+        runtimeStateService.setAllocationPreviewReady(false);
+
+        runtimeCacheService.setCurrentAllocationPreview(null);
+
+        runtimeStateService.setCurrentJob(null);
 
         log.info("Print finished. Session ID: {}, Job ID: {}",
                 printerState.getSessionId(),
@@ -154,7 +195,11 @@ public class PrintJobService {
         }
         job.setFinishedAt(LocalDateTime.now());
 
-        currentJob = null;
+        runtimeStateService.setAllocationPreviewReady(false);
+
+        runtimeCacheService.setCurrentAllocationPreview(null);
+
+        runtimeStateService.setCurrentJob(null);
 
         updatePrinterStats(job);
 
@@ -180,8 +225,8 @@ public class PrintJobService {
             job.setTotalLayers(printerState.getTotalLayers());
             job.setRemainingTime(printerState.getRemainingTime());
 
-            if (currentJob == null) {
-                currentJob = job;
+            if (runtimeStateService.getCurrentJob() == null) {
+                runtimeStateService.setCurrentJob(job);
             }
 
             log.info("Progress updated: {}%, layer: {}/{}. Session ID: {}, Job ID: {}",
@@ -285,14 +330,11 @@ public class PrintJobService {
                         ? (double) currentLayer / totalLayers
                         : progress / 100.0;
 
-        ratio =
-                Math.max(
-                        0,
-                        Math.min(
-                                1,
-                                ratio
-                        )
-                );
+        ratio = Math.clamp(
+                ratio
+                ,
+                0,
+                1);
 
         return Math.round(
                 plannedGrams * ratio * 100.0

@@ -23,6 +23,7 @@ public class PrintAllocationReconciliationService {
     private final JobSpoolUsageService jobSpoolUsageService;
     private final SpoolConsumptionService spoolConsumptionService;
     private final JobSpoolUsageRepository jobSpoolUsageRepository;
+    private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
 
     @Transactional
     public boolean finalizeReconciliation(
@@ -76,6 +77,10 @@ public class PrintAllocationReconciliationService {
         preview.setFinalized(false);
 
         previewRepository.save(preview);
+
+        allocationPreviewRuntimeSyncService.refresh(
+                printJobId
+        );
 
     }
 

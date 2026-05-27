@@ -17,7 +17,21 @@ public class DashboardController {
     public String dashboard(Model model) {
         PrinterState state = printerService.getState();
 
-        model.addAttribute("printer", state);
+        boolean offline = state == null;
+
+        if (state == null) {
+            state = new PrinterState();
+        }
+
+        model.addAttribute(
+                "printer",
+                state
+        );
+
+        model.addAttribute(
+                "printerOffline",
+                offline
+        );
 
         return "dashboard/index";
     }

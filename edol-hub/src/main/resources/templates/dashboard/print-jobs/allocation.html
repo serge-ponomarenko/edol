@@ -858,15 +858,15 @@
         try {
             const response =
                 await fetch(
-                endpoint
-                + `?jobId=${jobId}`
-                + `&filamentId=${filamentId}`
-                + `&spoolId=${spoolId}`
-                + `&grams=${grams}`,
-                {
-                    method: 'POST'
-                }
-            );
+                    endpoint
+                    + `?jobId=${jobId}`
+                    + `&filamentId=${filamentId}`
+                    + `&spoolId=${spoolId}`
+                    + `&grams=${grams}`,
+                    {
+                        method: 'POST'
+                    }
+                );
 
             if (!response.ok) {
                 throw new Error(

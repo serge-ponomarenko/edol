@@ -23,6 +23,7 @@ public class AllocationMutationService {
             spoolAllocationService;
     private final PrintAllocationReconciliationService
             reconciliationService;
+    private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
 
     @Transactional
     public void replaceAllocationWithSingleSpool(
@@ -60,6 +61,10 @@ public class AllocationMutationService {
         recalculateGroupState(group);
 
         previewRepository.save(preview);
+
+        allocationPreviewRuntimeSyncService.refresh(
+                printJobId
+        );
 
     }
 
@@ -107,6 +112,10 @@ public class AllocationMutationService {
 
         previewRepository.save(preview);
 
+        allocationPreviewRuntimeSyncService.refresh(
+                printJobId
+        );
+
     }
 
     @Transactional
@@ -140,6 +149,10 @@ public class AllocationMutationService {
         recalculateGroupState(group);
 
         previewRepository.save(preview);
+
+        allocationPreviewRuntimeSyncService.refresh(
+                printJobId
+        );
     }
 
     @Transactional
@@ -176,6 +189,10 @@ public class AllocationMutationService {
         recalculateGroupState(group);
 
         previewRepository.save(preview);
+
+        allocationPreviewRuntimeSyncService.refresh(
+                printJobId
+        );
 
     }
 

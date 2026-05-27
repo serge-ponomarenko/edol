@@ -488,17 +488,40 @@
 </script>
 <script>
     async function refreshPrinterState() {
-        const res = await fetch("/api/printer/state");
-        const data = await res.json();
+        try {
+            const res = await fetch("/api/printer/state");
 
-        updatePrinterStatus(data.printerState);
-        updateProgress(data.printerState);
-        updateModelInfo(data);
-        updateAMS(data.printerState);
-        updateEXT(data.printerState);
-        updateTemps(data.printerState);
-        updateCamera();
-        updateFilamentUsage(data);
+            if (!res.ok) {
+                throw new Error(
+                    "Dashboard state unavailable"
+                );
+            }
+
+            const data = await res.json();
+
+            if (!data || !data.printerState) {
+                throw new Error(
+                    "Printer state unavailable"
+                );
+            }
+
+            updatePrinterStatus(data.printerState);
+            updateProgress(data.printerState);
+            updateModelInfo(data);
+            updateAMS(data.printerState);
+            updateEXT(data.printerState);
+            updateTemps(data.printerState);
+            updateCamera();
+            updateFilamentUsage(data);
+
+        } catch (e) {
+            console.warn(
+                "Failed to refresh printer state",
+                e
+            );
+            renderOfflineDashboardState();
+
+        }
     }
 
     async function refreshPrinterStats() {
@@ -808,71 +831,134 @@
 
         container.innerHTML = "";
 
-        if (!data.printerState.filaments || data.printerState.filaments.length === 0) {
-            container.innerHTML =
-                "<span class='text-muted'>No filament data</span>";
+        if (data.allocationPreviewPending) {
+            container.innerHTML = `
+                <div class="text-muted text-center py-4">
+                    <div class="spinner-border spinner-border-sm mb-2"></div>
+
+                    <div>
+                        Waiting for print information being loaded...
+                    </div>
+                </div>
+            `;
             return;
         }
 
-        data.printerState.filaments.forEach(f => {
-            const row = document.createElement("div");
-            row.className = "filament-row";
-
-            const info = document.createElement("div");
-            info.className = "filament-info";
-
-            const color = document.createElement("div");
-            color.className = "filament-color";
-            color.style.background = f.color;
-
-            info.appendChild(color);
-
-            const name = document.createElement("div");
-            name.innerHTML =
-                "<b>" + f.fullId + "</b>";
-
-            info.appendChild(name);
-
-            row.appendChild(info);
-
-            const meta = document.createElement("div");
-            meta.className = "filament-meta";
-
-            const usage =
-                data.filamentUsage[f.id];
-
-            meta.innerHTML =
-                formatMeters(f.usedMeters) +
-                " • " +
-                formatGrams(f.usedGrams) +
-                " • " +
-                formatCost(usage?.totalCost);
-
-            if (
-                usage &&
-                usage.allocations &&
-                usage.allocations.length > 0
-            ) {
-
-                meta.innerHTML += `
-                    <div class="small text-muted mt-1">
-                        <b>Spools:</b>
-                        ${
-                    usage.allocations
-                        .map(a =>
-                            `#${a.spoolId} - ${a.allocatedGrams}g`
-                        )
-                        .join(", ")
-                }
+        if (data.allocationPreview && data.allocationPreview.groups) {
+            container.innerHTML =
+                renderCurrentAllocationPreview(data);
+            return;
+        } else {
+            container.innerHTML = `
+                <div class="text-muted text-center py-4">
+                    <div>
+                        No filament data
                     </div>
-                    `;
+                </div>
+            `;
+        }
+    }
 
-            }
-            row.appendChild(meta);
+    function renderCurrentAllocationPreview(data) {
+        const preview = data.allocationPreview;
 
-            container.appendChild(row);
+        const groupsHtml =
+            preview.groups
+                .map(renderAllocationGroup)
+                .join("");
 
-        });
+        const manageButton =
+            data.jobId
+                ? `
+                    <div class="mt-2">
+                        <a class="btn btn-sm btn-outline-primary"
+                           href="/print-jobs/allocation/${data.jobId}">
+                            <i class="ti ti-adjustments"></i>
+                            Manage Allocation
+                        </a>
+                    </div>
+                  `
+                : "";
+
+        return groupsHtml + manageButton;
+    }
+
+    function renderAllocationGroup(group) {
+        const items =
+            group.items
+                ?.map(renderAllocationItem)
+                .join("") || "";
+
+        const warning =
+            group.missingGrams > 0
+                ? `
+                    <div class="alert alert-danger py-1 px-2 mt-2 mb-0">
+                        <i class="ti ti-alert-triangle"></i>
+                        Missing ${group.missingGrams}g
+                    </div>
+                  `
+                : "";
+
+        const manual =
+            group.userOverridden
+                ? `
+                    <div class="text-blue small mt-1">
+                        <i class="ti ti-hand-click"></i>
+                        Manual allocation
+                    </div>
+                  `
+                : "";
+
+        return `
+            <div class="mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="filament-color"
+                          style="background:${group.colorHex}">
+                    </span>
+                    <b>${group.filamentName}</b>
+                </div>
+
+                <div class="small text-muted mt-1">
+                    Allocated:
+                    ${group.allocatedGrams}/${group.requestedGrams}g
+                    &bull;
+                    ${allocationGroupCost(group).toFixed(2)}
+                    &#8372;
+                </div>
+
+                <div class="small text-muted">
+                    ${items}
+                </div>
+
+                ${manual}
+
+                ${warning}
+            </div>
+        `;
+    }
+
+    function renderAllocationItem(item) {
+        const manual =
+            item.userSelected
+                ? '<span class="badge bg-blue-lt ms-1">Manual</span>'
+                : '';
+
+        return `
+            <div>
+                Spool #${item.spoolId}
+                - ${item.allocatedGrams}g
+                ${manual}
+            </div>
+        `;
+    }
+
+    function allocationGroupCost(group) {
+        return group.items
+            ?.reduce(
+                (sum, item) =>
+                    sum + (item.estimatedCost || 0),
+                0
+            ) || 0;
     }
 
     function setOfflineImages() {
@@ -892,6 +978,29 @@
         };
 
         modelImage.src = "/api/proxy/modelimage?t=" + Date.now();
+    }
+
+    function renderOfflineDashboardState() {
+        setOfflineImages();
+
+        document.getElementById("printerConnection")
+            .className =
+            "badge bg-red text-red-fg";
+
+        document.getElementById("printerConnection")
+            .textContent =
+            "Offline";
+
+        document.getElementById("printerState")
+            .textContent =
+            "UNAVAILABLE";
+
+        document.getElementById("filamentUsage")
+            .innerHTML = `
+            <div class="text-muted text-center py-4">
+                EDOL Core is unavailable
+            </div>
+        `;
     }
 
     function formatMeters(m) {

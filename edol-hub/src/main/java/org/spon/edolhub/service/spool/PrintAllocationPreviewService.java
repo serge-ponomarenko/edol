@@ -15,6 +15,7 @@ public class PrintAllocationPreviewService {
 
     private final PrintAllocationPreviewRepository previewRepository;
     private final AllocationResultMapper allocationResultMapper;
+    private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
 
     public PrintAllocationPreview createOrUpdate(
             PrintJob job,
@@ -114,7 +115,13 @@ public class PrintAllocationPreviewService {
 
         preview.getGroups().add(group);
 
-        return previewRepository.save(preview);
+        preview = previewRepository.save(preview);
+
+        allocationPreviewRuntimeSyncService.refresh(
+                job.getId()
+        );
+
+        return preview;
 
     }
 
@@ -185,6 +192,7 @@ public class PrintAllocationPreviewService {
 
         previewRepository.save(preview);
 
+        allocationPreviewRuntimeSyncService.refresh(job.getId());
     }
 
 }

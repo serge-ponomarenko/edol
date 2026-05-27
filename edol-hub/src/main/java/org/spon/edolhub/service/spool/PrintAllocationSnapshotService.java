@@ -22,8 +22,11 @@ public class PrintAllocationSnapshotService {
             PrintJob job,
             PrinterState printerState
     ) {
-        if (printerState.getFilaments() == null) {
-            return;
+        if (printerState.getFilaments() == null
+                || printerState.getFilaments().isEmpty()) {
+            throw new IllegalStateException(
+                    "Cannot create allocation snapshot without filament metadata"
+            );
         }
 
         for (org.spon.edol.model.Filament filamentDto
