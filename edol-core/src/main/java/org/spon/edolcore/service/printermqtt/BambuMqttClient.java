@@ -33,6 +33,9 @@ public class BambuMqttClient implements MqttCallback {
     @Value("${bambu.access-code}")
     private String accessCode;
 
+    @Value("${bambu.client-id}")
+    private String clientId;
+
     @Value("${bambu.connection-timeout}")
     private Integer bambuConnectionTimeout;
 
@@ -46,7 +49,7 @@ public class BambuMqttClient implements MqttCallback {
                 return;
             }
 
-            client = new MqttClient(host, "edol-core");
+            client = new MqttClient(host, clientId);
 
             MqttConnectOptions options = new MqttConnectOptions();
             options.setUserName("bblp");

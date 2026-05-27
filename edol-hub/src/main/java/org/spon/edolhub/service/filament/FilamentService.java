@@ -25,6 +25,15 @@ public class FilamentService {
     private final VendorRepository vendorRepository;
 
     @Transactional
+    public Filament findByBrandIndexOrCreate(String filamentBrandIndex, String color, String fullId) {
+        return filamentRepository
+                .findFirstByPrinterFilamentProfileIdAndColorHex(filamentBrandIndex, color)
+                .orElseGet(
+                        () -> findOrCreateFilament(fullId, color, filamentBrandIndex)
+                );
+    }
+
+    @Transactional
     @CacheEvict(value = "spools", allEntries = true)
     public Filament findOrCreateFilament(String fullId, String color, String filamentBrandIndex) {
         Optional<Filament> existing =

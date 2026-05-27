@@ -7,6 +7,8 @@ import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.model.entity.Filament;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -18,26 +20,39 @@ public class FilamentMatchingService {
             PrinterState printerState,
             org.spon.edol.model.Filament filamentDto
     ) {
-        String filamentColor =
-                resolveColor(
+        RuntimeFilamentMapping mapping =
+                resolveRuntimeMapping(
                         printerState,
                         filamentDto
                 );
 
-        return filamentService.findOrCreateFilament(
-                filamentDto.getFullId(),
-                filamentColor,
+        if (Objects.equals(
+                mapping.filamentBrandIndex(),
                 filamentDto.getFilamentBrandIndex()
+        )) {
+
+            return filamentService.findOrCreateFilament(
+                    filamentDto.getFullId(),
+                    mapping.color(),
+                    mapping.filamentBrandIndex()
+            );
+        }
+
+        return filamentService.findByBrandIndexOrCreate(
+                mapping.filamentBrandIndex(),
+                mapping.color(),
+                filamentDto.getFullId()
         );
     }
 
-    public String resolveColor(
+    private RuntimeFilamentMapping resolveRuntimeMapping(
             PrinterState printerState,
             org.spon.edol.model.Filament filamentDto
     ) {
-        String filamentColor = filamentDto.getColor();
+        String color = filamentDto.getColor();
 
-        // AMS override
+        String filamentBrandIndex = filamentDto.getFilamentBrandIndex();
+
         if (
                 filamentDto.getAmsSlot() != null
                         && filamentDto.getAmsSlot() != -1
@@ -48,43 +63,92 @@ public class FilamentMatchingService {
                             .getSlots()
                             .get(filamentDto.getAmsSlot());
 
-            if (!amsSlot.getColor().equals(filamentDto.getColor())) {
-                log.warn("""
+            if (!Objects.equals(
+                    amsSlot.getColor(),
+                    filamentDto.getColor()
+            )) {
+                log.info("""
                                 Filament {}, {} -> AMS: {}
-                                has color mismatch with AMS mapping!
+                                has color mismatch with AMS mapping.
                                 AMS color will be used.
                                 """,
                         filamentDto.getFullId(),
                         filamentDto.getColor(),
                         amsSlot.getColor()
                 );
-                filamentColor = amsSlot.getColor();
 
+                color = amsSlot.getColor();
             }
 
+            if (!Objects.equals(
+                    amsSlot.getFilamentBrandIndex(),
+                    filamentDto.getFilamentBrandIndex()
+            )) {
+                log.info("""
+                                Filament {}, {} -> AMS: {}
+                                has filament brand index mismatch with AMS mapping.
+                                AMS filament brand index will be used.
+                                """,
+                        filamentDto.getFullId(),
+                        filamentDto.getFilamentBrandIndex(),
+                        amsSlot.getFilamentBrandIndex()
+                );
+
+                filamentBrandIndex =
+                        amsSlot.getFilamentBrandIndex();
+            }
         }
 
-        // EXT tray override
         if (printerState.isExternalSpoolUsed()) {
-            ExtTray extTray = printerState.getExtTray();
-            if (!extTray.getColor().equals(filamentDto.getColor())) {
-                log.warn("""
+            ExtTray extTray =
+                    printerState.getExtTray();
+
+            if (!Objects.equals(
+                    extTray.getColor(),
+                    filamentDto.getColor()
+            )) {
+                log.info("""
                                 Filament {}, {} -> EXT: {}
-                                has color mismatch with EXT Tray mapping!
-                                EXT Tray color will be used.
+                                has color mismatch with EXT tray mapping.
+                                EXT tray color will be used.
                                 """,
                         filamentDto.getFullId(),
                         filamentDto.getColor(),
                         extTray.getColor()
                 );
 
-                filamentColor = extTray.getColor();
-
+                color = extTray.getColor();
             }
 
+            if (!Objects.equals(
+                    extTray.getFilamentBrandIndex(),
+                    filamentDto.getFilamentBrandIndex()
+            )) {
+                log.info("""
+                                Filament {}, {} -> EXT: {}
+                                has filament brand index mismatch with EXT tray mapping.
+                                EXT tray filament brand index will be used.
+                                """,
+                        filamentDto.getFullId(),
+                        filamentDto.getFilamentBrandIndex(),
+                        extTray.getFilamentBrandIndex()
+                );
+
+                filamentBrandIndex =
+                        extTray.getFilamentBrandIndex();
+            }
         }
 
-        return filamentColor;
+        return new RuntimeFilamentMapping(
+                color,
+                filamentBrandIndex
+        );
+    }
+
+    public record RuntimeFilamentMapping(
+            String color,
+            String filamentBrandIndex
+    ) {
     }
 
 }
