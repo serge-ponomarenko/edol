@@ -13,9 +13,9 @@ public class AllocationSpoolOptionDto {
 
     private String status;
 
-    private Integer weightTotal;
+    private Double weightTotal;
 
-    private Integer weightRemaining;
+    private Double weightRemaining;
 
     private BigDecimal price;
 

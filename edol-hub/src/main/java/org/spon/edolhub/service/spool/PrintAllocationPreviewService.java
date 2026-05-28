@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.spon.edolhub.config.GramUtils.GRAM_EPSILON;
+import static org.spon.edolhub.config.GramUtils.round;
+
 @Service
 @RequiredArgsConstructor
 public class PrintAllocationPreviewService {
@@ -59,26 +62,23 @@ public class PrintAllocationPreviewService {
             preview.getGroups().remove(existingGroup);
         }
 
-        int allocated =
-                allocations.stream()
-                        .mapToInt(
-                                AllocationResult::getAllocatedGrams
+        double allocated = sumAllocatedGrams(allocations);
+
+        double requested = round(requestedGrams);
+
+        double missing =
+                round(
+                        Math.max(
+                                0.0,
+                                requested - allocated
                         )
-                        .sum();
-
-        int requested = (int) Math.ceil(requestedGrams);
-
-        int missing =
-                Math.max(
-                        0,
-                        requested - allocated
                 );
 
         AllocationStatus status;
 
         if (allocations.isEmpty()) {
             status = AllocationStatus.MISSING_SPOOL;
-        } else if (missing > 0) {
+        } else if (missing > GRAM_EPSILON) {
             status = AllocationStatus.PARTIAL;
         } else {
             status = AllocationStatus.RESOLVED;
@@ -148,7 +148,9 @@ public class PrintAllocationPreviewService {
                         .findFirst()
                         .orElseThrow();
 
-        group.setRequestedGrams((int) Math.ceil(actualUsedGrams));
+        group.setRequestedGrams(
+                round(actualUsedGrams)
+        );
         group.getItems().clear();
 
         for (AllocationResult allocation
@@ -162,20 +164,17 @@ public class PrintAllocationPreviewService {
             group.getItems().add(item);
         }
 
-        int allocated =
-                allocations.stream()
-                        .mapToInt(
-                                AllocationResult::getAllocatedGrams
-                        )
-                        .sum();
+        double allocated = sumAllocatedGrams(allocations);
 
         group.setAllocatedGrams(allocated);
 
-        int missing =
-                Math.max(
-                        0,
-                        group.getRequestedGrams()
-                                - allocated
+        double missing =
+                round(
+                        Math.max(
+                                0.0,
+                                group.getRequestedGrams()
+                                        - allocated
+                        )
                 );
 
         group.setMissingGrams(
@@ -184,7 +183,7 @@ public class PrintAllocationPreviewService {
 
         if (allocations.isEmpty()) {
             group.setStatus(AllocationStatus.MISSING_SPOOL);
-        } else if (missing > 0) {
+        } else if (missing > GRAM_EPSILON) {
             group.setStatus(AllocationStatus.PARTIAL);
         } else {
             group.setStatus(AllocationStatus.RESOLVED);
@@ -193,6 +192,18 @@ public class PrintAllocationPreviewService {
         previewRepository.save(preview);
 
         allocationPreviewRuntimeSyncService.refresh(job.getId());
+    }
+
+    private double sumAllocatedGrams(
+            List<AllocationResult> allocations
+    ) {
+        return round(
+                allocations.stream()
+                        .mapToDouble(
+                                AllocationResult::getAllocatedGrams
+                        )
+                        .sum()
+        );
     }
 
 }

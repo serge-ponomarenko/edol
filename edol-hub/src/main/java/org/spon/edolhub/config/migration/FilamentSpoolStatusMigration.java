@@ -1,6 +1,5 @@
 package org.spon.edolhub.config.migration;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -11,7 +10,7 @@ public class FilamentSpoolStatusMigration {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @PostConstruct
+    //@PostConstruct
     public void migrateStatuses() {
 
         String type = jdbcTemplate.queryForObject("""

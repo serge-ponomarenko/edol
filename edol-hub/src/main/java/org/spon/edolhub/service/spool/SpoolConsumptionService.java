@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.spon.edolhub.config.GramUtils.GRAM_EPSILON;
+import static org.spon.edolhub.config.GramUtils.round;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,17 +28,20 @@ public class SpoolConsumptionService {
         for (JobSpoolUsage usage : spoolUsages) {
             FilamentSpool spool = usage.getFilamentSpool();
 
-            int remaining =
+            double remaining =
                     spool.getWeightRemaining() != null
                             ? spool.getWeightRemaining()
                             : spool.getWeightTotal();
 
-            int consumed = usage.getUsedGrams().intValue();
+            double consumed =
+                    usage.getUsedGrams();
 
-            int newRemaining =
+            double newRemaining =
                     Math.max(
-                            remaining - consumed,
-                            0
+                            0.0,
+                            round(
+                                    remaining - consumed
+                            )
                     );
 
             spool.setWeightRemaining(
@@ -46,7 +52,7 @@ public class SpoolConsumptionService {
                     LocalDateTime.now()
             );
 
-            if (newRemaining == 0) {
+            if (newRemaining <= GRAM_EPSILON) {
                 spool.setStatus(
                         FilamentSpool.FilamentSpoolStatus.EMPTY
                 );
@@ -79,20 +85,22 @@ public class SpoolConsumptionService {
                 : spoolUsages) {
             FilamentSpool spool = usage.getFilamentSpool();
 
-            int remaining =
+            double remaining =
                     spool.getWeightRemaining() != null
                             ? spool.getWeightRemaining()
                             : spool.getWeightTotal();
 
-            int restored = usage.getUsedGrams().intValue();
-            int newRemaining = remaining + restored;
+            double restored =
+                    usage.getUsedGrams();
+            double newRemaining =
+                    round(
+                            Math.min(
+                                    remaining + restored,
+                                    spool.getWeightTotal()
+                            )
+                    );
 
-            spool.setWeightRemaining(
-                    Math.min(
-                            newRemaining,
-                            spool.getWeightTotal()
-                    )
-            );
+            spool.setWeightRemaining(newRemaining);
 
             spool.setStatus(
                     FilamentSpool

@@ -13,6 +13,9 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.spon.edolhub.config.GramUtils.GRAM_EPSILON;
+import static org.spon.edolhub.config.GramUtils.round;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,7 +39,8 @@ public class SpoolAllocationService {
             Filament filament,
             double estimatedGrams
     ) {
-        int remainingToAllocate = (int) Math.ceil(estimatedGrams);
+        double remainingToAllocate =
+                round(estimatedGrams);
 
         List<AllocationResult> allocations = new ArrayList<>();
 
@@ -46,23 +50,25 @@ public class SpoolAllocationService {
                 );
 
         for (FilamentSpool spool : candidates) {
-            if (remainingToAllocate <= 0) {
+            if (remainingToAllocate <= GRAM_EPSILON) {
                 break;
             }
 
-            int spoolRemaining =
+            double spoolRemaining =
                     spool.getWeightRemaining() != null
                             ? spool.getWeightRemaining()
                             : spool.getWeightTotal();
 
-            if (spoolRemaining <= 0) {
+            if (spoolRemaining <= GRAM_EPSILON) {
                 continue;
             }
 
-            int allocated =
-                    Math.min(
-                            spoolRemaining,
-                            remainingToAllocate
+            double allocated =
+                    round(
+                            Math.min(
+                                    spoolRemaining,
+                                    remainingToAllocate
+                            )
                     );
 
             BigDecimal cost =
@@ -90,11 +96,17 @@ public class SpoolAllocationService {
                     allocated
             );
 
-            remainingToAllocate -= allocated;
+            remainingToAllocate =
+                    Math.max(
+                            0.0,
+                            round(
+                                    remainingToAllocate - allocated
+                            )
+                    );
 
         }
 
-        if (remainingToAllocate > 0) {
+        if (remainingToAllocate > GRAM_EPSILON) {
             log.warn("""
                             Not enough filament for allocation!
                             Filament: #{} {},
@@ -110,7 +122,7 @@ public class SpoolAllocationService {
 
     }
 
-    private static @NonNull BigDecimal calculateCost(FilamentSpool spool, int allocated) {
+    private static @NonNull BigDecimal calculateCost(FilamentSpool spool, double allocated) {
         BigDecimal cost = BigDecimal.ZERO;
 
         if (

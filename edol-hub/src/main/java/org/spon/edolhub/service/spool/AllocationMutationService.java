@@ -11,6 +11,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 
+import static org.spon.edolhub.config.GramUtils.GRAM_EPSILON;
+import static org.spon.edolhub.config.GramUtils.round;
+
 @Service
 @RequiredArgsConstructor
 public class AllocationMutationService {
@@ -30,7 +33,7 @@ public class AllocationMutationService {
             Long printJobId,
             Long filamentId,
             FilamentSpool spool,
-            Integer allocatedGrams,
+            Double allocatedGrams,
             BigDecimal estimatedCost
     ) {
         PrintAllocationPreview preview =
@@ -73,7 +76,7 @@ public class AllocationMutationService {
             Long printJobId,
             Long filamentId,
             FilamentSpool spool,
-            Integer allocatedGrams,
+            Double allocatedGrams,
             BigDecimal estimatedCost
     ) {
         PrintAllocationPreview preview =
@@ -239,7 +242,7 @@ public class AllocationMutationService {
     private void addUserSelectedItem(
             PrintAllocationGroup group,
             FilamentSpool spool,
-            Integer allocatedGrams,
+            Double allocatedGrams,
             BigDecimal estimatedCost
     ) {
         PrintAllocationItem item =
@@ -272,13 +275,12 @@ public class AllocationMutationService {
 
     private void validateReplaceAllocation(
             PrintAllocationGroup group,
-            Integer allocatedGrams
+            Double allocatedGrams
     ) {
         validatePositiveGrams(allocatedGrams);
 
         if (
-                allocatedGrams
-                        > group.getRequestedGrams()
+                allocatedGrams - group.getRequestedGrams() > GRAM_EPSILON
         ) {
             throw new IllegalArgumentException(
                     "Allocation exceeds requested job grams"
@@ -288,15 +290,15 @@ public class AllocationMutationService {
 
     private void validateAddedAllocation(
             PrintAllocationGroup group,
-            Integer allocatedGrams
+            Double allocatedGrams
     ) {
         validatePositiveGrams(allocatedGrams);
 
-        int remaining =
+        double remaining =
                 group.getRequestedGrams()
                         - currentAllocatedGrams(group);
 
-        if (allocatedGrams > remaining) {
+        if (allocatedGrams - remaining > GRAM_EPSILON) {
             throw new IllegalArgumentException(
                     "Allocation exceeds remaining job grams"
             );
@@ -304,11 +306,11 @@ public class AllocationMutationService {
     }
 
     private void validatePositiveGrams(
-            Integer allocatedGrams
+            Double allocatedGrams
     ) {
         if (
                 allocatedGrams == null
-                        || allocatedGrams <= 0
+                        || allocatedGrams <= 0.0
         ) {
             throw new IllegalArgumentException(
                     "Allocation grams must be greater than zero"
@@ -316,15 +318,17 @@ public class AllocationMutationService {
         }
     }
 
-    private int currentAllocatedGrams(
+    private double currentAllocatedGrams(
             PrintAllocationGroup group
     ) {
-        return group.getItems()
-                .stream()
-                .map(PrintAllocationItem::getAllocatedGrams)
-                .filter(Objects::nonNull)
-                .mapToInt(Integer::intValue)
-                .sum();
+        return round(
+                group.getItems()
+                        .stream()
+                        .map(PrintAllocationItem::getAllocatedGrams)
+                        .filter(Objects::nonNull)
+                        .mapToDouble(Double::doubleValue)
+                        .sum()
+        );
     }
 
     private void replaceGroupItems(
@@ -347,21 +351,25 @@ public class AllocationMutationService {
     private void recalculateGroupState(
             PrintAllocationGroup group
     ) {
-        int allocated =
-                currentAllocatedGrams(group);
+        double allocated =
+                round(
+                        currentAllocatedGrams(group)
+                );
 
         group.setAllocatedGrams(allocated);
 
-        int missing =
-                Math.max(
-                        0,
-                        group.getRequestedGrams()
-                                - allocated
+        double missing =
+                round(
+                        Math.max(
+                                0,
+                                group.getRequestedGrams()
+                                        - allocated
+                        )
                 );
 
         group.setMissingGrams(missing);
 
-        if (missing > 0) {
+        if (missing > GRAM_EPSILON) {
             group.setStatus(AllocationStatus.PARTIAL);
         } else {
             group.setStatus(AllocationStatus.RESOLVED);

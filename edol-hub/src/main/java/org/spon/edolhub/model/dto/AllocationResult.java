@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 public class AllocationResult {
 
     private FilamentSpool spool;
-    private Integer allocatedGrams;
+    private Double allocatedGrams;
     private BigDecimal cost;
 
 }

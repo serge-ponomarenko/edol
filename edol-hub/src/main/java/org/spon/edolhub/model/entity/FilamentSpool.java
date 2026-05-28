@@ -31,12 +31,12 @@ public class FilamentSpool {
     /**
      * Total spool weight (grams)
      */
-    private Integer weightTotal;
+    private Double weightTotal;
 
     /**
      * Remaining weight (grams)
      */
-    private Integer weightRemaining;
+    private Double weightRemaining;
 
     /**
      * Spool price

@@ -35,7 +35,7 @@ public class PrintAllocationItem {
     /**
      * Allocated grams from spool
      */
-    private Integer allocatedGrams;
+    private Double allocatedGrams;
 
     /**
      * Estimated spool allocation cost

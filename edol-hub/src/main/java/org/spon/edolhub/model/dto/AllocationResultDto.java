@@ -6,7 +6,7 @@ import lombok.Data;
 public class AllocationResultDto {
 
     private Long spoolId;
-    private Integer allocatedGrams;
+    private Double allocatedGrams;
     private Double cost;
 
 }

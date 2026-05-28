@@ -20,6 +20,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
+import static org.spon.edolhub.config.GramUtils.GRAM_EPSILON;
+
 @Controller
 @RequiredArgsConstructor
 public class PrintAllocationController {
@@ -157,7 +159,7 @@ public class PrintAllocationController {
             @RequestParam Long jobId,
             @RequestParam Long filamentId,
             @RequestParam Long spoolId,
-            @RequestParam Integer grams
+            @RequestParam Double grams
     ) {
         FilamentSpool spool =
                 filamentSpoolRepository
@@ -189,7 +191,7 @@ public class PrintAllocationController {
             @RequestParam Long jobId,
             @RequestParam Long filamentId,
             @RequestParam Long spoolId,
-            @RequestParam Integer grams
+            @RequestParam Double grams
     ) {
         FilamentSpool spool =
                 filamentSpoolRepository
@@ -234,11 +236,11 @@ public class PrintAllocationController {
     private void validateSpoolMutation(
             Long filamentId,
             FilamentSpool spool,
-            Integer grams
+            Double grams
     ) {
         if (
                 grams == null
-                        || grams <= 0
+                        || grams <= GRAM_EPSILON
         ) {
             throw new IllegalArgumentException(
                     "Allocation grams must be greater than zero"
@@ -256,14 +258,14 @@ public class PrintAllocationController {
             );
         }
 
-        Integer available =
+        Double available =
                 spool.getWeightRemaining() != null
                         ? spool.getWeightRemaining()
                         : spool.getWeightTotal();
 
         if (
                 available != null
-                        && grams > available
+                        && grams - available > GRAM_EPSILON
         ) {
             throw new IllegalArgumentException(
                     "Allocation exceeds spool remaining weight"
@@ -273,14 +275,14 @@ public class PrintAllocationController {
 
     private BigDecimal calculateCost(
             FilamentSpool spool,
-            Integer grams
+            Double grams
     ) {
         if (
                 grams == null
-                        || grams <= 0
+                        || grams <= GRAM_EPSILON
                         || spool.getPrice() == null
                         || spool.getWeightTotal() == null
-                        || spool.getWeightTotal() <= 0
+                        || spool.getWeightTotal() <= GRAM_EPSILON
         ) {
             return BigDecimal.ZERO;
         }

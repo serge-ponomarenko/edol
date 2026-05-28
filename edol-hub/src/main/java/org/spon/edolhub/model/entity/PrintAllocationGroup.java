@@ -41,17 +41,17 @@ public class PrintAllocationGroup {
     /**
      * Total requested grams
      */
-    private Integer requestedGrams;
+    private Double requestedGrams;
 
     /**
      * Successfully allocated grams
      */
-    private Integer allocatedGrams;
+    private Double allocatedGrams;
 
     /**
      * Missing grams
      */
-    private Integer missingGrams;
+    private Double missingGrams;
 
     /**
      * User manually changed this allocation

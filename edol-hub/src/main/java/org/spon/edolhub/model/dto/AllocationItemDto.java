@@ -11,9 +11,9 @@ public class AllocationItemDto {
 
     private String colorHex;
 
-    private Integer spoolRemainingGrams;
+    private Double spoolRemainingGrams;
 
-    private Integer allocatedGrams;
+    private Double allocatedGrams;
 
     private Double estimatedCost;
 

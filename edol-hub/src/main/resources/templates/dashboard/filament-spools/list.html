@@ -309,7 +309,7 @@
                                                 </div>
 
                                                 <div class="text-muted small"
-                                                     th:text="${#aggregates.sum(entry.value.![weightRemaining]) + ' g total'}">
+                                                     th:text="${#numbers.formatDecimal(#aggregates.sum(entry.value.![weightRemaining]),0,0) + ' g total'}">
                                                 </div>
                                             </div>
 
@@ -321,7 +321,13 @@
                                                     <div class="spool-mini-bar"
                                                          data-bs-toggle="tooltip"
                                                          data-bs-placement="top"
-                                                         th:attr="title=${'Spool #' + spool.id + ' • Remaining: ' + spool.weightRemaining + ' / ' + spool.weightTotal + ' g'}">
+                                                         th:attr="
+                                                            title=${'Spool #' + spool.id + ' • Remaining: '
+                                                            + #numbers.formatDecimal(spool.weightRemaining,0,0)
+                                                            + ' / '
+                                                            + #numbers.formatDecimal(spool.weightTotal,0,0)
+                                                            + ' g'}
+                                                            ">
 
                                                         <div class="spool-mini-fill"
                                                              th:classappend="${spool.weightRemaining < 200} ? ' low' : ''"
@@ -330,7 +336,7 @@
                                                     </div>
 
                                                     <div class="spool-mini-label"
-                                                         th:text="${spool.weightRemaining}">
+                                                         th:text="${#numbers.formatDecimal(spool.weightRemaining,0,0)}">
                                                     </div>
                                                 </div>
 
@@ -412,12 +418,13 @@
                                                 </div>
                                             </div>
                                             <div class="text-muted small mt-1">
-                                                <span th:text="${s.weightRemaining}"></span> /
-                                                <span th:text="${s.weightTotal}"></span> g
+                                                <span th:text="${#numbers.formatDecimal(s.weightRemaining,0,0)}"></span>
+                                                /
+                                                <span th:text="${#numbers.formatDecimal(s.weightTotal,0,0)}"></span> g
                                             </div>
                                         </td>
 
-                                        <td th:text="${#numbers.formatDecimal(s.price,1,2)} + ' ₴'"></td>
+                                        <td th:text="${#numbers.formatDecimal(s.price ?: 0,1,2)} + ' ₴'"></td>
 
                                         <td>
                                             <span class="badge"

@@ -16,11 +16,11 @@ public class AllocationGroupDto {
 
     private AllocationStatus status;
 
-    private Integer requestedGrams;
+    private Double requestedGrams;
 
-    private Integer allocatedGrams;
+    private Double allocatedGrams;
 
-    private Integer missingGrams;
+    private Double missingGrams;
 
     private Boolean userOverridden;
 

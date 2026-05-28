@@ -13,7 +13,7 @@ public record FilamentDeletePreviewDto(
 
     public record SpoolInfo(
             Long id,
-            Integer weightRemaining,
+            Double weightRemaining,
             String status
     ) {
     }

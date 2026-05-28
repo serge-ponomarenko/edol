@@ -90,7 +90,9 @@
                             <!-- TOTAL -->
                             <div class="mb-3">
                                 <label class="form-label">Total weight (g)</label>
-                                <input class="form-control" step="1"
+                                <input class="form-control"
+                                       min="0"
+                                       step="1"
                                        th:field="*{weightTotal}"
                                        type="number">
                             </div>
@@ -98,7 +100,9 @@
                             <!-- REMAINING -->
                             <div class="mb-3">
                                 <label class="form-label">Remaining weight (g)</label>
-                                <input class="form-control" step="1"
+                                <input class="form-control"
+                                       min="0"
+                                       step="0.1"
                                        th:field="*{weightRemaining}"
                                        type="number">
                             </div>
