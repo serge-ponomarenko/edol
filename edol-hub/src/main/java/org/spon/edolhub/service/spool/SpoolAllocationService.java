@@ -6,9 +6,6 @@ import org.jspecify.annotations.NonNull;
 import org.spon.edolhub.model.dto.AllocationResult;
 import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.FilamentSpool;
-import org.spon.edolhub.model.entity.JobSpoolUsage;
-import org.spon.edolhub.model.entity.PrintJob;
-import org.spon.edolhub.service.JobSpoolUsageService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -22,7 +19,7 @@ import java.util.List;
 public class SpoolAllocationService {
 
     private final SpoolResolverService spoolResolverService;
-    private final JobSpoolUsageService jobSpoolUsageService;
+
 
     public List<AllocationResult> previewAllocation(
             Filament filament,
@@ -34,36 +31,6 @@ public class SpoolAllocationService {
         );
     }
 
-    public List<JobSpoolUsage> allocate(
-            PrintJob job,
-            Filament filament,
-            double estimatedGrams
-    ) {
-        List<AllocationResult> allocations =
-                calculateAllocations(
-                        filament,
-                        estimatedGrams
-                );
-
-        List<JobSpoolUsage> usages = new ArrayList<>();
-
-        for (AllocationResult allocation : allocations) {
-            JobSpoolUsage usage =
-                    jobSpoolUsageService.create(
-                            job,
-                            allocation.getSpool()
-                    );
-
-            usage.setUsedGrams(
-                    allocation.getAllocatedGrams().doubleValue()
-            );
-
-            usage.setCost(allocation.getCost());
-
-            usages.add(usage);
-        }
-        return usages;
-    }
 
     private List<AllocationResult> calculateAllocations(
             Filament filament,

@@ -158,17 +158,19 @@
 </div>
 </body>
 <script>
-    const redirectDelay = 1500; // time before redirect (ms)
+    const toast = document.querySelector('.toast');
 
-    setTimeout(() => {
-        const toast = document.querySelector('.toast');
-        if (toast) {
+    if (toast) {
+        const redirectDelay = 1500;
+
+        setTimeout(() => {
             toast.classList.remove('show');
-        }
-    }, redirectDelay);
+        }, redirectDelay);
 
-    setTimeout(() => {
-        window.location.href = '/filament-spools';
-    }, redirectDelay + 500); // small extra delay after toast hides
+        setTimeout(() => {
+            window.location.href =
+                '/filament-spools';
+        }, redirectDelay + 500);
+    }
 </script>
 </html>

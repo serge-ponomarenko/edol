@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.controller.PrinterStateController.PrinterStateEnriched;
+import org.spon.edolhub.model.dto.PrintAllocationPreviewDto;
 import org.spon.edolhub.model.entity.PrintJob;
 import org.spon.edolhub.service.spool.AllocationPreviewRuntimeCacheService;
 import org.springframework.stereotype.Service;
@@ -64,10 +65,13 @@ public class PrinterDashboardStateService {
                 return response;
             }
 
-            response.setAllocationPreview(
-                    runtimeCacheService
-                            .getCurrentAllocationPreview()
-            );
+            PrintAllocationPreviewDto preview =
+                    runtimeCacheService.getCurrentAllocationPreview();
+            if (preview != null
+                    && !preview.getPrintJobId().equals(currentJob.getId())) {
+                preview = null;
+            }
+            response.setAllocationPreview(preview);
 
             return response;
 
