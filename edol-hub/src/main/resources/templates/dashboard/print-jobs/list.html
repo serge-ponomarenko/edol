@@ -43,8 +43,28 @@
 
                 <div class="card">
 
-                    <div class="card-header">
-                        <h3 class="card-title">Print Jobs</h3>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">
+                            Print Jobs
+                        </h3>
+
+                        <div class="d-flex align-items-center gap-2">
+
+                            <label class="form-label mb-0 text-muted small">
+                                Per page
+                            </label>
+
+                            <select class="form-select form-select-sm w-auto"
+                                    id="pageSizeSelect">
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                            </select>
+
+                        </div>
+
                     </div>
 
                     <div class="table-responsive">
@@ -100,6 +120,12 @@
 
     let page = 0;
     let size = 10;
+    const pageSizeSelect = document.getElementById("pageSizeSelect");
+    const savedSize = localStorage.getItem("printJobsPageSize");
+    if (savedSize) {
+        size = parseInt(savedSize);
+        pageSizeSelect.value = savedSize;
+    }
     let loading = false;
     let lastPage = false;
 
@@ -109,6 +135,19 @@
 
     // 🔹 initial load
     loadMore();
+
+    pageSizeSelect.addEventListener("change", () => {
+        size = parseInt(pageSizeSelect.value);
+        localStorage.setItem(
+            "printJobsPageSize",
+            size
+        );
+        page = 0;
+        lastPage = false;
+        tbody.innerHTML = "";
+        loadMoreBtn.style.display = "";
+        loadMore();
+    });
 
     // 🔹 button click
     loadMoreBtn.addEventListener("click", () => {
