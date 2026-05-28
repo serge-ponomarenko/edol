@@ -193,12 +193,9 @@
 
                                         <div class="card-header d-flex justify-content-between">
                                             <span>AMS</span>
-                                            <span class="text-muted small">
-                                            <span id="amsTemp"></span>°C •
-                                            Humidity
-                                            <span id="amsHumidityIcons"></span>
-                                            (<span id="amsHumidityRaw"></span>%)
-                                        </span>
+                                            <span class="text-muted small"
+                                                  id="amsMeta">
+                                            </span>
                                         </div>
 
                                         <div class="card-body">
@@ -800,13 +797,11 @@
     }
 
     function updateAMSHumidity(ams) {
+        const meta = document.getElementById("amsMeta");
+
         const rank = ams.humidity;
         const raw = ams.humidityRaw;
-
-        document.getElementById("amsHumidityRaw").textContent = raw;
-
-        document.getElementById("amsTemp").textContent =
-            Math.round(ams.temperature);
+        const temp = ams.temperature;
 
         let icons = "";
 
@@ -817,7 +812,17 @@
                 icons += "☀️";
         }
 
-        document.getElementById("amsHumidityIcons").textContent = icons;
+        const hasTemp = temp && temp > 0;
+
+        const hasRawHumidity = raw && raw > 0;
+
+        if (hasTemp && hasRawHumidity) {
+            meta.textContent =
+                `${Math.round(temp)}°C • Humidity ${icons} (${raw}%)`;
+        } else {
+            meta.textContent = `Humidity ${icons}`;
+        }
+
     }
 
     function updateCamera() {
