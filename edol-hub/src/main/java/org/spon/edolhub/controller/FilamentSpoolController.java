@@ -140,6 +140,7 @@ public class FilamentSpoolController {
 
         copy.setWeightTotal(spool.getWeightTotal());
         copy.setWeightRemaining(spool.getWeightRemaining());
+        copy.setEmptySpoolWeight(spool.getEmptySpoolWeight());
 
         copy.setPrice(spool.getPrice());
 

@@ -64,7 +64,13 @@
                                     <div class="dropdown-menu w-100" style="max-height:300px;overflow:auto;">
 
                                         <button class="dropdown-item d-flex align-items-center gap-2"
-                                                th:attr="data-id=${f.id}, data-color=${f.colorHex}, data-text=${f.fullId}"
+                                                th:attr="
+                                                        data-id=${f.id},
+                                                        data-color=${f.colorHex},
+                                                        data-text=${f.fullId},
+                                                        data-weight=${f.defaultWeightTotal},
+                                                        data-empty-weight=${f.defaultEmptySpoolWeight},
+                                                    "
                                                 th:each="f : ${filaments}"
                                                 type="button">
 
@@ -94,6 +100,18 @@
                                        min="0"
                                        step="1"
                                        th:field="*{weightTotal}"
+                                       type="number">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Empty spool weight (g)
+                                </label>
+
+                                <input class="form-control"
+                                       min="0"
+                                       step="0.1"
+                                       th:field="*{emptySpoolWeight}"
                                        type="number">
                             </div>
 
@@ -239,18 +257,39 @@
         hiddenInput.value = id;
 
         selectedText.innerHTML = `
-        <span style="display:inline-flex;align-items:center;gap:6px;">
-            <span style="
-                width:16px;
-                height:16px;
-                border-radius:4px;
-                border:1px solid #ccc;
-                background:${color};
-                display:inline-block;
-            "></span>
-            ${text}
-        </span>
-    `;
+            <span style="display:inline-flex;align-items:center;gap:6px;">
+                <span style="
+                    width:16px;
+                    height:16px;
+                    border-radius:4px;
+                    border:1px solid #ccc;
+                    background:${color};
+                    display:inline-block;
+                "></span>
+                ${text}
+            </span>
+        `;
+
+        const defaultWeight =
+            item.getAttribute('data-weight');
+
+        const totalInput =
+            document.querySelector('[name="weightTotal"]');
+
+        if (!totalInput.value && defaultWeight) {
+            totalInput.value = defaultWeight;
+        }
+
+        const emptyWeight =
+            item.getAttribute('data-empty-weight');
+
+        const emptyWeightInput =
+            document.querySelector('[name="emptySpoolWeight"]');
+
+        if (!emptyWeightInput.value && emptyWeight) {
+            emptyWeightInput.value = emptyWeight;
+        }
+
     }
 </script>
 </html>

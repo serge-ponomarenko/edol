@@ -37,6 +37,14 @@ public class Filament {
     // Example: 1.75 / 2.85
     private Double diameter;
 
+    private Double defaultWeightTotal;
+
+    private Double defaultEmptySpoolWeight;
+
+    private Integer recommendedDryingTemperature;
+
+    private Integer recommendedDryingHours;
+
     @Column(length = 2000)
     private String comment;
 

@@ -319,8 +319,8 @@
                                                      th:if="${iter.index < 5}">
 
                                                     <div class="spool-mini-bar"
-                                                         data-bs-toggle="tooltip"
                                                          data-bs-placement="top"
+                                                         data-bs-toggle="tooltip"
                                                          th:attr="
                                                             title=${'Spool #' + spool.id + ' • Remaining: '
                                                             + #numbers.formatDecimal(spool.weightRemaining,0,0)
@@ -537,6 +537,19 @@
                                                                                                 ? #temporals.format(s.lastDriedAt, 'dd.MM.yyyy HH:mm')
                                                                                                 : '—'}">
                                                                         </div>
+                                                                    </div>
+                                                                    <div class="text-muted small">
+                                                                        Recommended drying
+                                                                    </div>
+
+                                                                    <div th:if="${s.filament.recommendedDryingTemperature != null}">
+                                                                        <span th:text="${s.filament.recommendedDryingTemperature}"></span>°C
+                                                                        •
+                                                                        <span th:text="${s.filament.recommendedDryingHours}"></span>h
+                                                                    </div>
+
+                                                                    <div th:unless="${s.filament.recommendedDryingTemperature != null}">
+                                                                        —
                                                                     </div>
                                                                     <button class="btn btn-sm btn-outline-orange"
                                                                             th:onclick="|markDried(${s.id})|">

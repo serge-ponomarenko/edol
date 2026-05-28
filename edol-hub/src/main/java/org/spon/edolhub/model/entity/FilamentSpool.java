@@ -39,6 +39,11 @@ public class FilamentSpool {
     private Double weightRemaining;
 
     /**
+     * Empty spool weight (grams)
+     */
+    private Double emptySpoolWeight;
+
+    /**
      * Spool price
      */
     private BigDecimal price;
