@@ -504,10 +504,20 @@
                                                         <div class="row g-3">
 
                                                             <div class="col-md-4">
+                                                                <div class="text-muted small">Bought
+                                                                </div>
+                                                                <div th:text="${s.purchasedAt != null ? #temporals.format(s.purchasedAt, 'dd.MM.yyyy HH:mm') : '—'}"></div>
+                                                            </div>
+
+                                                            <div class="col-md-4">
                                                                 <div class="text-muted small">Opened
                                                                 </div>
                                                                 <div th:text="${s.openedAt != null ? #temporals.format(s.openedAt, 'dd.MM.yyyy HH:mm') : '—'}"></div>
                                                             </div>
+
+                                                        </div>
+
+                                                        <div class="row g-3">
 
                                                             <div class="col-md-4">
                                                                 <div class="text-muted small">Last

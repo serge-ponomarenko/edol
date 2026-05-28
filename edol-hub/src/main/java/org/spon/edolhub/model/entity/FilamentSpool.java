@@ -49,6 +49,12 @@ public class FilamentSpool {
     private String storeUrl;
 
     /**
+     * When spool was bought
+     */
+    @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm")
+    private LocalDateTime purchasedAt;
+
+    /**
      * When spool was opened
      */
     @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm")

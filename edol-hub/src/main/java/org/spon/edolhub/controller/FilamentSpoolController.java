@@ -79,6 +79,7 @@ public class FilamentSpoolController {
     @GetMapping("/new")
     public String createForm(Model model) {
         FilamentSpool spool = new FilamentSpool();
+        spool.setPurchasedAt(LocalDateTime.now());
 
         model.addAttribute("spool", spool);
         model.addAttribute("filaments", filamentRepository.findAll());
@@ -100,6 +101,7 @@ public class FilamentSpoolController {
 
         spool.setStatus(FilamentSpool.FilamentSpoolStatus.SEALED);
 
+        spool.setPurchasedAt(LocalDateTime.now());
         spool.setOpenedAt(null);
         spool.setLastUsedAt(null);
         spool.setLastDriedAt(null);
@@ -143,6 +145,7 @@ public class FilamentSpoolController {
 
         copy.setStoreUrl(spool.getStoreUrl());
 
+        copy.setPurchasedAt(spool.getPurchasedAt());
         copy.setOpenedAt(spool.getOpenedAt());
         copy.setLastUsedAt(spool.getLastUsedAt());
         copy.setLastDriedAt(spool.getLastDriedAt());
