@@ -7,12 +7,12 @@ import java.util.Optional;
 
 public interface FilamentRepository extends JpaRepository<Filament, Long> {
 
-    Optional<Filament> findFirstByFullIdAndColorHex(
+    Optional<Filament> findFirstByFullIdAndColorHexIgnoreCase(
             String fullId,
             String colorHex
     );
 
-    Optional<Filament> findFirstByPrinterFilamentProfileIdAndColorHex(
+    Optional<Filament> findFirstByPrinterFilamentProfileIdAndColorHexIgnoreCase(
             String printerFilamentProfileId,
             String colorHex
     );

@@ -27,7 +27,7 @@ public class FilamentService {
     @Transactional
     public Filament findByBrandIndexOrCreate(String filamentBrandIndex, String color, String fullId) {
         return filamentRepository
-                .findFirstByPrinterFilamentProfileIdAndColorHex(filamentBrandIndex, color)
+                .findFirstByPrinterFilamentProfileIdAndColorHexIgnoreCase(filamentBrandIndex, color)
                 .orElseGet(
                         () -> findOrCreateFilament(fullId, color, filamentBrandIndex)
                 );
@@ -37,7 +37,7 @@ public class FilamentService {
     @CacheEvict(value = "spools", allEntries = true)
     public Filament findOrCreateFilament(String fullId, String color, String filamentBrandIndex) {
         Optional<Filament> existing =
-                filamentRepository.findFirstByFullIdAndColorHex(fullId, color);
+                filamentRepository.findFirstByFullIdAndColorHexIgnoreCase(fullId, color);
 
         if (existing.isPresent()) {
             Filament filament = existing.get();
@@ -91,7 +91,7 @@ public class FilamentService {
 
         filament.setFullId(fullId);
         filament.setBrand(brand);
-        filament.setColorHex(color);
+        filament.setColorHex(color.toUpperCase());
 
         filament.setPrinterFilamentProfileId(filamentBrandIndex);
 

@@ -40,6 +40,7 @@ public class FilamentController {
 
     @PostMapping
     public String save(@ModelAttribute Filament filament) {
+        filament.setColorHex(filament.getColorHex().toUpperCase());
         filamentRepository.save(filament);
 
         return "redirect:/filaments";

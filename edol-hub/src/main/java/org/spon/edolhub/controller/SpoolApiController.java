@@ -30,7 +30,7 @@ public class SpoolApiController {
             @RequestParam("printerFilamentProfileId") String printerFilamentProfileId,
             @RequestParam("colorHex") String colorHex
     ) {
-        return filamentRepository.findFirstByPrinterFilamentProfileIdAndColorHex(
+        return filamentRepository.findFirstByPrinterFilamentProfileIdAndColorHexIgnoreCase(
                         printerFilamentProfileId,
                         colorHex
                 )
