@@ -126,6 +126,15 @@
                 <input type="hidden"
                        id="selectedSpoolId">
 
+                <div class="alert alert-secondary py-2 mb-3">
+                    <div class="small text-muted">
+                        Filament
+                    </div>
+                    <div id="selectedFilamentInfo">
+                        —
+                    </div>
+                </div>
+
                 <label class="form-label">
                     Spool
                 </label>
@@ -406,19 +415,16 @@
                         "></span>
 
                         <div>
-
                             <div class="fw-bold">
                                 ${group.filamentName}
                             </div>
-
                             <div class="text-muted small">
-
+                                ${group.colorName || group.colorHex}
+                                •
                                 ${group.allocatedGrams}g
                                 /
                                 ${group.requestedGrams}g
-
                             </div>
-
                         </div>
 
                     </div>
@@ -428,7 +434,7 @@
                         <button
                             class="btn btn-sm btn-outline-primary"
                             onclick="
-                openSpoolMutationModal(
+                                openSpoolMutationModal(
                                     'replace',
                                     ${group.filamentId},
                                     ${group.requestedGrams},
@@ -448,8 +454,8 @@
                                     'add',
                                     ${group.filamentId},
                                     ${group.missingGrams > 0
-                                        ? group.missingGrams
-                                        : 1},
+                    ? group.missingGrams
+                    : 1},
                                     ${group.missingGrams}
                                 )
                             ">
@@ -646,6 +652,34 @@
                 ? 'Replace Spool Allocation'
                 : 'Add Spool Allocation';
 
+        const group =
+            currentPreview.groups.find(
+                g => g.filamentId === filamentId
+            );
+
+        document.getElementById(
+            'selectedFilamentInfo'
+        ).innerHTML = `
+                <div class="d-flex align-items-center gap-2">
+                    <span style="
+                        width:16px;
+                        height:16px;
+                        border-radius:4px;
+                        border:1px solid #ccc;
+                        background:${group.colorHex};
+                        display:inline-block;
+                    "></span>
+                    <div>
+                        <div>
+                            ${group.filamentName}
+                        </div>
+                        <div class="small text-muted">
+                            ${group.colorName || group.colorHex}
+                        </div>
+                    </div>
+                </div>
+            `;
+
         await loadSpools(
             filamentId,
             mode
@@ -753,11 +787,9 @@
         document.getElementById(
             'selectedSpoolLabel'
         ).innerHTML = `
-            <span class="d-flex justify-content-between w-100">
-                <span>${label}</span>
-                <span class="text-muted">
-                    ${status} / ${remaining}g
-                </span>
+            ${label}
+            <span class="text-muted">
+                • ${status} / ${remaining}g
             </span>
         `;
 
@@ -932,7 +964,8 @@
                         selectFilament(
                             ${f.id},
                             '${f.fullId}',
-                            '${f.colorHex || "#ccc"}'
+                            '${f.colorHex || "#ccc"}',
+                            '${f.colorName || ""}'
                         )
                    ">
 
@@ -952,9 +985,14 @@
                               ">
                         </span>
 
-                        <span>
-                            ${f.fullId}
-                        </span>
+                        <div>
+                            <div>
+                                ${f.fullId}
+                            </div>
+                            <div class="small text-muted">
+                                ${f.colorName || ''}
+                            </div>
+                        </div>
 
                     </div>
 
@@ -976,7 +1014,8 @@
     function selectFilament(
         id,
         name,
-        color
+        color,
+        colorName
     ) {
 
         document.getElementById(
@@ -1010,7 +1049,17 @@
                        ">
                 </span>
 
-                ${name}
+                <div class="
+                            d-flex
+                            flex-column
+                       ">
+                    <span>
+                        ${name}
+                    </span>
+                    <small class="text-muted">
+                        ${colorName || ''}
+                    </small>
+                </div>
 
             </span>
 

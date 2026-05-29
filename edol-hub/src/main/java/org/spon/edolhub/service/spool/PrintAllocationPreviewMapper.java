@@ -72,6 +72,12 @@ public class PrintAllocationPreviewMapper {
                         : null
         );
 
+        dto.setColorName(
+                group.getFilament() != null
+                        ? group.getFilament().getColorName()
+                        : null
+        );
+
         dto.setStatus(group.getStatus());
         dto.setRequestedGrams(group.getRequestedGrams());
         dto.setAllocatedGrams(group.getAllocatedGrams());

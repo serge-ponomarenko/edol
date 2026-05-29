@@ -292,9 +292,15 @@
                                     <!-- Color -->
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
-                                            <span th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;background:' + ${entry.key.colorHex}">
+                                            <span
+                                                    th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;background:' + ${entry.key.colorHex}">
                                             </span>
-                                            <span th:text="${entry.key.colorHex}"></span>
+                                            <div>
+                                                <div th:text="${entry.key.colorName ?: '—'}"></div>
+                                                <div class="text-muted small font-monospace"
+                                                     th:text="${entry.key.colorHex}">
+                                                </div>
+                                            </div>
                                         </div>
                                     </td>
 
@@ -402,10 +408,15 @@
                                         <!-- COLOR -->
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
-                                                                <span
-                                                                        th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;background:' + ${s.filament.colorHex}">
-                                                                </span>
-                                                <span th:text="${s.filament.colorHex}"></span>
+                                                <span
+                                                        th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;background:' + ${s.filament.colorHex}">
+                                                </span>
+                                                <div>
+                                                    <div th:text="${s.filament.colorName ?: '—'}"></div>
+                                                    <div class="text-muted small font-monospace"
+                                                         th:text="${s.filament.colorHex}">
+                                                    </div>
+                                                </div>
                                             </div>
                                         </td>
 

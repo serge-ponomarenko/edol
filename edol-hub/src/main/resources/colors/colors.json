@@ -1,0 +1,352 @@
+[
+  {
+    "hex": "#000000",
+    "names": {
+      "en": "Black",
+      "uk": "Чорний"
+    }
+  },
+  {
+    "hex": "#1A1A1A",
+    "names": {
+      "en": "Matte Black",
+      "uk": "Матовий чорний"
+    }
+  },
+  {
+    "hex": "#2F2F2F",
+    "names": {
+      "en": "Carbon Black",
+      "uk": "Карбоновий чорний"
+    }
+  },
+  {
+    "hex": "#FFFFFF",
+    "names": {
+      "en": "White",
+      "uk": "Білий"
+    }
+  },
+  {
+    "hex": "#F5F5F0",
+    "names": {
+      "en": "Ivory White",
+      "uk": "Айворі"
+    }
+  },
+  {
+    "hex": "#D9D9D9",
+    "names": {
+      "en": "Silver",
+      "uk": "Срібний"
+    }
+  },
+  {
+    "hex": "#A6A6A6",
+    "names": {
+      "en": "Gray",
+      "uk": "Сірий"
+    }
+  },
+  {
+    "hex": "#6E6E6E",
+    "names": {
+      "en": "Dark Gray",
+      "uk": "Темно-сірий"
+    }
+  },
+  {
+    "hex": "#C0C0C0",
+    "names": {
+      "en": "Metallic Silver",
+      "uk": "Металік срібний"
+    }
+  },
+  {
+    "hex": "#FF0000",
+    "names": {
+      "en": "Red",
+      "uk": "Червоний"
+    }
+  },
+  {
+    "hex": "#B22222",
+    "names": {
+      "en": "Dark Red",
+      "uk": "Темно-червоний"
+    }
+  },
+  {
+    "hex": "#FF6B6B",
+    "names": {
+      "en": "Coral Red",
+      "uk": "Кораловий"
+    }
+  },
+  {
+    "hex": "#FF6600",
+    "names": {
+      "en": "Orange",
+      "uk": "Помаранчевий"
+    }
+  },
+  {
+    "hex": "#FFAA33",
+    "names": {
+      "en": "Amber",
+      "uk": "Бурштиновий"
+    }
+  },
+  {
+    "hex": "#FFD700",
+    "names": {
+      "en": "Gold",
+      "uk": "Золотий"
+    }
+  },
+  {
+    "hex": "#FFC300",
+    "names": {
+      "en": "Silk Gold",
+      "uk": "Шовковий золотий"
+    }
+  },
+  {
+    "hex": "#FFF44F",
+    "names": {
+      "en": "Yellow",
+      "uk": "Жовтий"
+    }
+  },
+  {
+    "hex": "#FFFACD",
+    "names": {
+      "en": "Pastel Yellow",
+      "uk": "Пастельний жовтий"
+    }
+  },
+  {
+    "hex": "#00FF00",
+    "names": {
+      "en": "Lime Green",
+      "uk": "Лаймовий"
+    }
+  },
+  {
+    "hex": "#228B22",
+    "names": {
+      "en": "Forest Green",
+      "uk": "Лісовий зелений"
+    }
+  },
+  {
+    "hex": "#556B2F",
+    "names": {
+      "en": "Army Green",
+      "uk": "Оливковий"
+    }
+  },
+  {
+    "hex": "#66CDAA",
+    "names": {
+      "en": "Mint Green",
+      "uk": "М'ятний"
+    }
+  },
+  {
+    "hex": "#00A86B",
+    "names": {
+      "en": "Emerald Green",
+      "uk": "Смарагдовий"
+    }
+  },
+  {
+    "hex": "#00FFFF",
+    "names": {
+      "en": "Cyan",
+      "uk": "Ціан"
+    }
+  },
+  {
+    "hex": "#00BFFF",
+    "names": {
+      "en": "Sky Blue",
+      "uk": "Небесно-блакитний"
+    }
+  },
+  {
+    "hex": "#0000FF",
+    "names": {
+      "en": "Blue",
+      "uk": "Синій"
+    }
+  },
+  {
+    "hex": "#1E3A8A",
+    "names": {
+      "en": "Navy Blue",
+      "uk": "Темно-синій"
+    }
+  },
+  {
+    "hex": "#4169E1",
+    "names": {
+      "en": "Royal Blue",
+      "uk": "Королівський синій"
+    }
+  },
+  {
+    "hex": "#6A5ACD",
+    "names": {
+      "en": "Indigo",
+      "uk": "Індиго"
+    }
+  },
+  {
+    "hex": "#800080",
+    "names": {
+      "en": "Purple",
+      "uk": "Фіолетовий"
+    }
+  },
+  {
+    "hex": "#9370DB",
+    "names": {
+      "en": "Lavender",
+      "uk": "Лавандовий"
+    }
+  },
+  {
+    "hex": "#8A2BE2",
+    "names": {
+      "en": "Galaxy Purple",
+      "uk": "Космічний фіолетовий"
+    }
+  },
+  {
+    "hex": "#FF69B4",
+    "names": {
+      "en": "Pink",
+      "uk": "Рожевий"
+    }
+  },
+  {
+    "hex": "#FFB6C1",
+    "names": {
+      "en": "Pastel Pink",
+      "uk": "Пастельний рожевий"
+    }
+  },
+  {
+    "hex": "#A0522D",
+    "names": {
+      "en": "Brown",
+      "uk": "Коричневий"
+    }
+  },
+  {
+    "hex": "#8B4513",
+    "names": {
+      "en": "Chocolate Brown",
+      "uk": "Шоколадний"
+    }
+  },
+  {
+    "hex": "#B87333",
+    "names": {
+      "en": "Copper",
+      "uk": "Мідний"
+    }
+  },
+  {
+    "hex": "#CD7F32",
+    "names": {
+      "en": "Bronze",
+      "uk": "Бронзовий"
+    }
+  },
+  {
+    "hex": "#E5E4E2",
+    "names": {
+      "en": "Pearl White",
+      "uk": "Перламутровий білий"
+    }
+  },
+  {
+    "hex": "#F8F8FF",
+    "names": {
+      "en": "Transparent",
+      "uk": "Прозорий"
+    }
+  },
+  {
+    "hex": "#7FFFD4",
+    "names": {
+      "en": "Transparent Aqua",
+      "uk": "Прозорий аквамариновий"
+    }
+  },
+  {
+    "hex": "#98FB98",
+    "names": {
+      "en": "Glow Green",
+      "uk": "Світлонакопичувальний зелений"
+    }
+  },
+  {
+    "hex": "#FFD1DC",
+    "names": {
+      "en": "Silk Pink",
+      "uk": "Шовковий рожевий"
+    }
+  },
+  {
+    "hex": "#DAA520",
+    "names": {
+      "en": "Silk Bronze",
+      "uk": "Шовковий бронзовий"
+    }
+  },
+  {
+    "hex": "#708090",
+    "names": {
+      "en": "Slate Gray",
+      "uk": "Сланцевий сірий"
+    }
+  },
+  {
+    "hex": "#36454F",
+    "names": {
+      "en": "Charcoal",
+      "uk": "Графітовий"
+    }
+  },
+  {
+    "hex": "#B0E0E6",
+    "names": {
+      "en": "Ice Blue",
+      "uk": "Крижаний блакитний"
+    }
+  },
+  {
+    "hex": "#F4A460",
+    "names": {
+      "en": "Sand",
+      "uk": "Пісочний"
+    }
+  },
+  {
+    "hex": "#FA8072",
+    "names": {
+      "en": "Salmon",
+      "uk": "Лососевий"
+    }
+  },
+  {
+    "hex": "#D8BFD8",
+    "names": {
+      "en": "Lilac",
+      "uk": "Бузковий"
+    }
+  }
+]

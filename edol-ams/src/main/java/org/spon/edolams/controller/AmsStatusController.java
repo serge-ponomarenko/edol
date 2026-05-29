@@ -57,6 +57,7 @@ public class AmsStatusController {
                 if (printerState.isPrinting()) {
                     amsStatus.setCurrentLayer(printerState.getLayer());
                     amsStatus.setTotalLayers(printerState.getTotalLayers());
+                    amsStatus.setRemainingTime(printerState.getRemainingTime());
                 }
 
                 List<AmsStatus.Slot> slots = new ArrayList<>();

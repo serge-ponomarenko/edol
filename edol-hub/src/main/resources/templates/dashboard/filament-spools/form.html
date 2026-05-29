@@ -67,6 +67,7 @@
                                                 th:attr="
                                                         data-id=${f.id},
                                                         data-color=${f.colorHex},
+                                                         data-color-name=${f.colorName},
                                                         data-text=${f.fullId},
                                                         data-weight=${f.defaultWeightTotal},
                                                         data-empty-weight=${f.defaultEmptySpoolWeight},
@@ -78,13 +79,16 @@
                                             <span th:style="'width:16px;height:16px;border-radius:4px;border:1px solid #ccc;background:' + ${f.colorHex}">
                                         </span>
 
-                                            <!-- TEXT -->
-                                            <span th:text="${f.fullId}"></span>
-
-                                            <!-- HEX -->
-                                            <span class="text-muted small"
-                                                  th:text="'(' + ${f.colorHex} + ')'">
-                                        </span>
+                                            <div class="d-flex flex-column">
+                                                <span th:text="${f.fullId}"></span>
+                                                <small class="text-muted">
+                                                    <span th:text="${f.colorName ?: 'Unknown'}"></span>
+                                                    •
+                                                    <span class="font-monospace"
+                                                          th:text="${f.colorHex}">
+                                                     </span>
+                                                </small>
+                                            </div>
 
                                         </button>
 
@@ -250,6 +254,7 @@
         const id = item.getAttribute('data-id');
         const text = item.getAttribute('data-text');
         const color = item.getAttribute('data-color');
+        const colorName = item.getAttribute('data-color-name');
 
         const hiddenInput = document.getElementById('filamentId');
         const selectedText = document.getElementById('selectedFilamentText');
@@ -266,7 +271,12 @@
                     background:${color};
                     display:inline-block;
                 "></span>
-                ${text}
+                <div style="display:flex;flex-direction:column;">
+                    <span>${text}</span>
+                    <small style="color:#6c757d;">
+                        ${colorName || ''}
+                    </small>
+                </div>
             </span>
         `;
 
@@ -276,7 +286,7 @@
         const totalInput =
             document.querySelector('[name="weightTotal"]');
 
-        if (!totalInput.value && defaultWeight) {
+        if (defaultWeight) {
             totalInput.value = defaultWeight;
         }
 
@@ -286,8 +296,15 @@
         const emptyWeightInput =
             document.querySelector('[name="emptySpoolWeight"]');
 
-        if (!emptyWeightInput.value && emptyWeight) {
+        if (emptyWeight) {
             emptyWeightInput.value = emptyWeight;
+        }
+
+        const remainingInput =
+            document.querySelector('[name="weightRemaining"]');
+
+        if (defaultWeight) {
+            remainingInput.value = defaultWeight;
         }
 
     }

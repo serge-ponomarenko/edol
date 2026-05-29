@@ -19,6 +19,7 @@ public class AmsStatus {
 
     private int currentLayer;
     private int totalLayers;
+    private int remainingTime;
 
     @Data
     public static class Slot {

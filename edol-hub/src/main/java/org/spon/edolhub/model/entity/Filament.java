@@ -34,6 +34,8 @@ public class Filament {
 
     private String colorHex;
 
+    private String colorName;
+
     // Example: 1.75 / 2.85
     private Double diameter;
 

@@ -107,10 +107,15 @@
                                     <!-- COLOR -->
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
-                                        <span
-                                                th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;display:inline-block;background:' + ${f.colorHex}">
-                                        </span>
-                                            <span th:text="${f.colorHex ?: '—'}"></span>
+                                            <span
+                                                    th:style="'width:28px;height:28px;border-radius:4px;border:1px solid #ccc;display:inline-block;background:' + ${f.colorHex}">
+                                            </span>
+                                            <div>
+                                                <div th:text="${f.colorName ?: '—'}"></div>
+                                                <div class="text-muted small font-monospace"
+                                                     th:text="${f.colorHex ?: '—'}">
+                                                </div>
+                                            </div>
                                         </div>
                                     </td>
 

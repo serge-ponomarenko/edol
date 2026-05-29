@@ -14,6 +14,8 @@ public class AllocationGroupDto {
 
     private String colorHex;
 
+    private String colorName;
+
     private AllocationStatus status;
 
     private Double requestedGrams;
