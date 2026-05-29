@@ -38,6 +38,7 @@
                         <form method="post" th:action="@{/filaments}" th:object="${filament}">
 
                             <input th:field="*{id}" type="hidden"/>
+                            <input th:field="*{printerFilamentProfileId}" type="hidden"/>
 
                             <div class="row g-3">
 
