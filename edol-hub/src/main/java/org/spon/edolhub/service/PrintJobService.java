@@ -166,6 +166,10 @@ public class PrintJobService {
                             filamentDto
                     );
 
+            if (group == null) {
+                continue;
+            }
+
             Filament filament = group.getFilament();
 
             List<AllocationResult> allocations =
@@ -275,7 +279,16 @@ public class PrintJobService {
                         .findByPrintJobId(
                                 job.getId()
                         )
-                        .orElseThrow();
+                        .orElse(null);
+
+        if (preview == null) {
+            log.warn(
+                    "No allocation preview found for job {}. Skipping interrupted usage for AMS slot {}.",
+                    job.getId(),
+                    filamentDto.getAmsSlot()
+            );
+            return null;
+        }
 
         return preview.getGroups()
                 .stream()
@@ -288,7 +301,7 @@ public class PrintJobService {
                                 )
                 )
                 .findFirst()
-                .orElseThrow();
+                .orElse(null);
     }
 
 
