@@ -1,0 +1,7 @@
+{
+  "bbox_objects": [
+    {"id": 0, "name": "result (1).obj_A", "bbox": [10.0, 20.0, 110.0, 120.0]},
+    {"id": 1, "name": "result (2).obj_B", "bbox": [130.0, 20.0, 230.0, 120.0]},
+    {"id": 2, "name": "wipe_tower", "bbox": [0.0, 0.0, 5.0, 5.0]}
+  ]
+}
