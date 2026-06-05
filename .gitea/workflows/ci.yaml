@@ -20,9 +20,12 @@ jobs:
           restore-keys: |
             maven-
 
-      - name: Build, Test and Sonar
+      - name: Build and Test
+        run: mvn -B clean verify
+
+      - name: SonarQube Analysis
         run: |
-          mvn -B clean verify \
+          mvn -B \
             org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }} \

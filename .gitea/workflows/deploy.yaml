@@ -45,6 +45,7 @@ jobs:
             docker compose down || true
             
             # ===== BACKUP DATABASE =====
+            echo "Creating deployment backup..."
   
             DB_DIR="../../db-files"
             BACKUP_DIR="../../db-files/backups"
@@ -68,6 +69,7 @@ jobs:
             # Remove old backups, keep latest 20
             ls -1t "$BACKUP_DIR"/edol-hub-db_*.mv.db | tail -n +21 | xargs -r rm --
             
+            echo "Backup completed."
             # ==========================
   
             docker compose up --build -d
