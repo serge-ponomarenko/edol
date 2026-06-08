@@ -9,6 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      SONAR_PROJECT_KEY: org.spon:edol
+
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +30,271 @@ jobs:
         run: |
           mvn -B \
             org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.qualitygate.wait=true
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_IP }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+
+      - name: Wait for Sonar Quality Gate
+        id: sonar-gate
+        shell: bash
+        run: |
+          set -e
+          
+          # TODO multi-module support
+          REPORT_FILE=$(find . -name report-task.txt | head -n 1)
+
+          if [ -z "$REPORT_FILE" ]; then
+            echo "report-task.txt not found"
+            exit 1
+          fi
+
+          echo "Using report file:"
+          echo "$REPORT_FILE"
+
+          CE_TASK_URL=$(grep '^ceTaskUrl=' "$REPORT_FILE" | cut -d= -f2-)
+
+          if [ -z "$CE_TASK_URL" ]; then
+            echo "ceTaskUrl not found"
+            exit 1
+          fi
+
+          echo "Waiting for Sonar Compute Engine..."
+
+          for i in {1..60}; do
+            RESPONSE=$(curl -s \
+              -u "${{ secrets.SONAR_TOKEN }}:" \
+              "$CE_TASK_URL")
+
+            TASK_STATUS=$(echo "$RESPONSE" | jq -r '.task.status')
+
+            echo "Compute Engine status: $TASK_STATUS"
+
+            if [ "$TASK_STATUS" = "SUCCESS" ]; then
+              ANALYSIS_ID=$(echo "$RESPONSE" | jq -r '.task.analysisId')
+
+              echo "analysis_id=$ANALYSIS_ID" >> "$GITHUB_OUTPUT"
+
+              break
+            fi
+
+            if [ "$TASK_STATUS" = "FAILED" ]; then
+              echo "Sonar Compute Engine task failed"
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          if [ -z "${ANALYSIS_ID:-}" ]; then
+            echo "Timed out waiting for Sonar analysis"
+            exit 1
+          fi
+
+          QUALITY_GATE=$(curl -s \
+            -u "${{ secrets.SONAR_TOKEN }}:" \
+            "${{ secrets.SONAR_HOST_IP }}/api/qualitygates/project_status?analysisId=${ANALYSIS_ID}")
+
+          echo "$QUALITY_GATE" > sonar-quality-gate.json
+          
+          FAILED_COUNT=$(jq '[.projectStatus.conditions[] | select(.status != "OK")] | length' sonar-quality-gate.json)
+  
+          echo "failed_conditions=$FAILED_COUNT" >> "$GITHUB_OUTPUT"
+
+          STATUS=$(echo "$QUALITY_GATE" | jq -r '.projectStatus.status')
+
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+          echo "Quality Gate: $STATUS"
+
+      - name: Generate Sonar Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## SonarQube Quality Gate" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ ! -f sonar-quality-gate.json ]; then
+            echo "❌ Quality Gate information unavailable." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          STATUS=$(jq -r '.projectStatus.status' sonar-quality-gate.json)
+          
+          FAILED_COUNT="${{ steps.sonar-gate.outputs.failed_conditions }}"
+
+          if [ "$STATUS" = "OK" ]; then
+            echo "✅ **PASSED**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ **FAILED ($FAILED_COUNT condition(s))**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Actual | Required | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|----------|----------|----------|----------|" >> "$GITHUB_STEP_SUMMARY"
+
+          jq -c '.projectStatus.conditions[] | select(.status != "OK")' sonar-quality-gate.json | while read condition; do
+
+            METRIC=$(echo "$condition" | jq -r '.metricKey')
+
+            case "$METRIC" in
+              new_coverage)
+                METRIC="Coverage"
+                ;;
+              new_security_hotspots_reviewed)
+                METRIC="Security Hotspots Reviewed"
+                ;;
+              new_duplicated_lines_density)
+                METRIC="Duplications"
+                ;;
+              new_reliability_rating)
+                METRIC="Reliability Rating"
+                ;;
+              new_security_rating)
+                METRIC="Security Rating"
+                ;;
+              new_maintainability_rating)
+                METRIC="Maintainability Rating"
+                ;;
+            esac
+
+            ACTUAL=$(echo "$condition" | jq -r '.actualValue // "-"')
+            REQUIRED=$(echo "$condition" | jq -r '.errorThreshold // "-"')
+            CONDITION_STATUS=$(echo "$condition" | jq -r '.status')
+
+            if [ "$CONDITION_STATUS" = "OK" ]; then
+              ICON="✅"
+            else
+              ICON="❌"
+            fi
+
+            echo "| $METRIC | $ACTUAL | $REQUIRED | $ICON |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Links" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dashboard: ${{ secrets.SONAR_HOST_URL }}/dashboard?id=${SONAR_PROJECT_KEY}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Issues: ${{ secrets.SONAR_HOST_URL }}/project/issues?issueStatuses=OPEN,CONFIRMED&inNewCodePeriod=true&id=${SONAR_PROJECT_KEY}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Security Hotspots: ${{ secrets.SONAR_HOST_URL }}/security_hotspots?inNewCodePeriod=true&id=${SONAR_PROJECT_KEY}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish Sonar PR Comment
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEACI_TOKEN }}
+        run: |
+          set -e
+
+          PR_NUMBER=$(jq -r '.number' "$GITHUB_EVENT_PATH")
+
+          STATUS="${{ steps.sonar-gate.outputs.status }}"
+          FAILED_COUNT="${{ steps.sonar-gate.outputs.failed_conditions }}"
+
+          DASHBOARD_URL="${{ secrets.SONAR_HOST_URL }}/dashboard?id=${SONAR_PROJECT_KEY}"
+          ISSUES_URL="${{ secrets.SONAR_HOST_URL }}/project/issues?issueStatuses=OPEN,CONFIRMED&inNewCodePeriod=true&id=${SONAR_PROJECT_KEY}"
+          HOTSPOTS_URL="${{ secrets.SONAR_HOST_URL }}/security_hotspots?inNewCodePeriod=true&id=${SONAR_PROJECT_KEY}"
+
+          cat > comment.md <<EOF
+          <!-- EDOL_SONAR_REPORT -->
+
+          ## SonarQube Quality Gate
+
+          EOF
+
+          if [ "$STATUS" = "OK" ]; then
+            echo "✅ **Quality Gate Passed**" >> comment.md
+          else
+            echo "❌ **Quality Gate Failed ($FAILED_COUNT condition(s))**" >> comment.md
+          fi
+
+          echo "" >> comment.md
+          echo "| Metric | Actual | Required |" >> comment.md
+          echo "|----------|----------|----------|" >> comment.md
+
+          jq -c '.projectStatus.conditions[] | select(.status != "OK")' sonar-quality-gate.json | while read condition; do
+
+            METRIC=$(echo "$condition" | jq -r '.metricKey')
+
+            case "$METRIC" in
+              new_coverage)
+                METRIC="Coverage"
+                ;;
+              new_security_hotspots_reviewed)
+                METRIC="Security Hotspots Reviewed"
+                ;;
+              new_duplicated_lines_density)
+                METRIC="Duplications"
+                ;;
+            esac
+
+            ACTUAL=$(echo "$condition" | jq -r '.actualValue // "-"')
+            REQUIRED=$(echo "$condition" | jq -r '.errorThreshold // "-"')
+
+            echo "| $METRIC | $ACTUAL | $REQUIRED |" >> comment.md
+          done
+          
+          UPDATED_AT=$(date -u +"%Y-%m-%d %H:%M UTC")
+
+          cat >> comment.md <<EOF
+  
+          ### Links
+        
+          - [Dashboard]($DASHBOARD_URL)
+          - [Issues]($ISSUES_URL)
+          - [Security Hotspots]($HOTSPOTS_URL)
+          
+          _Updated automatically by EDOL CI_
+          
+          Last updated: $UPDATED_AT
+          EOF
+
+          echo "========== GENERATED COMMENT =========="
+          cat comment.md
+          echo "======================================="
+
+          COMMENTS=$(curl -s \
+            -H "Authorization: token $GITEA_TOKEN" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments")
+
+          COMMENT_ID=$(echo "$COMMENTS" | jq -r '
+            .[]
+            | select(.body | contains("EDOL_SONAR_REPORT"))
+            | .id
+          ' | head -n1)
+
+          echo "PR Number: $PR_NUMBER"
+          echo "Existing Comment ID: $COMMENT_ID"
+
+          jq -Rs '{body: .}' < comment.md > payload.json
+
+          if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
+
+            echo "Updating existing comment..."
+
+            curl -s \
+              -X PATCH \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @payload.json \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}"
+
+          else
+
+            echo "Creating new comment..."
+
+            curl -s \
+              -X POST \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @payload.json \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments"
+
+          fi
+
+      - name: Fail on Quality Gate Error
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.sonar-gate.outputs.status }}" != "OK" ]; then
+            echo "Quality Gate failed"
+            exit 1
+          fi
