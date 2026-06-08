@@ -7,6 +7,12 @@ logging:
 app:
   zone-id: Europe/Kiev
 
+edol:
+  printer:
+    connection-mode: ${CONNECTION_MODE:"DIRECT"}        # DIRECT or AGENT
+  agent:
+    id: agent-dev
+
 mqttServer:
   url: tcp://mqtt:1883
 

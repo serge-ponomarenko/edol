@@ -1,10 +1,12 @@
 package org.spon.edolcore.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPSClient;
+import org.spon.edolcore.exception.FtpsTransferException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +17,7 @@ import java.time.Duration;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Setter
 public class FtpsService {
 
     @Value("${bambu.ftp-url}")
@@ -26,7 +29,7 @@ public class FtpsService {
     @Value("${bambu.access-code}")
     private String accessCode;
 
-    public void download(String requestedFile, String localFile) throws Exception {
+    public void download(String requestedFile, String localFile) {
         int maxAttempts = 5;
         long delayMs = 5000;
 
@@ -39,53 +42,33 @@ public class FtpsService {
             try {
                 ftps = getFtpsClient();
 
-                ftps.setFileType(FTP.BINARY_FILE_TYPE);
-                ftps.enterLocalPassiveMode();
-
-                ftps.changeWorkingDirectory(modelDirectory);
-
-                String remoteFile = resolveRemoteFile(ftps, requestedFile);
-
-                log.info("Downloading '{}' (requested '{}'). Attempt: {}", remoteFile, requestedFile, attempt);
-
-                try (OutputStream output = new FileOutputStream(localFile)) {
-                    boolean success = ftps.retrieveFile(remoteFile, output);
-                    if (!success)
-                        throw new RuntimeException("Download failed: " + remoteFile);
-                }
-
-                try (InputStream in = new FileInputStream(localFile)) {
-                    byte[] header = new byte[2];
-                    if (in.read(header) != 2 || header[0] != 'P' || header[1] != 'K') {
-                        throw new RuntimeException("Invalid ZIP file: " + remoteFile);
-                    }
-                }
+                downloadModel(ftps, requestedFile, localFile, attempt);
 
                 log.info("Model downloaded!");
 
-                ftps.logout();
-                ftps.disconnect();
+                safeLogout(ftps);
+                safeDisconnect(ftps);
 
                 return;
 
-            } catch (Exception e) {
+            } catch (IOException | FtpsTransferException e) {
 
                 lastError = e;
 
                 log.warn("FTPS attempt {} failed: {}", attempt, e.getMessage());
 
-                if (ftps != null && ftps.isConnected()) {
-                    try {
-                        ftps.disconnect();
-                    } catch (Exception ignored) {
-                    }
-                }
+                safeDisconnect(ftps);
 
-                Thread.sleep(delayMs * attempt);
+                try {
+                    Thread.sleep(delayMs * attempt);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new FtpsTransferException("FTPS download interrupted", interruptedException);
+                }
             }
         }
 
-        throw new RuntimeException("Download failed after retries", lastError);
+        throw new FtpsTransferException("Download failed after retries", lastError);
     }
 
     private FTPSClient getFtpsClient() throws IOException {
@@ -106,7 +89,7 @@ public class FtpsService {
         ftps.connect(ip, 990);
 
         if (!ftps.login("bblp", accessCode))
-            throw new RuntimeException("FTP login failed");
+            throw new FtpsTransferException("FTP login failed");
 
         ftps.setSoTimeout(30000);
 
@@ -116,11 +99,46 @@ public class FtpsService {
         return ftps;
     }
 
+    private void downloadModel(
+            FTPSClient ftps,
+            String requestedFile,
+            String localFile,
+            int attempt
+    ) throws IOException {
+        ftps.setFileType(FTP.BINARY_FILE_TYPE);
+        ftps.enterLocalPassiveMode();
+        ftps.changeWorkingDirectory(modelDirectory);
+
+        String remoteFile = resolveRemoteFile(ftps, requestedFile);
+
+        log.info(
+                "Downloading '{}' (requested '{}'). Attempt: {}",
+                remoteFile,
+                requestedFile,
+                attempt
+        );
+
+        try (OutputStream output = new FileOutputStream(localFile)) {
+            boolean success = ftps.retrieveFile(remoteFile, output);
+            if (!success) {
+                throw new FtpsTransferException("Download failed: " + remoteFile);
+            }
+        }
+
+        try (InputStream in = new FileInputStream(localFile)) {
+            byte[] header = new byte[2];
+            if (in.read(header) != 2 || header[0] != 'P' || header[1] != 'K') {
+                throw new FtpsTransferException("Invalid ZIP file: " + remoteFile);
+            }
+        }
+    }
+
     private String resolveRemoteFile(FTPSClient ftps, String requested) throws IOException {
         FTPFile[] files = ftps.listFiles();
 
-        if (files == null || files.length == 0)
-            throw new RuntimeException("No files found on printer");
+        if (files == null || files.length == 0) {
+            throw new FtpsTransferException("No files found on printer");
+        }
 
         String normalizedRequested = normalizeName(requested);
 
@@ -129,19 +147,41 @@ public class FtpsService {
 
             if (normalizeName(name).equalsIgnoreCase(normalizedRequested)) {
                 if (file.getSize() == 0) {
-                    throw new RuntimeException("Remote file is empty");
+                    throw new FtpsTransferException("Remote file is empty");
                 }
                 return name;
             }
 
         }
 
-        throw new RuntimeException("No matching model file found on printer");
+        throw new FtpsTransferException("No matching model file found on printer");
     }
 
     private String normalizeName(String name) {
         if (name == null)
             return "";
         return Normalizer.normalize(name, Normalizer.Form.NFKC);
+    }
+
+    private void safeLogout(FTPSClient ftps) {
+        if (ftps == null) {
+            return;
+        }
+        try {
+            ftps.logout();
+        } catch (IOException ignored) {
+            //Nothing
+        }
+    }
+
+    private void safeDisconnect(FTPSClient ftps) {
+        if (ftps == null || !ftps.isConnected()) {
+            return;
+        }
+        try {
+            ftps.disconnect();
+        } catch (IOException ignored) {
+            //Nothing
+        }
     }
 }

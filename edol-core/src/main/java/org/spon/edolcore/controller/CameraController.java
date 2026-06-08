@@ -4,8 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.spon.edol.model.CameraSnapshot;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.spon.edolcore.service.camera.PrinterStatusImageService;
-import org.spon.edolcore.service.camera.TimelapseService;
-import org.spon.edolcore.service.printmetadata.ModelService;
+import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
+import org.spon.edolcore.service.timelapse.TimelapseService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,7 +21,7 @@ public class CameraController {
     private final CameraSnapshotStore store;
     private final TimelapseService timelapseService;
     private final PrinterStatusImageService printerStatusImageService;
-    private final ModelService modelService;
+    private final ModelMetadataWorkflowService modelMetadataWorkflowService;
 
     @GetMapping(value = "/camera/latest", produces = MediaType.IMAGE_JPEG_VALUE)
     public byte[] latest() {
@@ -35,7 +35,7 @@ public class CameraController {
 
     @GetMapping(value = "/camera/status-image")
     public Path getLatestStatusImagePath() {
-        if (modelService.isMetadataLoaded()) {
+        if (modelMetadataWorkflowService.isMetadataLoaded()) {
             File statusImage = printerStatusImageService.getStatusImage();
             if (statusImage != null) {
                 return statusImage.toPath().toAbsolutePath();
@@ -45,7 +45,7 @@ public class CameraController {
     }
 
     @GetMapping("/camera/timelapse/{id}")
-    public String edit(@PathVariable String id) throws Exception {
+    public String edit(@PathVariable String id) {
         timelapseService.generate(id);
         return "OK";
     }

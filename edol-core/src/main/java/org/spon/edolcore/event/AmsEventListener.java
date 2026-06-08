@@ -2,7 +2,7 @@ package org.spon.edolcore.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.spon.edolcore.service.MqttEventPublisher;
+import org.spon.edolcore.service.MqttMessagePublisher;
 import org.spon.edolcore.service.PrinterStateService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 public class AmsEventListener {
 
     private final PrinterStateService printerStateService;
-    private final MqttEventPublisher mqttEventPublisher;
+    private final MqttMessagePublisher mqttMessagePublisher;
 
     @EventListener
     public void handleAmsEvent(AmsEvent event) {
@@ -25,27 +25,27 @@ public class AmsEventListener {
         printerStateService.getState().setError(null);
 
         switch (event.getType()) {
+            case AMS_SLOT_UNLOADED -> CompletableFuture.runAsync(() ->
+                    mqttMessagePublisher.publish(
+                            "edolcore/ams",
+                            Map.of(
+                                    "event", "ams.slot.unloaded",
+                                    "slot", event.getSlot()
+                            )
+                    ));
 
-            case AMS_SLOT_UNLOADED -> {
-                CompletableFuture.runAsync(() ->
-                        mqttEventPublisher.publish(
-                                "edolcore/ams",
-                                Map.of(
-                                        "event", "ams.slot.unloaded",
-                                        "slot", event.getSlot()
-                                )
-                        ));
-            }
 
-            case AMS_SLOT_LOADED -> {
-                CompletableFuture.runAsync(() ->
-                        mqttEventPublisher.publish(
-                                "edolcore/ams",
-                                Map.of(
-                                        "event", "ams.slot.loaded",
-                                        "slot", event.getSlot()
-                                )
-                        ));
+            case AMS_SLOT_LOADED -> CompletableFuture.runAsync(() ->
+                    mqttMessagePublisher.publish(
+                            "edolcore/ams",
+                            Map.of(
+                                    "event", "ams.slot.loaded",
+                                    "slot", event.getSlot()
+                            )
+                    ));
+
+            default -> {
+                // Nothing
             }
 
         }

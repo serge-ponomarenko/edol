@@ -5,9 +5,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.spon.edol.model.PrinterState;
+import org.spon.edolcore.model.dto.SpoolChangeRequestDto;
 import org.spon.edolcore.service.PrinterStateService;
-import org.spon.edolcore.service.printermqtt.BambuMqttClient;
-import org.spon.edolcore.service.printmetadata.ModelService;
+import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
+import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
+import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityProvider;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -27,14 +29,20 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class PrinterController {
 
-    private final PrinterStateService service;
-    private final BambuMqttClient client;
-    private final ModelService modelService;
+    ResponseEntity<Map<String, Object>> okResponseEntity =
+            ResponseEntity.ok().body(Map.of(
+                    "status", "ok"
+            ));
+
+    private final PrinterStateService printerStateService;
+    private final PrinterConnectivityProvider connectivityProvider;
+    private final ModelMetadataWorkflowService modelMetadataWorkflowService;
+    private final PrinterCommandGateway printerCommandGateway;
 
     @GetMapping("/state")
     public PrinterState getState() {
-        if (client.isConnected()) {
-            return service.getState();
+        if (connectivityProvider.isConnected()) {
+            return printerStateService.getState();
         } else {
             PrinterState printerState = new PrinterState();
             printerState.setOnline(false);
@@ -44,7 +52,7 @@ public class PrinterController {
 
     @GetMapping("/connection")
     public boolean isConnected() {
-        return client.isConnected();
+        return connectivityProvider.isConnected();
     }
 
     @GetMapping(value = "/modelimage", produces = MediaType.IMAGE_PNG_VALUE)
@@ -58,82 +66,75 @@ public class PrinterController {
     }
 
     @PostMapping("/request/skip-objects")
-    public ResponseEntity<?> skipObjects(@RequestBody SkipObjectsRequest request) {
-        client.skipObjects(request.getObjectIds());
+    public ResponseEntity<Map<String, Object>> skipObjects(@RequestBody SkipObjectsRequest request) {
+        List<Integer> objectIds = request.getObjectIds();
+        printerCommandGateway.skipObjects(objectIds);
 
-        return ResponseEntity.ok().body(Map.of(
-                "status", "ok",
-                "skipped", request.getObjectIds()
-        ));
+        printerStateService.getState().getPrintObjects().forEach(po -> {
+            if (objectIds.contains(po.getId())) {
+                po.setSkipped(true);
+            }
+        });
+
+
+        return okResponseEntity;
     }
 
     @PostMapping("/request/spool-change")
-    public ResponseEntity<?> skipObjects(@RequestBody BambuMqttClient.SpoolChangeRequest request) {
-        client.spoolChange(request);
+    public ResponseEntity<Map<String, Object>> spoolChange(@RequestBody SpoolChangeRequestDto request) {
+        printerCommandGateway.spoolChange(request);
         log.info("-> Spool change API request");
 
-        return ResponseEntity.ok().body(Map.of(
-                "status", "ok"
-        ));
+        return okResponseEntity;
     }
 
     @PostMapping("/request/pause")
-    public ResponseEntity<?> pausePrint() {
-        client.pause();
+    public ResponseEntity<Map<String, Object>> pausePrint() {
+        printerCommandGateway.pause();
         log.info("-> Print PAUSE API request");
 
-        return ResponseEntity.ok().body(Map.of(
-                "status", "ok"
-        ));
+        return okResponseEntity;
     }
 
     @PostMapping("/request/resume")
-    public ResponseEntity<?> resumePrint() {
-        client.resume();
+    public ResponseEntity<Map<String, Object>> resumePrint() {
+        printerCommandGateway.resume();
         log.info("-> Print RESUME API request");
 
-        return ResponseEntity.ok().body(Map.of(
-                "status", "ok"
-        ));
+        return okResponseEntity;
     }
 
     @PostMapping("/request/stop")
-    public ResponseEntity<?> stopPrint() {
-        client.stop();
+    public ResponseEntity<Map<String, Object>> stopPrint() {
+        printerCommandGateway.stop();
         log.info("-> Print STOP API request");
 
-        return ResponseEntity.ok().body(Map.of(
-                "status", "ok"
-        ));
+        return okResponseEntity;
     }
 
     @PostMapping("/request/pushall")
-    public ResponseEntity<?> pushAll() {
-        client.pushAll();
+    public ResponseEntity<Map<String, Object>> pushAll() {
+        printerCommandGateway.pushAll();
         log.info("-> Print PushAll API request");
 
-        return ResponseEntity.ok().body(Map.of(
-                "status", "ok"
-        ));
+        return okResponseEntity;
     }
 
     @PostMapping("/request/fetchmetadata")
-    public ResponseEntity<?> fetchMetadata() throws Exception {
-        modelService.fetchMetadata();
+    public ResponseEntity<Map<String, Object>> fetchMetadata() {
+        modelMetadataWorkflowService.requestMetadata();
 
-        return ResponseEntity.ok().body(Map.of(
-                "status", "ok"
-        ));
+        return okResponseEntity;
     }
 
     private @NonNull ResponseEntity<Resource> getImageResponseEntity(String imageName) {
         Path platePath = Path.of(
                 "models",
                 "metadata",
-                imageName + "_" + service.getState().getPlateIndex() + ".png"
+                imageName + "_" + printerStateService.getState().getPlateIndex() + ".png"
         );
 
-        if (!Files.exists(platePath) || !modelService.isMetadataLoaded()) {
+        if (!Files.exists(platePath) || !modelMetadataWorkflowService.isMetadataLoaded()) {
             return ResponseEntity.notFound().build();
         }
 
