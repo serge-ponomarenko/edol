@@ -12,7 +12,6 @@ public class PrinterConnectivityStateService {
     private final PrinterStateService printerStateService;
 
     public void setConnected() {
-
         if (printerStateService.getState().isOnline()) {
             return;
         }
@@ -22,7 +21,6 @@ public class PrinterConnectivityStateService {
     }
 
     public void setDisconnected() {
-
         if (!printerStateService.getState().isOnline()) {
             return;
         }

@@ -7,6 +7,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(
+        value = "edol.printer.connection-mode",
+        havingValue = "AGENT"
+)
 @RequiredArgsConstructor
 public class AgentHeartbeatMonitor {
 
@@ -14,10 +18,6 @@ public class AgentHeartbeatMonitor {
     private final PrinterConnectivityStateService connectivityStateService;
 
     @Scheduled(fixedDelay = 10000)
-    @ConditionalOnProperty(
-            value = "edol.printer.connection-mode",
-            havingValue = "AGENT"
-    )
     public void monitor() {
         if (agentStateService.isOnline()) {
             connectivityStateService.setConnected();
