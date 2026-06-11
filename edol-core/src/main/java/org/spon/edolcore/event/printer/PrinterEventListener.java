@@ -11,6 +11,9 @@ import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.agent.command.AgentCommandGateway;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
+import org.spon.edolcore.service.print.ActivePrintContext;
+import org.spon.edolcore.service.print.ActivePrintContextService;
+import org.spon.edolcore.service.print.SpoolFingerprintBuilder;
 import org.spon.edolcore.service.timelapse.TimelapseService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -41,6 +44,8 @@ public class PrinterEventListener {
     private final TimelapseService timelapseService;
     private final MqttMessagePublisher mqttMessagePublisher;
     private final AgentCommandGateway agentCommandGateway;
+    private final ActivePrintContextService activePrintContextService;
+    private final SpoolFingerprintBuilder spoolFingerprintBuilder;
 
     private int lastLogProgressMilestone = -1;
     private int lastLogLayerMilestone = -1;
@@ -76,9 +81,9 @@ public class PrinterEventListener {
 
             case PRINT_ERROR -> handlePrintError(event);
 
-            case LAYER_CHANGED -> handleLayerChanged(event);
+            case LAYER_CHANGED -> handleLayerChanged();
 
-            case PROGRESS_CHANGED -> handleProgressChanged(event);
+            case PROGRESS_CHANGED -> handleProgressChanged();
 
             case AMS_STATUS_CHANGED -> handleAmsStatusChanged();
 
@@ -112,10 +117,33 @@ public class PrinterEventListener {
         lastLogLayerMilestone = -1;
 
         String sessionId = UUID.randomUUID().toString();
-        printerStateService.getState().setSessionId(sessionId);
+
+        PrinterState state = printerStateService.getState();
+
+        state.setSessionId(sessionId);
+        state.setProgress(0);
         cameraSnapshotStore.setCurrentSessionId(sessionId);
         modelMetadataWorkflowService.setMetadataLoaded(false);
-        printerStateService.getState().setProgress(0);
+
+        activePrintContextService.save(
+                ActivePrintContext.builder()
+                        .sessionId(UUID.fromString(sessionId))
+                        .gcodeFile(state.getCurrentFile())
+                        .subtaskName(state.getCurrentTask())
+                        .totalLayers(state.getTotalLayers())
+                        .savedLayer(state.getLayer())
+                        .savedProgress(state.getProgress())
+                        .remainingTime(state.getRemainingTime())
+                        .spoolFingerprint(
+                                spoolFingerprintBuilder.build(
+                                        state.getAms(),
+                                        state.getExtTray()
+                                )
+                        )
+                        .startedAt(java.time.Instant.now())
+                        .lastUpdatedAt(java.time.Instant.now())
+                        .build()
+        );
 
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
@@ -167,6 +195,13 @@ public class PrinterEventListener {
 
     private void handlePrintFinished(String topic, String eventName) {
         PrinterState state = printerStateService.getState();
+
+        if (state.getSessionId() != null) {
+            activePrintContextService.delete(
+                    UUID.fromString(state.getSessionId())
+            );
+        }
+
         state.setPrinting(false);
 
         CompletableFuture.runAsync(() ->
@@ -201,17 +236,20 @@ public class PrinterEventListener {
                 ));
     }
 
-    private void handleLayerChanged(PrinterEvent event) {
-        int layer = event.getLayer();
+    private void handleLayerChanged() {
+        updateActivePrintContext();
+
+        int layer = printerStateService.getState().getLayer();
         if (isLayerLogMilestone(layer)) {
-            log.info("Layer: {}", event.getLayer());
+            log.info("Layer changed: {}", layer);
         }
     }
 
-    private void handleProgressChanged(PrinterEvent event) {
-        int progress = event.getProgress();
+    private void handleProgressChanged() {
+        updateActivePrintContext();
 
         PrinterState state = printerStateService.getState();
+        int progress = state.getProgress();
 
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
@@ -301,6 +339,22 @@ public class PrinterEventListener {
         }
 
         return false;
+    }
+
+    private void updateActivePrintContext() {
+        PrinterState state = printerStateService.getState();
+
+        if (state.getSessionId() == null) {
+            return;
+        }
+
+        activePrintContextService.updateRuntimeState(
+                UUID.fromString(state.getSessionId()),
+                state.getLayer(),
+                state.getProgress(),
+                state.getRemainingTime()
+        );
+
     }
 
     private Map<String, Object> payload(String eventName) {

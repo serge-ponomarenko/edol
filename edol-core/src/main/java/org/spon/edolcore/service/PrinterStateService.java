@@ -1,17 +1,18 @@
 package org.spon.edolcore.service;
 
+
+
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.spon.edol.model.AmsSlot;
-import org.spon.edol.model.AmsState;
-import org.spon.edol.model.ExtTray;
-import org.spon.edol.model.PrinterState;
+import org.spon.edol.model.*;
 import org.spon.edolcore.event.AmsEvent;
 import org.spon.edolcore.event.AmsEventType;
 import org.spon.edolcore.event.PrinterEvent;
 import org.spon.edolcore.event.PrinterEventType;
+import org.spon.edolcore.event.printer.PrinterStateUpdatedEvent;
+import org.spon.edolcore.service.print.recovery.StartupSynchronizationService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -24,10 +25,50 @@ import java.util.List;
 @Service
 public class PrinterStateService {
 
+    private static final String FIELD_GCODE_STATE = "gcode_state";
+    private static final String FIELD_MC_PERCENT = "mc_percent";
+    private static final String FIELD_LAYER_NUM = "layer_num";
+    private static final String FIELD_PRINT_ERROR = "print_error";
+    private static final String FIELD_AMS_STATUS = "ams_status";
+    private static final String FIELD_AMS = "ams";
+    private static final String FIELD_AMS_MAPPING = "ams_mapping";
+    private static final String FIELD_VT_TRAY = "vt_tray";
+    private static final String FIELD_TOTAL_LAYER_NUM = "total_layer_num";
+    private static final String FIELD_MC_REMAINING_TIME = "mc_remaining_time";
+    private static final String FIELD_NOZZLE_TEMPER = "nozzle_temper";
+    private static final String FIELD_NOZZLE_TARGET_TEMPER = "nozzle_target_temper";
+    private static final String FIELD_BED_TEMPER = "bed_temper";
+    private static final String FIELD_BED_TARGET_TEMPER = "bed_target_temper";
+    private static final String FIELD_GCODE_FILE = "gcode_file";
+    private static final String FIELD_SUBTASK_NAME = "subtask_name";
+    private static final String FIELD_WIFI_SIGNAL = "wifi_signal";
+    private static final String FIELD_SPD_MAG = "spd_mag";
+    private static final String FIELD_TRAY_NOW = "tray_now";
+    private static final String FIELD_TRAY_TAR = "tray_tar";
+    private static final String FIELD_TRAY_TYPE = "tray_type";
+    private static final String FIELD_TRAY_SUB_BRANDS = "tray_sub_brands";
+    private static final String FIELD_TRAY_INFO_IDX = "tray_info_idx";
+    private static final String FIELD_TRAY_COLOR = "tray_color";
+    private static final String FIELD_REMAIN = "remain";
+    private static final String FIELD_ID = "id";
+    private static final String FIELD_TEMP = "temp";
+    private static final String FIELD_HUMIDITY = "humidity";
+    private static final String FIELD_HUMIDITY_RAW = "humidity_raw";
+    private static final String FIELD_AMS_TRAY = "tray";
+    private static final String FIELD_AMS_LIST = "ams";
+
+    private static final String STATE_IDLE = "IDLE";
+    private static final String STATE_FINISH = "FINISH";
+    private static final String STATE_FAILED = "FAILED";
+    private static final String STATE_PAUSE = "PAUSE";
+    private static final String STATE_PREPARE = "PREPARE";
+    private static final String STATE_RUNNING = "RUNNING";
+
     private final PrinterState state = new PrinterState();
     private final ApplicationEventPublisher events;
+    private final StartupSynchronizationService startupSynchronizationService;
 
-    private String lastState = "IDLE";
+    private String lastState = STATE_IDLE;
     private int lastError = 0;
     private int lastAmsStatus = -1;
     private int lastActiveSlot = -1;
@@ -40,286 +81,56 @@ public class PrinterStateService {
         List<PrinterEvent> pendingEvents = new ArrayList<>();
         List<AmsEvent> pendingAmsEvents = new ArrayList<>();
 
-        // ---------- gcode_state ----------
-        if (print.has("gcode_state")) {
-            String newState = print.get("gcode_state").asText();
+        updateGcodeState(print, pendingEvents);
+        updateProgress(print, pendingEvents);
+        updateLayer(print, pendingEvents);
+        updateError(print, pendingEvents);
+        updateAmsStatus(print, pendingEvents);
+        updateAms(print, pendingAmsEvents);
+        updateAmsMapping(print);
+        updateExtTray(print);
+        updateAmsActiveSlot(print, pendingEvents);
+        updateScalarFields(print);
 
-            if (!newState.equals(lastState)) {
-                log.info("### G-code new state: {}. Old state: {}", newState, lastState);
-
-                detectStateEvents(lastState, newState, pendingEvents);
-
-                state.setGcodeState(newState);
-                lastState = newState;
-            }
+        if (!startupSynchronizationService.isRecoverySynchronizationActive()) {
+            pendingEvents.forEach(events::publishEvent);
+            pendingAmsEvents.forEach(events::publishEvent);
         }
 
-
-        // ---------- progress ----------
-        if (print.has("mc_percent")) {
-            int progress = print.get("mc_percent").asInt();
-
-            if (progress != lastProgress) {
-                state.setProgress(progress);
-
-                pendingEvents.add(
-                        new PrinterEvent(
-                                PrinterEventType.PROGRESS_CHANGED,
-                                state.getCurrentFile(),
-                                null,
-                                progress,
-                                null
-                        )
-                );
-                lastProgress = progress;
-            }
-
-        }
-
-        // ---------- layer ----------
-        if (print.has("layer_num")) {
-            int layer = print.get("layer_num").asInt();
-
-            if (layer != lastLayer) {
-                state.setLayer(layer);
-
-                pendingEvents.add(
-                        new PrinterEvent(
-                                PrinterEventType.LAYER_CHANGED,
-                                state.getCurrentFile(),
-                                layer,
-                                null,
-                                null
-                        )
-                );
-
-                lastLayer = layer;
-            }
-        }
-
-        // ---------- error ----------
-        if (print.has("print_error")) {
-            int error = print.get("print_error").asInt();
-
-            if (error != 0 && error != lastError) {
-
-                pendingEvents.add(
-                        new PrinterEvent(
-                                PrinterEventType.PRINT_ERROR,
-                                state.getCurrentFile(),
-                                null,
-                                null,
-                                error
-                        )
-                );
-
-                lastError = error;
-            }
-        }
-
-        // ---------- AMS ----------
-        if (print.has("ams_status")) {
-            JsonNode amsStatus = print.get("ams_status");
-            int ams = amsStatus.asInt();
-
-            if (ams != lastAmsStatus) {
-                pendingEvents.add(
-                        new PrinterEvent(
-                                PrinterEventType.AMS_STATUS_CHANGED,
-                                state.getCurrentFile(),
-                                null,
-                                null,
-                                null
-                        )
-                );
-
-                lastAmsStatus = ams;
-
-            }
-        }
-
-        if (print.has("ams")) {
-            updateAms(print.get("ams"), pendingAmsEvents);
-        }
-
-        if (print.has("ams_mapping")) {
-            JsonNode amsMapping = print.get("ams_mapping");
-            List<Integer> amsMappingList = new ArrayList<>();
-            for (JsonNode node : amsMapping) {
-                amsMappingList.add(node.asInt());
-            }
-            state.setAmsMapping(amsMappingList);
-        }
-
-        if (print.has("vt_tray")) {
-            updateExtTray(print.get("vt_tray"));
-        }
-
-        if (print.has("ams") && print.get("ams").has("tray_now")) {
-
-            int active = print.get("ams").get("tray_now").asInt();
-
-            state.getAms().setActiveSlot(active);
-
-            state.setExternalSpoolUsed(active == 254);
-
-            if (active != lastActiveSlot) {
-
-                pendingEvents.add(
-                        new PrinterEvent(
-                                PrinterEventType.AMS_SLOT_CHANGED,
-                                state.getCurrentFile(),
-                                null,
-                                null,
-                                null
-                        )
-                );
-
-                state.getAms().setPreviousSlot(lastActiveSlot);
-                lastActiveSlot = active;
-            }
-        }
-
-        if (print.has("total_layer_num"))
-            state.setTotalLayers(print.get("total_layer_num").asInt());
-
-        if (print.has("mc_remaining_time"))
-            state.setRemainingTime(print.get("mc_remaining_time").asInt());
-
-        if (print.has("nozzle_temper"))
-            state.setNozzleTemp(print.get("nozzle_temper").asDouble());
-
-        if (print.has("nozzle_target_temper"))
-            state.setNozzleTargetTemp(print.get("nozzle_target_temper").asDouble());
-
-        if (print.has("bed_temper"))
-            state.setBedTemp(print.get("bed_temper").asDouble());
-
-        if (print.has("bed_target_temper"))
-            state.setBedTargetTemp(print.get("bed_target_temper").asDouble());
-
-        if (print.has("gcode_file"))
-            state.setCurrentFile(print.get("gcode_file").asText());
-
-        if (print.has("subtask_name"))
-            state.setCurrentTask(print.get("subtask_name").asText());
-
-        if (print.has("wifi_signal"))
-            state.setWifiSignal(print.get("wifi_signal").asText());
-
-        if (print.has("spd_mag"))
-            state.setSpeed(print.get("spd_mag").asInt());
-
-        pendingEvents.forEach(events::publishEvent);
-        pendingAmsEvents.forEach(events::publishEvent);
+        events.publishEvent(new PrinterStateUpdatedEvent());
 
     }
 
-    private void updateAms(JsonNode amsNode, List<AmsEvent> pendingAmsEvents) {
-
-        if (!amsNode.has("ams"))
+    private void updateAms(JsonNode print, List<AmsEvent> pendingAmsEvents) {
+        if (!print.has(FIELD_AMS))
             return;
 
-        JsonNode amsArray = amsNode.get("ams");
-
-        if (amsArray.isEmpty())
+        JsonNode amsNode = print.get(FIELD_AMS);
+        JsonNode ams = getFirstAms(amsNode);
+        if (ams == null)
             return;
-
-        JsonNode ams = amsArray.get(0);
 
         AmsState amsState = new AmsState();
+        amsState.setAmsId(ams.get(FIELD_ID).asInt());
+        applyAmsEnvironment(ams, amsState);
 
-        amsState.setAmsId(ams.get("id").asInt());
-
-        if (ams.has("temp"))
-            amsState.setTemperature(ams.get("temp").asDouble());
-
-        if (ams.has("humidity"))
-            amsState.setHumidity(ams.get("humidity").asInt());
-
-        if (ams.has("humidity_raw"))
-            amsState.setHumidityRaw(ams.get("humidity_raw").asInt());
-
-        List<AmsSlot> slots = new ArrayList<>();
-
-        JsonNode trays = ams.get("tray");
-
-        for (JsonNode tray : trays) {
-
-            AmsSlot slot = new AmsSlot();
-
-            slot.setId(tray.get("id").asInt());
-
-            if (tray.has("tray_type"))
-                slot.setFilamentType(tray.get("tray_type").asText());
-
-            if (tray.has("tray_sub_brands"))
-                slot.setFilamentBrand(tray.get("tray_sub_brands").asText());
-
-            if (tray.has("tray_info_idx"))
-                slot.setFilamentBrandIndex(tray.get("tray_info_idx").asText());
-
-            if (tray.has("tray_color"))
-                slot.setColor("#" + tray.get("tray_color").asText().substring(0, 6));
-
-            if (tray.has("remain"))
-                slot.setRemaining(tray.get("remain").asInt());
-
-            slots.add(slot);
-        }
-
-        if (!previousAmsSlots.equals(slots)) {
-            previousAmsSlots.forEach(previousSlot -> {
-                if (previousSlot.isEmpty() && !slots.get(previousSlot.getId()).isEmpty()) {
-                    log.warn("[AMS] New Spool has been loaded into slot {}", previousSlot.getId());
-                    pendingAmsEvents.add(
-                            new AmsEvent(
-                                    AmsEventType.AMS_SLOT_LOADED,
-                                    previousSlot.getId()
-                            )
-                    );
-                }
-                if (!previousSlot.isEmpty() && slots.get(previousSlot.getId()).isEmpty()) {
-                    log.warn("[AMS] Spool has been unloaded from slot {}", previousSlot.getId());
-                    pendingAmsEvents.add(
-                            new AmsEvent(
-                                    AmsEventType.AMS_SLOT_UNLOADED,
-                                    previousSlot.getId()
-                            )
-                    );
-                }
-            });
-        }
-
+        List<AmsSlot> slots = buildAmsSlots(ams);
+        detectAmsSlotChanges(slots, pendingAmsEvents);
         amsState.setSlots(slots);
         previousAmsSlots = slots;
-
-        if (amsNode.has("tray_tar"))
-            amsState.setActiveSlot(amsNode.get("tray_tar").asInt());
-
-        if (amsNode.has("tray_now"))
-            amsState.setActiveSlot(amsNode.get("tray_now").asInt());
+        applyAmsActiveSlot(amsNode, amsState);
 
         state.setAms(amsState);
     }
 
-    private void updateExtTray(JsonNode vtTrayNode) {
+    private void updateExtTray(JsonNode print) {
+        if (!print.has(FIELD_VT_TRAY))
+            return;
+
+        JsonNode vtTrayNode = print.get(FIELD_VT_TRAY);
         ExtTray extTray = new ExtTray();
 
-        if (vtTrayNode.has("tray_type"))
-            extTray.setFilamentType(vtTrayNode.get("tray_type").asText());
-
-        if (vtTrayNode.has("tray_sub_brands"))
-            extTray.setFilamentBrand(vtTrayNode.get("tray_sub_brands").asText());
-
-        if (vtTrayNode.has("tray_info_idx"))
-            extTray.setFilamentBrandIndex(vtTrayNode.get("tray_info_idx").asText());
-
-        if (vtTrayNode.has("tray_color"))
-            extTray.setColor("#" + vtTrayNode.get("tray_color").asText().substring(0, 6));
-
-        if (vtTrayNode.has("remain"))
-            extTray.setRemaining(vtTrayNode.get("remain").asInt());
+        applyTrayMetadata(vtTrayNode, extTray);
 
         state.setExtTray(extTray);
     }
@@ -328,33 +139,286 @@ public class PrinterStateService {
         if (oldState.equals(newState))
             return;
 
-        if (
-                ("IDLE".equals(oldState) || "FINISH".equals(oldState) || "FAILED".equals(oldState))
-                        && ("PREPARE".equals(newState) || "RUNNING".equals(newState))
-        ) {
+        if (isPrintStartedTransition(oldState, newState)) {
             pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_STARTED));
         }
-
-        if (
-                ("PREPARE".equals(oldState) || "PAUSE".equals(oldState))
-                        && "RUNNING".equals(newState)
-        ) {
+        if (isPrintRunningTransition(oldState, newState)) {
             pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_RUNNING));
         }
-
-        if (!"PAUSE".equals(oldState) && "PAUSE".equals(newState)) {
+        if (isPrintPausedTransition(oldState, newState)) {
             pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_PAUSED));
         }
-
-        if (!"FINISH".equals(oldState) && "FINISH".equals(newState)
-        ) {
+        if (isPrintFinishedTransition(oldState, newState)) {
             pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_FINISHED));
         }
-
-        if (!"FAILED".equals(oldState) && "FAILED".equals(newState)) {
+        if (isPrintFailedTransition(oldState, newState)) {
             pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_FAILED));
         }
 
+    }
+
+    private void updateGcodeState(JsonNode print, List<PrinterEvent> pendingEvents) {
+        if (!print.has(FIELD_GCODE_STATE))
+            return;
+
+        String newState = print.get(FIELD_GCODE_STATE).asText();
+
+        if (newState.equals(lastState))
+            return;
+
+        log.info("### G-code new state: {}. Old state: {}", newState, lastState);
+        detectStateEvents(lastState, newState, pendingEvents);
+        state.setGcodeState(newState);
+        lastState = newState;
+    }
+
+    private void updateProgress(JsonNode print, List<PrinterEvent> pendingEvents) {
+        if (!print.has(FIELD_MC_PERCENT))
+            return;
+
+        int progress = print.get(FIELD_MC_PERCENT).asInt();
+
+        if (progress == lastProgress)
+            return;
+
+        state.setProgress(progress);
+        pendingEvents.add(new PrinterEvent(PrinterEventType.PROGRESS_CHANGED, state.getCurrentFile(), null, progress, null));
+        lastProgress = progress;
+    }
+
+    private void updateLayer(JsonNode print, List<PrinterEvent> pendingEvents) {
+        if (!print.has(FIELD_LAYER_NUM))
+            return;
+
+        int layer = print.get(FIELD_LAYER_NUM).asInt();
+
+        if (layer == lastLayer)
+            return;
+
+        state.setLayer(layer);
+        pendingEvents.add(new PrinterEvent(PrinterEventType.LAYER_CHANGED, state.getCurrentFile(), layer, null, null));
+        lastLayer = layer;
+    }
+
+    private void updateError(JsonNode print, List<PrinterEvent> pendingEvents) {
+        if (!print.has(FIELD_PRINT_ERROR))
+            return;
+
+        int error = print.get(FIELD_PRINT_ERROR).asInt();
+
+        if (error == 0 || error == lastError)
+            return;
+
+        pendingEvents.add(new PrinterEvent(PrinterEventType.PRINT_ERROR, state.getCurrentFile(), null, null, error));
+        lastError = error;
+    }
+
+    private void updateAmsStatus(JsonNode print, List<PrinterEvent> pendingEvents) {
+        if (!print.has(FIELD_AMS_STATUS))
+            return;
+
+        int amsStatus = print.get(FIELD_AMS_STATUS).asInt();
+
+        if (amsStatus == lastAmsStatus)
+            return;
+
+        pendingEvents.add(new PrinterEvent(PrinterEventType.AMS_STATUS_CHANGED, state.getCurrentFile(), null, null, null));
+        lastAmsStatus = amsStatus;
+    }
+
+    private void updateAmsMapping(JsonNode print) {
+        if (!print.has(FIELD_AMS_MAPPING))
+            return;
+
+        JsonNode amsMapping = print.get(FIELD_AMS_MAPPING);
+        List<Integer> amsMappingList = new ArrayList<>();
+        for (JsonNode node : amsMapping) {
+            amsMappingList.add(node.asInt());
+        }
+        state.setAmsMapping(amsMappingList);
+    }
+
+    private void updateAmsActiveSlot(JsonNode print, List<PrinterEvent> pendingEvents) {
+        if (!print.has(FIELD_AMS))
+            return;
+
+        JsonNode amsNode = print.get(FIELD_AMS);
+        if (!amsNode.has(FIELD_TRAY_NOW))
+            return;
+
+        int active = amsNode.get(FIELD_TRAY_NOW).asInt();
+
+        state.getAms().setActiveSlot(active);
+        state.setExternalSpoolUsed(active == 254);
+
+        if (active == lastActiveSlot)
+            return;
+
+        pendingEvents.add(new PrinterEvent(PrinterEventType.AMS_SLOT_CHANGED, state.getCurrentFile(), null, null, null));
+        state.getAms().setPreviousSlot(lastActiveSlot);
+        lastActiveSlot = active;
+    }
+
+    private void updateScalarFields(JsonNode print) {
+        if (print.has(FIELD_TOTAL_LAYER_NUM))
+            state.setTotalLayers(print.get(FIELD_TOTAL_LAYER_NUM).asInt());
+
+        if (print.has(FIELD_MC_REMAINING_TIME))
+            state.setRemainingTime(print.get(FIELD_MC_REMAINING_TIME).asInt());
+
+        if (print.has(FIELD_NOZZLE_TEMPER))
+            state.setNozzleTemp(print.get(FIELD_NOZZLE_TEMPER).asDouble());
+
+        if (print.has(FIELD_NOZZLE_TARGET_TEMPER))
+            state.setNozzleTargetTemp(print.get(FIELD_NOZZLE_TARGET_TEMPER).asDouble());
+
+        if (print.has(FIELD_BED_TEMPER))
+            state.setBedTemp(print.get(FIELD_BED_TEMPER).asDouble());
+
+        if (print.has(FIELD_BED_TARGET_TEMPER))
+            state.setBedTargetTemp(print.get(FIELD_BED_TARGET_TEMPER).asDouble());
+
+        if (print.has(FIELD_GCODE_FILE))
+            state.setCurrentFile(print.get(FIELD_GCODE_FILE).asText());
+
+        if (print.has(FIELD_SUBTASK_NAME))
+            state.setCurrentTask(print.get(FIELD_SUBTASK_NAME).asText());
+
+        if (print.has(FIELD_WIFI_SIGNAL))
+            state.setWifiSignal(print.get(FIELD_WIFI_SIGNAL).asText());
+
+        if (print.has(FIELD_SPD_MAG))
+            state.setSpeed(print.get(FIELD_SPD_MAG).asInt());
+    }
+
+    private boolean isPrintStartedTransition(String oldState, String newState) {
+        return isAnyOf(oldState, STATE_IDLE, STATE_FINISH, STATE_FAILED)
+                && isAnyOf(newState, STATE_PREPARE, STATE_RUNNING);
+    }
+
+    private boolean isPrintRunningTransition(String oldState, String newState) {
+        return isAnyOf(oldState, STATE_PREPARE, STATE_PAUSE) && STATE_RUNNING.equals(newState);
+    }
+
+    private boolean isPrintPausedTransition(String oldState, String newState) {
+        return !STATE_PAUSE.equals(oldState) && STATE_PAUSE.equals(newState);
+    }
+
+    private boolean isPrintFinishedTransition(String oldState, String newState) {
+        return !STATE_FINISH.equals(oldState) && STATE_FINISH.equals(newState);
+    }
+
+    private boolean isPrintFailedTransition(String oldState, String newState) {
+        return !STATE_FAILED.equals(oldState) && STATE_FAILED.equals(newState);
+    }
+
+    private boolean isAnyOf(String value, String first, String second, String third) {
+        return first.equals(value) || second.equals(value) || third.equals(value);
+    }
+
+    private boolean isAnyOf(String value, String first, String second) {
+        return first.equals(value) || second.equals(value);
+    }
+
+    private JsonNode getFirstAms(JsonNode amsNode) {
+        if (!amsNode.has(FIELD_AMS_LIST))
+            return null;
+
+        JsonNode amsArray = amsNode.get(FIELD_AMS_LIST);
+        if (amsArray.isEmpty())
+            return null;
+
+        return amsArray.get(0);
+    }
+
+    private void applyAmsEnvironment(JsonNode ams, AmsState amsState) {
+        if (ams.has(FIELD_TEMP))
+            amsState.setTemperature(ams.get(FIELD_TEMP).asDouble());
+
+        if (ams.has(FIELD_HUMIDITY))
+            amsState.setHumidity(ams.get(FIELD_HUMIDITY).asInt());
+
+        if (ams.has(FIELD_HUMIDITY_RAW))
+            amsState.setHumidityRaw(ams.get(FIELD_HUMIDITY_RAW).asInt());
+    }
+
+    private List<AmsSlot> buildAmsSlots(JsonNode ams) {
+        List<AmsSlot> slots = new ArrayList<>();
+        JsonNode trays = ams.get(FIELD_AMS_TRAY);
+
+        for (JsonNode tray : trays) {
+            AmsSlot slot = new AmsSlot();
+            slot.setId(tray.get(FIELD_ID).asInt());
+            applyTrayMetadata(tray, slot);
+            slots.add(slot);
+        }
+
+        return slots;
+    }
+
+    private void detectAmsSlotChanges(List<AmsSlot> slots, List<AmsEvent> pendingAmsEvents) {
+        if (previousAmsSlots.equals(slots))
+            return;
+
+        previousAmsSlots.forEach(previousSlot -> {
+            int slotId = previousSlot.getId();
+            AmsSlot currentSlot = slots.get(slotId);
+
+            if (previousSlot.isEmpty() && !currentSlot.isEmpty()) {
+                log.warn("[AMS] New Spool has been loaded into slot {}", slotId);
+                pendingAmsEvents.add(new AmsEvent(AmsEventType.AMS_SLOT_LOADED, slotId));
+            }
+
+            if (!previousSlot.isEmpty() && currentSlot.isEmpty()) {
+                log.warn("[AMS] Spool has been unloaded from slot {}", slotId);
+                pendingAmsEvents.add(new AmsEvent(AmsEventType.AMS_SLOT_UNLOADED, slotId));
+            }
+        });
+    }
+
+    private void applyAmsActiveSlot(JsonNode amsNode, AmsState amsState) {
+        if (amsNode.has(FIELD_TRAY_TAR))
+            amsState.setActiveSlot(amsNode.get(FIELD_TRAY_TAR).asInt());
+
+        if (amsNode.has(FIELD_TRAY_NOW))
+            amsState.setActiveSlot(amsNode.get(FIELD_TRAY_NOW).asInt());
+    }
+
+    private void applyTrayMetadata(JsonNode trayNode, SpoolTray tray) {
+        TrayMetadata metadata = extractTrayMetadata(trayNode);
+
+        if (metadata.filamentType() != null)
+            tray.setFilamentType(metadata.filamentType());
+
+        if (metadata.filamentBrand() != null)
+            tray.setFilamentBrand(metadata.filamentBrand());
+
+        if (metadata.filamentBrandIndex() != null)
+            tray.setFilamentBrandIndex(metadata.filamentBrandIndex());
+
+        if (metadata.color() != null)
+            tray.setColor(metadata.color());
+
+        if (metadata.remaining() != null)
+            tray.setRemaining(metadata.remaining());
+    }
+
+    private TrayMetadata extractTrayMetadata(JsonNode trayNode) {
+        String filamentType = trayNode.has(FIELD_TRAY_TYPE) ? trayNode.get(FIELD_TRAY_TYPE).asText() : null;
+        String filamentBrand = trayNode.has(FIELD_TRAY_SUB_BRANDS) ? trayNode.get(FIELD_TRAY_SUB_BRANDS).asText() : null;
+        String filamentBrandIndex = trayNode.has(FIELD_TRAY_INFO_IDX) ? trayNode.get(FIELD_TRAY_INFO_IDX).asText() : null;
+        String color = trayNode.has(FIELD_TRAY_COLOR) ? "#" + trayNode.get(FIELD_TRAY_COLOR).asText().substring(0, 6) : null;
+        Integer remaining = trayNode.has(FIELD_REMAIN) ? trayNode.get(FIELD_REMAIN).asInt() : null;
+        return new TrayMetadata(filamentType, filamentBrand, filamentBrandIndex, color, remaining);
+    }
+
+    private record TrayMetadata(
+            String filamentType,
+            String filamentBrand,
+            String filamentBrandIndex,
+            String color,
+            Integer remaining
+    ) {
     }
 
     private PrinterEvent createPrintEvent(PrinterEventType type) {

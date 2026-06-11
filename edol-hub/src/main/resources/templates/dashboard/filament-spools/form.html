@@ -303,7 +303,7 @@
         const remainingInput =
             document.querySelector('[name="weightRemaining"]');
 
-        if (defaultWeight) {
+        if (defaultWeight && remainingInput.value.trim() === '') {
             remainingInput.value = defaultWeight;
         }
 

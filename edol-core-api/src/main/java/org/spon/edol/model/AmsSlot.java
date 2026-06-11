@@ -1,21 +1,13 @@
 package org.spon.edol.model;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
-
+@EqualsAndHashCode(callSuper = true)
 @Data
-public class AmsSlot {
+public class AmsSlot extends SpoolTray {
 
     private int id = 0;
-
-    private String filamentType = "";
-
-    private String filamentBrand = "";
-    private String filamentBrandIndex = "";
-
-    private String color = "";
-
-    private Integer remaining = 0;
 
     private boolean active;
 

@@ -16,6 +16,7 @@ services:
     ports:
       - "8091:8080"
     volumes:
+      - ../../db-files:/app/db-files
       - ../../models:/app/models
       - ../../camera_snapshots:/app/camera_snapshots
       - ../../logs:/app/logs

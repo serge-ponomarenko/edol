@@ -4,6 +4,22 @@ server:
 logging:
   file.name: ./logs/edol_core_application.log
 
+spring:
+
+  datasource:
+    url: jdbc:h2:file:./db-files/edol-core-db;AUTO_SERVER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
 app:
   zone-id: Europe/Kiev
 
