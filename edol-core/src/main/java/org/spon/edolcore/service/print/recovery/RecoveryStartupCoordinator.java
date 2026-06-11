@@ -6,9 +6,10 @@ import org.spon.edolcore.event.PrinterEventType;
 import org.spon.edolcore.event.recovery.RecoverySnapshotReadyEvent;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -20,8 +21,13 @@ public class RecoveryStartupCoordinator {
     private final PrinterCommandGateway printerCommandGateway;
     private final PrinterStateService printerStateService;
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void onApplicationReady() {
+    private final AtomicBoolean recoveryStarted = new AtomicBoolean(false);
+
+    public void startRecoveryIfNeeded() {
+        if (!recoveryStarted.compareAndSet(false, true)) {
+            return;
+        }
+        log.info("Starting recovery after printer connectivity established");
         Thread.ofVirtual().start(this::runRecoveryWorkflow);
     }
 

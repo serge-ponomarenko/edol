@@ -14,6 +14,7 @@ import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
 import org.spon.edolcore.service.print.ActivePrintContext;
 import org.spon.edolcore.service.print.ActivePrintContextService;
 import org.spon.edolcore.service.print.SpoolFingerprintBuilder;
+import org.spon.edolcore.service.print.recovery.RecoveryStartupCoordinator;
 import org.spon.edolcore.service.timelapse.TimelapseService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -46,6 +47,7 @@ public class PrinterEventListener {
     private final AgentCommandGateway agentCommandGateway;
     private final ActivePrintContextService activePrintContextService;
     private final SpoolFingerprintBuilder spoolFingerprintBuilder;
+    private final RecoveryStartupCoordinator recoveryStartupCoordinator;
 
     private int lastLogProgressMilestone = -1;
     private int lastLogLayerMilestone = -1;
@@ -96,6 +98,8 @@ public class PrinterEventListener {
     }
 
     private void handlePrinterOnline() {
+        recoveryStartupCoordinator.startRecoveryIfNeeded();
+
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/printer/online",
