@@ -38,7 +38,6 @@
                         <form method="post" th:action="@{/filaments}" th:object="${filament}">
 
                             <input th:field="*{id}" type="hidden"/>
-                            <input th:field="*{printerFilamentProfileId}" type="hidden"/>
 
                             <div class="row g-3">
 
@@ -49,7 +48,6 @@
                                            type="text">
                                 </div>
 
-                                <!-- FULL ID -->
                                 <div class="col-md-6">
                                     <label class="form-label">Printer Filament Profile ID</label>
                                     <input class="form-control" th:field="*{printerFilamentProfileId}"
