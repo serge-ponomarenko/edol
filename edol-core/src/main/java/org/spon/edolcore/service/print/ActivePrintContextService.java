@@ -1,5 +1,6 @@
 package org.spon.edolcore.service.print;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.persistence.print.ActivePrintContextEntity;
 import org.spon.edolcore.persistence.print.ActivePrintContextRepository;
@@ -41,7 +42,9 @@ public class ActivePrintContextService {
         return repository.count();
     }
 
+    @Transactional
     public void save(ActivePrintContext context) {
+        repository.deleteAll();
         repository.save(toEntity(context));
     }
 
