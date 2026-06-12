@@ -35,7 +35,7 @@ edol:
     connection-mode: ${CONNECTION_MODE:"DIRECT"}        # DIRECT or AGENT
     camera-provider: ${CAMERA_PROVIDER:"LEGACY"}        # LEGACY or RTSPS
   agent:
-    id: agent-dev
+    id: ${AGENT_ID:"agent-dev"}
 
 mqttServer:
   url: tcp://mqtt:1883
