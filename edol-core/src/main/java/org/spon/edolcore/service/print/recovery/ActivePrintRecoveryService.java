@@ -9,7 +9,10 @@ import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.spon.edolcore.service.print.ActivePrintContext;
 import org.spon.edolcore.service.print.ActivePrintContextService;
 import org.spon.edolcore.service.print.SpoolFingerprintBuilder;
+import org.spon.edolcore.service.printer.PrinterService;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -21,10 +24,13 @@ public class ActivePrintRecoveryService {
     private final CameraSnapshotStore cameraSnapshotStore;
     private final MetadataRecoveryService metadataRecoveryService;
     private final SpoolFingerprintBuilder spoolFingerprintBuilder;
+    private final PrinterService printerService;
 
     public RecoveryResult recover() {
         PrinterState state = printerStateService.getState();
-        ActivePrintContext context = activePrintContextService.findAny()
+        UUID printerId = printerService.getDefaultPrinter().getId();
+        ActivePrintContext context = activePrintContextService
+                .findByPrinterId(printerId)
                 .orElse(null);
 
         if (context == null) {

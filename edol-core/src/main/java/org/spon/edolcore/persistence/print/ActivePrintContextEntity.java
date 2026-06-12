@@ -20,6 +20,9 @@ public class ActivePrintContextEntity {
     @Column(name = "session_id", nullable = false)
     private UUID sessionId;
 
+    @Column(name = "printer_id", nullable = false)
+    private UUID printerId;
+
     @Column(name = "gcode_file")
     private String gcodeFile;
 

@@ -12,6 +12,8 @@ public class ActivePrintContext {
 
     private UUID sessionId;
 
+    private UUID printerId;
+
     private String fileName;
     private String subtaskName;
 

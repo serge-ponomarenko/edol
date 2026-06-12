@@ -16,6 +16,7 @@ import org.spon.edolcore.service.print.ActivePrintContext;
 import org.spon.edolcore.service.print.ActivePrintContextService;
 import org.spon.edolcore.service.print.SpoolFingerprintBuilder;
 import org.spon.edolcore.service.print.recovery.RecoveryStartupCoordinator;
+import org.spon.edolcore.service.printer.PrinterService;
 import org.spon.edolcore.service.timelapse.TimelapseService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -50,6 +51,7 @@ public class PrinterEventListener {
     private final SpoolFingerprintBuilder spoolFingerprintBuilder;
     private final RecoveryStartupCoordinator recoveryStartupCoordinator;
     private final MetadataAcquisitionService metadataAcquisitionService;
+    private final PrinterService printerService;
 
     private int lastLogProgressMilestone = -1;
     private int lastLogLayerMilestone = -1;
@@ -131,8 +133,12 @@ public class PrinterEventListener {
         cameraSnapshotStore.setCurrentSessionId(sessionId);
         modelMetadataWorkflowService.setMetadataLoaded(false);
 
+        UUID printerId = printerService.getDefaultPrinter().getId();
+
         activePrintContextService.save(
+                printerId,
                 ActivePrintContext.builder()
+                        .printerId(printerId)
                         .sessionId(UUID.fromString(sessionId))
                         .fileName(state.getCurrentFile())
                         .subtaskName(state.getCurrentTask())
@@ -205,8 +211,11 @@ public class PrinterEventListener {
         PrinterState state = printerStateService.getState();
 
         if (state.getSessionId() != null) {
-            activePrintContextService.delete(
-                    UUID.fromString(state.getSessionId())
+            UUID printerId =
+                    printerService.getDefaultPrinter().getId();
+
+            activePrintContextService.deleteByPrinterId(
+                    printerId
             );
         }
 

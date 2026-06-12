@@ -38,31 +38,42 @@ public class ActivePrintContextService {
                 .map(this::toDomain);
     }
 
+    public Optional<ActivePrintContext> findByPrinterId(UUID printerId) {
+        return repository
+                .findByPrinterId(printerId)
+                .map(this::toDomain);
+    }
+
     public long count() {
         return repository.count();
     }
 
     @Transactional
-    public void save(ActivePrintContext context) {
-        repository.deleteAll();
-        repository.save(toEntity(context));
+    public void save(
+            UUID printerId,
+            ActivePrintContext context
+    ) {
+        repository.deleteByPrinterId(printerId);
+
+        ActivePrintContextEntity entity = toEntity(context);
+        entity.setPrinterId(printerId);
+
+        repository.save(entity);
     }
 
     public void delete(UUID sessionId) {
         repository.deleteById(sessionId);
     }
 
-    public Optional<ActivePrintContext> findAny() {
-        return repository.findAll()
-                .stream()
-                .map(this::toDomain)
-                .findFirst();
+    public void deleteByPrinterId(UUID printerId) {
+        repository.deleteByPrinterId(printerId);
     }
 
     private ActivePrintContextEntity toEntity(ActivePrintContext context) {
         ActivePrintContextEntity entity = new ActivePrintContextEntity();
 
         entity.setSessionId(context.getSessionId());
+        entity.setPrinterId(context.getPrinterId());
         entity.setGcodeFile(context.getFileName());
         entity.setSubtaskName(context.getSubtaskName());
         entity.setTotalLayers(context.getTotalLayers());
@@ -83,6 +94,7 @@ public class ActivePrintContextService {
     private ActivePrintContext toDomain(ActivePrintContextEntity entity) {
         return ActivePrintContext.builder()
                 .sessionId(entity.getSessionId())
+                .printerId(entity.getPrinterId())
                 .fileName(entity.getGcodeFile())
                 .subtaskName(entity.getSubtaskName())
                 .totalLayers(entity.getTotalLayers())
