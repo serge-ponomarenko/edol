@@ -10,6 +10,7 @@ import org.spon.edolcore.service.MqttMessagePublisher;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.agent.command.AgentCommandGateway;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
+import org.spon.edolcore.service.model.metadata.MetadataAcquisitionService;
 import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
 import org.spon.edolcore.service.print.ActivePrintContext;
 import org.spon.edolcore.service.print.ActivePrintContextService;
@@ -48,6 +49,7 @@ public class PrinterEventListener {
     private final ActivePrintContextService activePrintContextService;
     private final SpoolFingerprintBuilder spoolFingerprintBuilder;
     private final RecoveryStartupCoordinator recoveryStartupCoordinator;
+    private final MetadataAcquisitionService metadataAcquisitionService;
 
     private int lastLogProgressMilestone = -1;
     private int lastLogLayerMilestone = -1;
@@ -161,7 +163,7 @@ public class PrinterEventListener {
                 // Some printers may reject FTPS access immediately after PRINT_STARTED.
                 Thread.sleep(1000);
 
-                modelMetadataWorkflowService.requestMetadata();
+                metadataAcquisitionService.start();
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -198,6 +200,8 @@ public class PrinterEventListener {
     }
 
     private void handlePrintFinished(String topic, String eventName) {
+        metadataAcquisitionService.stop();
+
         PrinterState state = printerStateService.getState();
 
         if (state.getSessionId() != null) {
