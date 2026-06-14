@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.persistence.printer.PrinterConnectionMode;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.printer.PrinterService;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,7 @@ public class BambuTelemetryConsumer {
     private final PrinterStateService stateService;
     private final PrinterService printerService;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final LogContextFactory logContextFactory;
 
     @Value("${bambu.show-raw-mqtt}")
     private boolean showRawMqttMessages;
@@ -38,9 +40,15 @@ public class BambuTelemetryConsumer {
             String connection = PrinterConnectionMode.AGENT.equals(connectionMode) ? "A" : "D";  // D - direct connection, A - agent connectio
 
             if (showRawMqttMessages) {
-                log.atInfo()
-                        .addKeyValue("printerId", printerId)
-                        .log("[{}] {}", connection, root);
+                logContextFactory
+                        .session(
+                                log.atInfo(),
+                                printerId,
+                                stateService.getState(printerId).getSessionId()
+                        )
+                        .log(
+                                "[{}] {}", connection, root
+                        );
             }
 
             if (root.has("print")) {
@@ -51,9 +59,15 @@ public class BambuTelemetryConsumer {
             }
 
         } catch (Exception e) {
-            log.atError()
-                    .addKeyValue("printerId", printerId)
-                    .log("Cannot process printer telemetry", e);
+            logContextFactory
+                    .session(
+                            log.atError(),
+                            printerId,
+                            stateService.getState(printerId).getSessionId()
+                    )
+                    .log(
+                            "Cannot process printer telemetry", e
+                    );
         }
     }
 }

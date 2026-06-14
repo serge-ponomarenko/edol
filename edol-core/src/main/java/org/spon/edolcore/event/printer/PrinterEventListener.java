@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.ErrorCodes;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.event.PrinterEvent;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.MqttMessagePublisher;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.agent.command.AgentCommandGateway;
@@ -53,6 +54,7 @@ public class PrinterEventListener {
     private final RecoveryStartupCoordinator recoveryStartupCoordinator;
     private final MetadataAcquisitionService metadataAcquisitionService;
     private final PrinterRuntimeContextProvider printerRuntimeContextProvider;
+    private final LogContextFactory logContextFactory;
 
     private PrinterStateRuntime runtime(UUID printerId) {
         return printerRuntimeContextProvider
@@ -62,10 +64,16 @@ public class PrinterEventListener {
 
     @EventListener
     public void handlePrinterEvent(PrinterEvent event) {
-
-        log.info("PRINTER EVENT: {}", event.getType());
-
         UUID printerId = event.getPrinterId();
+
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "PRINTER EVENT: {}", event.getType()
+                );
 
         printerStateService.getState(printerId).setError(null);
 
@@ -103,7 +111,7 @@ public class PrinterEventListener {
 
             case AMS_SLOT_CHANGED -> handleAmdSlotChanged(printerId);
 
-            case FILAMENT_CHANGED -> handleFilamentChanged();
+            case FILAMENT_CHANGED -> handleFilamentChanged(printerId);
 
         }
 
@@ -136,11 +144,19 @@ public class PrinterEventListener {
     private void handlePrintStarted(UUID printerId) {
         PrinterState state = printerStateService.getState(printerId);
 
-        log.info("Print started: {}", state.getCurrentTask());
-        runtime(printerId).setLastLogLayerMilestone(-1);
         runtime(printerId).setLastLogProgressMilestone(-1);
 
         String sessionId = UUID.randomUUID().toString();
+
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        sessionId
+                )
+                .log(
+                        "Print started: {}", state.getCurrentTask()
+                );
 
         state.setSessionId(sessionId);
         state.setProgress(0);
@@ -189,16 +205,31 @@ public class PrinterEventListener {
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.warn("Metadata download interrupted", e);
+                logContextFactory
+                        .session(
+                                log.atWarn(),
+                                printerId,
+                                sessionId
+                        )
+                        .log(
+                                "Metadata download interrupted", e
+                        );
             } catch (Exception e) {
-                log.error("Cannot download model!", e);
+                logContextFactory
+                        .session(
+                                log.atError(),
+                                printerId,
+                                sessionId
+                        )
+                        .log(
+                                "Cannot download model!", e
+                        );
             }
 
         });
     }
 
     private void handlePrintRunning(UUID printerId) {
-        log.info("Print running");
         PrinterState state = printerStateService.getState(printerId);
 
         if (state.isPrinting()) {
@@ -216,7 +247,6 @@ public class PrinterEventListener {
     }
 
     private void handlePrintPaused(UUID printerId) {
-        log.info("Print paused");
         PrinterState state = printerStateService.getState(printerId);
 
         mqttMessagePublisher.publish(
@@ -260,7 +290,17 @@ public class PrinterEventListener {
     private void handlePrintError(UUID printerId) {
         PrinterState state = printerStateService.getState(printerId);
         Integer errorCode = state.getError().getCode();
-        log.error("❌ Printer error code: {}", errorCode);
+        logContextFactory
+                .session(
+                        log.atError(),
+                        printerId,
+                        state.getSessionId()
+                )
+                .log(
+                        "❌ Printer error code: {} - {}",
+                        errorCode,
+                        ErrorCodes.errorMap.get(errorCode)
+                );
 
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
@@ -279,7 +319,15 @@ public class PrinterEventListener {
 
         int layer = printerStateService.getState(printerId).getLayer();
         if (isLayerLogMilestone(printerId, layer)) {
-            log.info("Layer changed: {}", layer);
+            logContextFactory
+                    .session(
+                            log.atInfo(),
+                            printerId,
+                            printerStateService.getState(printerId).getSessionId()
+                    )
+                    .log(
+                            "Layer changed: {}", layer
+                    );
         }
     }
 
@@ -300,7 +348,15 @@ public class PrinterEventListener {
                 ));
 
         if (isProgressLogMilestone(printerId, progress)) {
-            log.info("Progress: {}%", progress);
+            logContextFactory
+                    .session(
+                            log.atInfo(),
+                            printerId,
+                            state.getSessionId()
+                    )
+                    .log(
+                            "Progress: {}%", progress
+                    );
         }
     }
 
@@ -314,8 +370,6 @@ public class PrinterEventListener {
                                 "ams.status.changed"
                         )
                 ));
-
-        log.info("AMS status changed");
     }
 
     private void handleAmdSlotChanged(UUID printerId) {
@@ -332,13 +386,30 @@ public class PrinterEventListener {
                         )
                 ));
 
-        log.info("AMS slot changed: {} -> {}",
-                state.getAms().getPreviousSlot(),
-                state.getAms().getActiveSlot());
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        state.getSessionId()
+                )
+                .log(
+                        "AMS slot changed: {} -> {}",
+                        state.getAms().getPreviousSlot(),
+                        state.getAms().getActiveSlot()
+                );
+
     }
 
-    private void handleFilamentChanged() {
-        log.info("AMS Filament changed");
+    private void handleFilamentChanged(UUID printerId) {
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        printerStateService.getState(printerId).getSessionId()
+                )
+                .log(
+                        "AMS Filament changed"
+                );
     }
 
 
@@ -362,7 +433,15 @@ public class PrinterEventListener {
 
                 }
             } catch (Exception e) {
-                log.error("Timelapse generation failed", e);
+                logContextFactory
+                        .session(
+                                log.atInfo(),
+                                printerId,
+                                printerStateService.getState(printerId).getSessionId()
+                        )
+                        .log(
+                                "Timelapse generation failed", e
+                        );
             }
         });
     }
@@ -439,6 +518,5 @@ public class PrinterEventListener {
                 key2, value2
         );
     }
-
 
 }

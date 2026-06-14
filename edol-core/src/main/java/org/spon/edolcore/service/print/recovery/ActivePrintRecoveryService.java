@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.event.model.MetadataRecoveryService;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.spon.edolcore.service.print.ActivePrintContext;
@@ -23,6 +24,7 @@ public class ActivePrintRecoveryService {
     private final CameraSnapshotStore cameraSnapshotStore;
     private final MetadataRecoveryService metadataRecoveryService;
     private final SpoolFingerprintBuilder spoolFingerprintBuilder;
+    private final LogContextFactory logContextFactory;
 
     public RecoveryResult recover(UUID printerId) {
         PrinterState state = printerStateService.getState(printerId);
@@ -32,14 +34,22 @@ public class ActivePrintRecoveryService {
 
         if (context == null) {
             if (isPrinterPrinting(state)) {
-                log.info(
-                        "Recovery skipped: no persisted ActivePrintContext, creating new session"
-                );
+                logContextFactory
+                        .printer(
+                                log.atInfo(),
+                                printerId
+                        )
+                        .log("Recovery skipped: no persisted ActivePrintContext, creating new session");
+
                 return RecoveryResult.START_NEW_SESSION;
             }
-            log.info(
-                    "Recovery skipped: no persisted ActivePrintContext and printer is not printing"
-            );
+            logContextFactory
+                    .printer(
+                            log.atInfo(),
+                            printerId
+                    )
+                    .log("Recovery skipped: no persisted ActivePrintContext and printer is not printing");
+
             return RecoveryResult.NO_ACTIVE_PRINT;
         }
 
@@ -78,19 +88,25 @@ public class ActivePrintRecoveryService {
         );
 
         if (!isPrinterPrinting(state)) {
-            log.warn(
-                    "Recovery rejected: printer is not actively printing. Removing stale context {}",
-                    context.getSessionId()
-            );
+            logContextFactory
+                    .context(
+                            log.atWarn(),
+                            context
+                    )
+                    .log("Recovery rejected: printer is not actively printing. Removing stale context");
+
             activePrintContextService.delete(context.getSessionId());
             return RecoveryResult.NO_ACTIVE_PRINT;
         }
 
         if (!matches(context, state)) {
-            log.warn(
-                    "Recovery rejected: active print does not match persisted context {}",
-                    context.getSessionId()
-            );
+            logContextFactory
+                    .context(
+                            log.atWarn(),
+                            context
+                    )
+                    .log("Recovery rejected: active print does not match persisted context");
+
             activePrintContextService.delete(context.getSessionId());
             return RecoveryResult.RECOVERY_REJECTED;
         }
@@ -109,10 +125,12 @@ public class ActivePrintRecoveryService {
                 context.getSessionId().toString()
         );
 
-        log.info(
-                "Successfully recovered print session {}",
-                context.getSessionId()
-        );
+        logContextFactory
+                .context(
+                        log.atInfo(),
+                        context
+                )
+                .log("Successfully recovered print session");
 
         return RecoveryResult.RECOVERED;
     }
@@ -133,11 +151,17 @@ public class ActivePrintRecoveryService {
                 context.getSubtaskName(),
                 state.getCurrentTask()
         )) {
-            log.warn(
-                    "Recovery mismatch: subtask persisted='{}', current='{}'",
-                    context.getSubtaskName(),
-                    state.getCurrentTask()
-            );
+            logContextFactory
+                    .context(
+                            log.atWarn(),
+                            context
+                    )
+                    .log(
+                            "Recovery mismatch: subtask persisted='{}', current='{}'",
+                            context.getSubtaskName(),
+                            state.getCurrentTask()
+                    );
+
             return false;
         }
 
@@ -145,29 +169,47 @@ public class ActivePrintRecoveryService {
                 context.getTotalLayers(),
                 state.getTotalLayers()
         )) {
-            log.warn(
-                    "Recovery mismatch: totalLayers persisted={}, current={}",
-                    context.getTotalLayers(),
-                    state.getTotalLayers()
-            );
+            logContextFactory
+                    .context(
+                            log.atWarn(),
+                            context
+                    )
+                    .log(
+                            "Recovery mismatch: totalLayers persisted={}, current={}",
+                            context.getTotalLayers(),
+                            state.getTotalLayers()
+                    );
+
             return false;
         }
 
         if (state.getLayer() < context.getSavedLayer()) {
-            log.warn(
-                    "Recovery mismatch: current layer {} < persisted layer {}",
-                    state.getLayer(),
-                    context.getSavedLayer()
-            );
+            logContextFactory
+                    .context(
+                            log.atWarn(),
+                            context
+                    )
+                    .log(
+                            "Recovery mismatch: current layer {} < persisted layer {}",
+                            state.getLayer(),
+                            context.getSavedLayer()
+                    );
+
             return false;
         }
 
         if (state.getProgress() < context.getSavedProgress()) {
-            log.warn(
-                    "Recovery mismatch: current progress {} < persisted progress {}",
-                    state.getProgress(),
-                    context.getSavedProgress()
-            );
+            logContextFactory
+                    .context(
+                            log.atWarn(),
+                            context
+                    )
+                    .log(
+                            "Recovery mismatch: current progress {} < persisted progress {}",
+                            state.getProgress(),
+                            context.getSavedProgress()
+                    );
+
             return false;
         }
 
@@ -181,16 +223,21 @@ public class ActivePrintRecoveryService {
                 context.getSpoolFingerprint(),
                 currentFingerprint
         )) {
-            log.warn(
-                    """
-                            Recovery mismatch: spool fingerprint
-                            
-                            persisted={}
-                            current={}
-                            """,
-                    context.getSpoolFingerprint(),
-                    currentFingerprint
-            );
+            logContextFactory
+                    .context(
+                            log.atWarn(),
+                            context
+                    )
+                    .log(
+                            """
+                                    Recovery mismatch: spool fingerprint
+                                    
+                                    persisted={}
+                                    current={}
+                                    """,
+                            context.getSpoolFingerprint(),
+                            currentFingerprint
+                    );
 
             return false;
         }

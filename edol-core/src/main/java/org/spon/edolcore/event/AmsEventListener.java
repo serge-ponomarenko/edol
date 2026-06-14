@@ -2,6 +2,7 @@ package org.spon.edolcore.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.MqttMessagePublisher;
 import org.spon.edolcore.service.PrinterStateService;
 import org.springframework.context.event.EventListener;
@@ -18,12 +19,22 @@ public class AmsEventListener {
 
     private final PrinterStateService printerStateService;
     private final MqttMessagePublisher mqttMessagePublisher;
+    private final LogContextFactory logContextFactory;
 
     @EventListener
     public void handleAmsEvent(AmsEvent event) {
-        log.info("AMS EVENT: {}", event.getType());
-
         UUID printerId = event.getPrinterId();
+
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        printerStateService.getState(printerId).getSessionId()
+                )
+                .log(
+                        "AMS EVENT: {}", event.getType()
+                );
+
 
         printerStateService.getState(printerId).setError(null);
 

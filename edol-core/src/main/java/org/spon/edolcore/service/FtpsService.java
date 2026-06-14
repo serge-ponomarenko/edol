@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPSClient;
+import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.exception.FtpsTransferException;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
@@ -23,6 +24,8 @@ import java.util.UUID;
 public class FtpsService {
 
     private final PrinterConnectionConfigurationRepository configurationRepository;
+    private final PrinterStateService printerStateService;
+    private final LogContextFactory logContextFactory;
 
     public void download(
             UUID printerId,
@@ -33,6 +36,8 @@ public class FtpsService {
         long delayMs = 5000;
 
         Exception lastError = null;
+
+        PrinterState state = printerStateService.getState(printerId);
 
         PrinterConnectionConfiguration configuration =
                 configurationRepository
@@ -50,9 +55,29 @@ public class FtpsService {
             try {
                 ftps = getFtpsClient(configuration);
 
-                downloadModel(ftps, requestedFile, localFile, configuration.getModelDirectory(), attempt);
+                logContextFactory
+                        .session(
+                                log.atInfo(),
+                                printerId,
+                                state.getSessionId()
+                        )
+                        .log(
+                                "Downloading '{}'. Attempt: {}",
+                                requestedFile,
+                                attempt
+                        );
 
-                log.info("Model downloaded!");
+                downloadModel(ftps, requestedFile, localFile, configuration.getModelDirectory());
+
+                logContextFactory
+                        .session(
+                                log.atInfo(),
+                                printerId,
+                                state.getSessionId()
+                        )
+                        .log(
+                                "Model downloaded"
+                        );
 
                 safeLogout(ftps);
                 safeDisconnect(ftps);
@@ -63,7 +88,15 @@ public class FtpsService {
 
                 lastError = e;
 
-                log.warn("FTPS attempt {} failed: {}", attempt, e.getMessage());
+                logContextFactory
+                        .session(
+                                log.atWarn(),
+                                printerId,
+                                state.getSessionId()
+                        )
+                        .log(
+                                "FTPS attempt {} failed: {}", attempt, e.getMessage()
+                        );
 
                 safeDisconnect(ftps);
 
@@ -111,21 +144,13 @@ public class FtpsService {
             FTPSClient ftps,
             String requestedFile,
             String localFile,
-            String modelDirectory,
-            int attempt
+            String modelDirectory
     ) throws IOException {
         ftps.setFileType(FTP.BINARY_FILE_TYPE);
         ftps.enterLocalPassiveMode();
         ftps.changeWorkingDirectory(modelDirectory);
 
         String remoteFile = resolveRemoteFile(ftps, requestedFile);
-
-        log.info(
-                "Downloading '{}' (requested '{}'). Attempt: {}",
-                remoteFile,
-                requestedFile,
-                attempt
-        );
 
         try (OutputStream output = new FileOutputStream(localFile)) {
             boolean success = ftps.retrieveFile(remoteFile, output);

@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.model.dto.SpoolChangeRequestDto;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
 import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class PrinterController {
 
+    private final LogContextFactory logContextFactory;
     ResponseEntity<Map<String, Object>> okResponseEntity =
             ResponseEntity.ok().body(Map.of(
                     "status", "ok"
@@ -136,6 +138,15 @@ public class PrinterController {
                 objectIds
         );
 
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Skip objects API request"
+                );
+
         printerStateService.getState(printerId).getPrintObjects().forEach(po -> {
             if (objectIds.contains(po.getId())) {
                 po.setSkipped(true);
@@ -163,10 +174,14 @@ public class PrinterController {
                 request
         );
 
-        log.info(
-                "-> Spool change API request [{}]",
-                printerId
-        );
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Spool change API request"
+                );
 
         return okResponseEntity;
     }
@@ -184,10 +199,14 @@ public class PrinterController {
     ) {
         printerCommandGateway.pause(printerId);
 
-        log.info(
-                "-> Print PAUSE API request [{}]",
-                printerId
-        );
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Print PAUSE API request"
+                );
 
         return okResponseEntity;
     }
@@ -205,10 +224,14 @@ public class PrinterController {
     ) {
         printerCommandGateway.resume(printerId);
 
-        log.info(
-                "-> Print RESUME API request [{}]",
-                printerId
-        );
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Print RESUME API request"
+                );
 
         return okResponseEntity;
     }
@@ -226,10 +249,14 @@ public class PrinterController {
     ) {
         printerCommandGateway.stop(printerId);
 
-        log.info(
-                "-> Print STOP API request [{}]",
-                printerId
-        );
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Print STOP API request"
+                );
 
         return okResponseEntity;
     }
@@ -247,10 +274,14 @@ public class PrinterController {
     ) {
         printerCommandGateway.pushAll(printerId);
 
-        log.info(
-                "-> Print PushAll API request [{}]",
-                printerId
-        );
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Print PushAll API request"
+                );
 
         return okResponseEntity;
     }

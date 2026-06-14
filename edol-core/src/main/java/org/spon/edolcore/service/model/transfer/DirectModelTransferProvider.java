@@ -41,8 +41,6 @@ public class DirectModelTransferProvider implements ModelTransferProvider {
         try {
             Files.createDirectories(MODELS_DIR.resolve(printerId.toString()));
 
-            log.info("Downloading model: {}", fileName);
-
             Files.deleteIfExists(localFile);
 
             FtpsConnection ftpsConnection = new FtpsConnection(

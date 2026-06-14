@@ -3,6 +3,7 @@ package org.spon.edolcore.service.timelapse;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.spon.edolcore.exception.TimelapseGenerationException;
+import org.spon.edolcore.service.LogContextFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -18,22 +19,36 @@ import java.util.UUID;
 @Slf4j
 public class TimelapseService {
 
+    private final LogContextFactory logContextFactory;
     @Value("${camera.snapshot-dir}")
     private String snapshotDir;
 
     @Value("${camera.store-snapshots}")
     private boolean storeSnapshots;
 
-    public File generate(UUID printerId, String jobId) {
+    public TimelapseService(LogContextFactory logContextFactory) {
+        this.logContextFactory = logContextFactory;
+    }
+
+    public File generate(UUID printerId, String sessionId) {
         if (!storeSnapshots) {
             return null;
         }
-        Path dir = Paths.get(snapshotDir, printerId.toString(), jobId);
+        Path dir = Paths.get(snapshotDir, printerId.toString(), sessionId);
 
-        String output = dir.resolve("job_" + jobId + ".mp4").toString();
+        String output = dir.resolve("job_" + sessionId + ".mp4").toString();
 
-        log.info("Timelapse dir: {}", dir.toAbsolutePath());
-        log.info("Output file: {}", output);
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        sessionId
+                )
+                .log(
+                        "Timelapse dir: {}. Output file: {}",
+                        dir.toAbsolutePath(),
+                        output
+                );
 
         ProcessBuilder pb = getProcessBuilder(dir, output);
 
@@ -45,21 +60,21 @@ public class TimelapseService {
             )) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    log.info("[FFMPEG] {}", line);
+                    log.debug("[FFMPEG] {}", line);
                 }
             }
 
             int exit = process.waitFor();
             if (exit != 0) {
-                throw new TimelapseGenerationException(jobId);
+                throw new TimelapseGenerationException(sessionId);
             }
 
             return new File(output);
         } catch (IOException e) {
-            throw new TimelapseGenerationException(jobId, e);
+            throw new TimelapseGenerationException(sessionId, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new TimelapseGenerationException(jobId, e);
+            throw new TimelapseGenerationException(sessionId, e);
         }
     }
 

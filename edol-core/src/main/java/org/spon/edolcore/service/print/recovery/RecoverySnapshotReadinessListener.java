@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.event.printer.PrinterStateUpdatedEvent;
 import org.spon.edolcore.event.recovery.RecoverySnapshotReadyEvent;
+import org.spon.edolcore.service.LogContextFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class RecoverySnapshotReadinessListener {
     private final StartupSynchronizationService startupSynchronizationService;
     private final RecoverySnapshotValidator recoverySnapshotValidator;
     private final ApplicationEventPublisher events;
+    private final LogContextFactory logContextFactory;
 
     @EventListener
     public void onPrinterStateUpdated(PrinterStateUpdatedEvent event) {
@@ -27,15 +29,26 @@ public class RecoverySnapshotReadinessListener {
 
         UUID printerId = event.getPrinterId();
 
-        log.info(
-                "Recovery validator reason: {}",
-                recoverySnapshotValidator.explainWhyRecoveryDecisionNotReady(printerId)
-        );
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Recovery validator reason: {}",
+                        recoverySnapshotValidator.explainWhyRecoveryDecisionNotReady(printerId)
+                );
 
-        log.info(
-                "Recovery snapshot already published={}",
-                startupSynchronizationService.isSnapshotReadyPublished(printerId)
-        );
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Recovery snapshot already published={}",
+                        startupSynchronizationService.isSnapshotReadyPublished(printerId)
+                );
+
         if (!recoverySnapshotValidator.isRecoveryDecisionReady(printerId)) {
             return;
         }
@@ -44,7 +57,14 @@ public class RecoverySnapshotReadinessListener {
             return;
         }
 
-        log.info("Recovery snapshot ready");
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Recovery snapshot ready"
+                );
 
         events.publishEvent(
                 new RecoverySnapshotReadyEvent(printerId)

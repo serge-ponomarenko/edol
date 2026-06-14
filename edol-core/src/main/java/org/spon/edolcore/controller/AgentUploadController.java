@@ -2,8 +2,11 @@ package org.spon.edolcore.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.event.model.ModelAvailableEvent;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
+import org.spon.edolcore.service.LogContextFactory;
+import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +30,8 @@ public class AgentUploadController {
     private final CameraSnapshotStore cameraSnapshotStore;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final PrinterConnectionConfigurationRepository printerConnectionConfigurationRepository;
+    private final PrinterStateService printerStateService;
+    private final LogContextFactory logContextFactory;
 
     @PostMapping(
             value = "/upload",
@@ -62,11 +67,19 @@ public class AgentUploadController {
                 new ModelAvailableEvent(printerId, targetFile)
         );
 
-        log.info(
-                "File uploaded: {} ({} bytes)",
-                fileName,
-                size
-        );
+        PrinterState state = printerStateService.getState(printerId);
+
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        state.getSessionId()
+                )
+                .log(
+                        "File uploaded: {} ({} bytes)",
+                        fileName,
+                        size
+                );
 
         return ResponseEntity.ok("OK");
     }
@@ -86,13 +99,6 @@ public class AgentUploadController {
         cameraSnapshotStore.store(
                 printerId,
                 image
-        );
-
-        log.debug(
-                "Camera snapshot uploaded: {} -> {} ({} bytes)",
-                agentId,
-                printerId,
-                image.length
         );
 
         return ResponseEntity.ok("OK");

@@ -3,6 +3,7 @@ package org.spon.edolcore.service.camera;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.persistence.printer.Printer;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.printer.PrinterService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ public class CameraBackgroundService {
     private final CameraSnapshotStore store;
     private final DefaultCameraProvider cameraProvider;
     private final PrinterService printerService;
+    private final LogContextFactory logContextFactory;
 
     @Scheduled(fixedDelay = 15000)
     public void capture() {
@@ -49,12 +51,15 @@ public class CameraBackgroundService {
                 }
 
             } catch (Exception e) {
-
-                log.error(
-                        "Camera capture failed for printer {}",
-                        printerId,
-                        e
-                );
+                logContextFactory
+                        .printer(
+                                log.atError(),
+                                printerId
+                        )
+                        .log(
+                                "Camera capture failed ",
+                                e
+                        );
             }
         }
     }

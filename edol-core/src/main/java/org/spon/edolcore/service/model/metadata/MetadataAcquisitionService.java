@@ -2,6 +2,9 @@ package org.spon.edolcore.service.model.metadata;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.spon.edol.model.PrinterState;
+import org.spon.edolcore.service.LogContextFactory;
+import org.spon.edolcore.service.PrinterStateService;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
@@ -14,7 +17,6 @@ import java.util.concurrent.ScheduledFuture;
 @RequiredArgsConstructor
 public class MetadataAcquisitionService {
 
-    private static final String PRINTER_ID_KEY = "printerId";
     private static final long[] RETRY_DELAYS_SECONDS = {
             30,
             60,
@@ -27,6 +29,8 @@ public class MetadataAcquisitionService {
 
     private final ConcurrentHashMap<UUID, MetadataAcquisitionState> states =
             new ConcurrentHashMap<>();
+    private final LogContextFactory logContextFactory;
+    private final PrinterStateService printerStateService;
 
 
     public void start(UUID printerId) {
@@ -37,9 +41,7 @@ public class MetadataAcquisitionService {
         state.setActive(true);
         state.setAttempt(0);
 
-        log.atInfo()
-                .addKeyValue(PRINTER_ID_KEY, printerId)
-                .log("Starting metadata acquisition for printer");
+        logMessage(printerId, "Starting metadata acquisition for printer");
 
         attemptAcquisition(printerId);
     }
@@ -61,9 +63,8 @@ public class MetadataAcquisitionService {
             task.cancel(false);
         }
 
-        log.atInfo()
-                .addKeyValue(PRINTER_ID_KEY, printerId)
-                .log("Stopped metadata acquisition for printer");
+        logMessage(printerId, "Stopped metadata acquisition for printer");
+
     }
 
     public void retryNow(UUID printerId) {
@@ -83,10 +84,7 @@ public class MetadataAcquisitionService {
         }
 
         try {
-            log.atInfo()
-                    .addKeyValue(PRINTER_ID_KEY, printerId)
-                    .addKeyValue("attempt", state.getAttempt() + 1)
-                    .log("Attempting metadata acquisition");
+            logMessage(printerId, "Attempting metadata acquisition");
 
             modelMetadataWorkflowService.requestMetadata(
                     printerId
@@ -115,12 +113,18 @@ public class MetadataAcquisitionService {
         long delaySeconds =
                 getRetryDelaySeconds(printerId);
 
-        log.atWarn()
-                .addKeyValue(PRINTER_ID_KEY, printerId)
-                .addKeyValue("attempt", failedAttempt)
-                .addKeyValue("retryingIn", delaySeconds)
-                .addKeyValue("exception", exception)
-                .log("Metadata acquisition failed");
+        logContextFactory
+                .session(
+                        log.atWarn(),
+                        printerId,
+                        printerStateService.getState(printerId).getSessionId()
+                )
+                .log(
+                        "Metadata acquisition attempt #{} failed. Retrying in {} seconds",
+                        failedAttempt,
+                        delaySeconds,
+                        exception
+                );
 
         state.setRetryTask(
                 taskScheduler.schedule(
@@ -159,6 +163,19 @@ public class MetadataAcquisitionService {
                 printerId,
                 id -> new MetadataAcquisitionState()
         );
+    }
+
+    private void logMessage(UUID printerId, String message) {
+        PrinterState printerState = printerStateService.getState(printerId);
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        printerState.getSessionId()
+                )
+                .log(
+                        message
+                );
     }
 
 }

@@ -35,7 +35,10 @@ public class MqttMessagePublisher {
             mqttOutboundChannel.send(message);
 
         } catch (Exception e) {
-            log.error("MQTT publish failed", e);
+            log.atError()
+                    .addKeyValue("topic", topic)
+                    .addKeyValue("message", payload)
+                    .log("MQTT publish failed", e);
         }
     }
 }

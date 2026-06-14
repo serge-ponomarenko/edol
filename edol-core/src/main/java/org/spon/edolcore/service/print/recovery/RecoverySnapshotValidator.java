@@ -45,11 +45,6 @@ public class RecoverySnapshotValidator {
     public String explainWhyRecoveryDecisionNotReady(UUID printerId) {
         PrinterState state = printerStateService.getState(printerId);
 
-        log.info(
-                "VALIDATOR gcodeState={}",
-                state.getGcodeState()
-        );
-
         String gcodeState = state.getGcodeState();
 
         if (gcodeState == null) {

@@ -73,6 +73,7 @@ public class PrinterStateService {
     private final ApplicationEventPublisher events;
     private final StartupSynchronizationService startupSynchronizationService;
     private final PrinterRuntimeContextProvider runtimeContextProvider;
+    private final LogContextFactory logContextFactory;
 
 
     private PrinterStateRuntime runtime(UUID printerId) {
@@ -182,7 +183,16 @@ public class PrinterStateService {
         if (newState.equals(lastState(printerId)))
             return;
 
-        log.info("### G-code new state: {}. Old state: {}", newState, lastState(printerId));
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        getState(printerId).getSessionId()
+                )
+                .log(
+                        "G-code new state: {}. Old state: {}", newState, lastState(printerId)
+                );
+
         detectStateEvents(printerId, lastState(printerId), newState, pendingEvents);
         getState(printerId).setGcodeState(newState);
         lastState(printerId, newState);
@@ -427,12 +437,28 @@ public class PrinterStateService {
             AmsSlot currentSlot = slots.get(slotId);
 
             if (previousSlot.isEmpty() && !currentSlot.isEmpty()) {
-                log.info("[AMS] New Spool has been loaded into slot {}", slotId);
+                logContextFactory
+                        .session(
+                                log.atInfo(),
+                                printerId,
+                                getState(printerId).getSessionId()
+                        )
+                        .log(
+                                "[AMS] New Spool has been loaded into slot {}", slotId
+                        );
                 pendingAmsEvents.add(new AmsEvent(printerId, AmsEventType.AMS_SLOT_LOADED, slotId));
             }
 
             if (!previousSlot.isEmpty() && currentSlot.isEmpty()) {
-                log.info("[AMS] Spool has been unloaded from slot {}", slotId);
+                logContextFactory
+                        .session(
+                                log.atInfo(),
+                                printerId,
+                                getState(printerId).getSessionId()
+                        )
+                        .log(
+                                "[AMS] Spool has been unloaded from slot {}", slotId
+                        );
                 pendingAmsEvents.add(new AmsEvent(printerId, AmsEventType.AMS_SLOT_UNLOADED, slotId));
             }
         });

@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.CameraSnapshot;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.printer.runtime.CameraRuntimeState;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +32,7 @@ public class CameraSnapshotStore {
     private final PrinterRuntimeContextProvider runtimeContextProvider;
 
     private static final int MAX_HISTORY = 50;
+    private final LogContextFactory logContextFactory;
 
     @Value("${camera.snapshot-dir}")
     private String snapshotDir;
@@ -108,7 +110,14 @@ public class CameraSnapshotStore {
             runtime(printerId).setLatestSnapshotFile(file);
 
         } catch (IOException e) {
-            log.error("Failed to save snapshot", e);
+            logContextFactory
+                    .printer(
+                            log.atError(),
+                            printerId
+                    )
+                    .log(
+                            "Failed to save snapshot", e
+                    );
         }
     }
 
@@ -137,26 +146,39 @@ public class CameraSnapshotStore {
                                 if (lastModified < cutoff) {
                                     deleteDirectory(sessionDir);
 
-                                    log.info(
-                                            "Deleted old snapshot folder: {}",
-                                            sessionDir
-                                    );
+                                    logContextFactory
+                                            .system(
+                                                    log.atInfo()
+                                            )
+                                            .log(
+                                                    "Deleted old snapshot folder: {}",
+                                                    sessionDir
+                                            );
+
                                 }
                             } catch (IOException e) {
-                                log.warn(
-                                        "Cleanup failed for {}",
-                                        sessionDir,
-                                        e
-                                );
+                                logContextFactory
+                                        .system(
+                                                log.atWarn()
+                                        )
+                                        .log(
+                                                "Cleanup failed for session directory {}",
+                                                sessionDir,
+                                                e
+                                        );
                             }
                         });
                     }
                 } catch (IOException e) {
-                    log.warn(
-                            "Cleanup failed for printer directory {}",
-                            printerDir,
-                            e
-                    );
+                    logContextFactory
+                            .system(
+                                    log.atWarn()
+                            )
+                            .log(
+                                    "Cleanup failed for printer directory {}",
+                                    printerDir,
+                                    e
+                            );
                 }
             });
         }

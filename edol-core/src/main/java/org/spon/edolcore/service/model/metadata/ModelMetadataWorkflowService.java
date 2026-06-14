@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.BoundingBox;
 import org.spon.edol.model.Filament;
 import org.spon.edol.model.PrintObject;
+import org.spon.edol.model.PrinterState;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.model.transfer.DefaultModelTransferProvider;
 import org.spon.edolcore.service.printer.runtime.MetadataRuntimeState;
@@ -27,6 +29,7 @@ public class ModelMetadataWorkflowService {
     private final ProjectSettingsParserService projectSettingsParserService;
     private final PlateParserService plateParserService;
     private final PrinterRuntimeContextProvider runtimeContextProvider;
+    private final LogContextFactory logContextFactory;
 
     public void requestMetadata(UUID printerId) {
         modelTransferProvider.requestModel(printerId);
@@ -34,12 +37,40 @@ public class ModelMetadataWorkflowService {
 
     public void parseMetadata(UUID printerId, Path model) throws Exception {
         Path output = Path.of("models", printerId.toString(), "metadata");
+        PrinterState state = printerStateService.getState(printerId);
 
-        log.info("Extracting metadata from {}", model);
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        state.getSessionId()
+                )
+                .log(
+                        "Extracting metadata from {}", model
+                );
+
         Path path = metadataService.extractMetadata(model, output);
-        log.info("Extracted metadata from {}", path);
 
-        log.info("Starting metadata parsing");
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        state.getSessionId()
+                )
+                .log(
+                        "Extracted metadata from {}", path
+                );
+
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        state.getSessionId()
+                )
+                .log(
+                        "Starting metadata parsing"
+                );
+
         Path sliceInfoPath = path.resolve("slice_info.config");
         List<Filament> filaments =
                 sliceInfoParserService.parseFilaments(sliceInfoPath);
@@ -63,7 +94,15 @@ public class ModelMetadataWorkflowService {
         List<BoundingBox> boxes = plateParserService.parse(plateJsonPath);
 
         if (printObjects.size() != boxes.size()) {
-            log.warn("Mismatch between printer and plate objects!");
+            logContextFactory
+                    .session(
+                            log.atWarn(),
+                            printerId,
+                            state.getSessionId()
+                    )
+                    .log(
+                            "Mismatch between printer and plate objects!"
+                    );
         } else {
             for (int i = 0; i < printObjects.size(); i++) {
                 PrintObject printerObj = printObjects.get(i);
@@ -73,7 +112,15 @@ public class ModelMetadataWorkflowService {
 
         printerStateService.getState(printerId).setPrintObjects(printObjects);
 
-        log.info("Metadata has been parsed successfully");
+        logContextFactory
+                .session(
+                        log.atInfo(),
+                        printerId,
+                        state.getSessionId()
+                )
+                .log(
+                        "Metadata has been parsed successfully"
+                );
 
         runtime(printerId).setMetadataLoaded(true);
     }

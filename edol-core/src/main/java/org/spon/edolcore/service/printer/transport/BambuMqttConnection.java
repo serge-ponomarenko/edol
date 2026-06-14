@@ -13,6 +13,8 @@ import java.util.UUID;
 @Slf4j
 public class BambuMqttConnection implements MqttCallback {
 
+    private static final String PRINTER_ID_KEY = "printerId";
+
     private final UUID printerId;
     @Getter
     private final PrinterConnectionConfiguration configuration;
@@ -67,12 +69,16 @@ public class BambuMqttConnection implements MqttCallback {
 
             client.subscribe("device/" + configuration.getPrinter().getSerialNumber() + "/report");
 
-            log.info("Connected to Bambu MQTT");
+            log.atInfo()
+                    .addKeyValue(PRINTER_ID_KEY, printerId)
+                    .log("Connected to Bambu MQTT");
 
             connectivityStateService.setConnected(printerId);
 
         } catch (Exception e) {
-            log.warn("Printer connection failed: {}", e.getMessage());
+            log.atWarn()
+                    .addKeyValue(PRINTER_ID_KEY, printerId)
+                    .log("Printer connection failed: {}", e.getMessage());
         }
 
     }
@@ -99,10 +105,9 @@ public class BambuMqttConnection implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
-        log.error(
-                "MQTT connection lost for printer {}",
-                printerId
-        );
+        log.atError()
+                .addKeyValue(PRINTER_ID_KEY, printerId)
+                .log("MQTT connection lost");
 
         connectivityStateService.setDisconnected(
                 printerId
@@ -120,11 +125,9 @@ public class BambuMqttConnection implements MqttCallback {
                 client = null;
             }
         } catch (MqttException e) {
-            log.warn(
-                    "Failed to disconnect MQTT client for printer {}",
-                    printerId,
-                    e
-            );
+            log.atWarn()
+                    .addKeyValue(PRINTER_ID_KEY, printerId)
+                    .log("Failed to disconnect MQTT client");
         }
     }
 }
