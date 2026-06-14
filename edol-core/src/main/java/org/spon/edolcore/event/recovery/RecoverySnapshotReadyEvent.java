@@ -1,7 +1,12 @@
 package org.spon.edolcore.event.recovery;
 
-import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-@NoArgsConstructor
+import java.util.UUID;
+
+@AllArgsConstructor
 public class RecoverySnapshotReadyEvent {
+    @Getter
+    private UUID printerId;
 }

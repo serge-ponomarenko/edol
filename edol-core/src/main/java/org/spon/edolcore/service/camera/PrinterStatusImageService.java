@@ -13,10 +13,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class PrinterStatusImageService {
+
+    private static final String FONT_FAMILY = "SansSerif";
 
     private final PrinterStateService printerStateService;
     private final CameraSnapshotStore cameraSnapshotStore;
@@ -24,20 +27,35 @@ public class PrinterStatusImageService {
     @Value("${camera.snapshot-dir}")
     private String snapshotDir;
 
-    public File getStatusImage() {
-        File plate = Path.of("models", "metadata", "plate_" + printerStateService.getState().getPlateIndex() + ".png").toFile();
-        File snapshot = cameraSnapshotStore.getLatestSnapshotFile();
+    public File getStatusImage(UUID printerId) {
+        File plate = Path.of(
+                "models",
+                printerId.toString(),
+                "metadata",
+                "plate_" + printerStateService.getState(printerId).getPlateIndex() + ".png"
+        ).toFile();
+        File snapshot =
+                cameraSnapshotStore
+                        .getLatestSnapshotFile(
+                                printerId
+                        );
 
-        if (printerStateService.getState().getCurrentFile() != null
-                && printerStateService.getState().getFilaments() != null
+        if (printerStateService.getState(printerId).getCurrentFile() != null
+                && printerStateService.getState(printerId).getFilaments() != null
                 && snapshot != null) {
-            return renderStatusImage(printerStateService.getState(), snapshot, plate);
+            return renderStatusImage(
+                    printerId,
+                    printerStateService.getState(printerId),
+                    snapshot,
+                    plate
+            );
         }
 
         return null;
     }
 
     public File renderStatusImage(
+            UUID printerId,
             PrinterState state,
             File cameraFile,
             File plateFile
@@ -78,7 +96,10 @@ public class PrinterStatusImageService {
             g.dispose();
 
             Path snapshotPath = Paths.get(snapshotDir);
-            File file = snapshotPath.resolve("printer_status_tmp.jpg").toFile();
+            File file = snapshotPath
+                    .resolve(printerId.toString())
+                    .resolve("printer_status_tmp.jpg")
+                    .toFile();
 
             ImageIO.write(result, "jpg", file);
 
@@ -97,10 +118,10 @@ public class PrinterStatusImageService {
 
         g.setColor(Color.WHITE);
 
-        g.setFont(new Font("SansSerif", Font.BOLD, 22));
+        g.setFont(new Font(FONT_FAMILY, Font.BOLD, 22));
         g.drawString(state.getCurrentTask(), margin + 15, margin + 30);
 
-        g.setFont(new Font("SansSerif", Font.PLAIN, 18));
+        g.setFont(new Font(FONT_FAMILY, Font.PLAIN, 18));
 
         g.drawString("Progress: " + state.getProgress() + "%",
                 margin + 15, margin + 60);
@@ -134,14 +155,13 @@ public class PrinterStatusImageService {
                 plate.getScaledInstance(previewWidth, previewHeight, Image.SCALE_SMOOTH);
 
         int x = cameraWidth - previewWidth - margin;
-        int y = margin;
 
         g.setColor(new Color(0, 0, 0, 160));
-        g.fillRoundRect(x - 10, y - 10,
+        g.fillRoundRect(x - 10, margin - 10,
                 previewWidth + 20, previewHeight + 20,
                 20, 20);
 
-        g.drawImage(scaled, x, y, null);
+        g.drawImage(scaled, x, margin, null);
     }
 
     private void drawProgressBar(Graphics2D g, int width, int height, int progress) {
@@ -160,7 +180,7 @@ public class PrinterStatusImageService {
         g.fillRect(10, y, filled, barHeight);
 
         g.setColor(Color.WHITE);
-        g.setFont(new Font("SansSerif", Font.BOLD, 16));
+        g.setFont(new Font(FONT_FAMILY, Font.BOLD, 16));
         g.drawString(progress + "%", width / 2 - 15, y + 17);
     }
 }

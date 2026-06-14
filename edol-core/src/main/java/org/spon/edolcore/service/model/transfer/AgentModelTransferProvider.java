@@ -6,14 +6,11 @@ import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.exception.ModelNotLoadedException;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.agent.command.AgentCommandGateway;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
-@ConditionalOnProperty(
-        value = "edol.printer.connection-mode",
-        havingValue = "AGENT"
-)
 @Slf4j
 @RequiredArgsConstructor
 public class AgentModelTransferProvider implements ModelTransferProvider {
@@ -22,15 +19,15 @@ public class AgentModelTransferProvider implements ModelTransferProvider {
     private final AgentCommandGateway agentCommandGateway;
 
     @Override
-    public void requestModel() {
-        PrinterState state = printerStateService.getState();
+    public void requestModel(UUID printerId) {
+        PrinterState state = printerStateService.getState(printerId);
 
         String fileName = state.getCurrentFile();
 
         if (fileName == null || fileName.isEmpty())
             throw new ModelNotLoadedException();
 
-        agentCommandGateway.disableSnapshotScheduler();
-        agentCommandGateway.uploadModel(fileName);
+        agentCommandGateway.disableSnapshotScheduler(printerId);
+        agentCommandGateway.uploadModel(printerId, fileName);
     }
 }

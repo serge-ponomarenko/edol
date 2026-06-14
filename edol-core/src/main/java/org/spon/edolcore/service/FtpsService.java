@@ -7,12 +7,14 @@ import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPSClient;
 import org.spon.edolcore.exception.FtpsTransferException;
-import org.springframework.beans.factory.annotation.Value;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.text.Normalizer;
 import java.time.Duration;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -20,29 +22,35 @@ import java.time.Duration;
 @Setter
 public class FtpsService {
 
-    @Value("${bambu.ftp-url}")
-    private String ip;
+    private final PrinterConnectionConfigurationRepository configurationRepository;
 
-    @Value("${bambu.model-directory}")
-    private String modelDirectory;
-
-    @Value("${bambu.access-code}")
-    private String accessCode;
-
-    public void download(String requestedFile, String localFile) {
+    public void download(
+            UUID printerId,
+            String requestedFile,
+            String localFile
+    ) {
         int maxAttempts = 5;
         long delayMs = 5000;
 
         Exception lastError = null;
+
+        PrinterConnectionConfiguration configuration =
+                configurationRepository
+                        .findByPrinterId(printerId)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Printer configuration not found: " + printerId
+                                )
+                        );
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
 
             FTPSClient ftps = null;
 
             try {
-                ftps = getFtpsClient();
+                ftps = getFtpsClient(configuration);
 
-                downloadModel(ftps, requestedFile, localFile, attempt);
+                downloadModel(ftps, requestedFile, localFile, configuration.getModelDirectory(), attempt);
 
                 log.info("Model downloaded!");
 
@@ -71,7 +79,7 @@ public class FtpsService {
         throw new FtpsTransferException("Download failed after retries", lastError);
     }
 
-    private FTPSClient getFtpsClient() throws IOException {
+    private FTPSClient getFtpsClient(PrinterConnectionConfiguration configuration) throws IOException {
         FTPSClient ftps = new FTPSClient(true);
 
         ftps.setControlEncoding("UTF-8");
@@ -86,9 +94,9 @@ public class FtpsService {
         ftps.setStrictReplyParsing(false);
         ftps.setRemoteVerificationEnabled(false);
 
-        ftps.connect(ip, 990);
+        ftps.connect(configuration.getFtpHost(), configuration.getFtpPort());
 
-        if (!ftps.login("bblp", accessCode))
+        if (!ftps.login("bblp", configuration.getAccessCode()))
             throw new FtpsTransferException("FTP login failed");
 
         ftps.setSoTimeout(30000);
@@ -103,6 +111,7 @@ public class FtpsService {
             FTPSClient ftps,
             String requestedFile,
             String localFile,
+            String modelDirectory,
             int attempt
     ) throws IOException {
         ftps.setFileType(FTP.BINARY_FILE_TYPE);

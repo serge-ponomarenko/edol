@@ -3,18 +3,19 @@ package org.spon.edolcore.service.printer.command;
 import org.spon.edolcore.model.dto.SpoolChangeRequestDto;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface PrinterCommandGateway {
 
-    void pause();
+    void pause(UUID printerId);
 
-    void resume();
+    void resume(UUID printerId);
 
-    void stop();
+    void stop(UUID printerId);
 
-    void pushAll();
+    void pushAll(UUID printerId);
 
-    void skipObjects(List<Integer> objectIds);
+    void skipObjects(UUID printerId, List<Integer> objectIds);
 
-    void spoolChange(SpoolChangeRequestDto request);
+    void spoolChange(UUID printerId, SpoolChangeRequestDto request);
 }

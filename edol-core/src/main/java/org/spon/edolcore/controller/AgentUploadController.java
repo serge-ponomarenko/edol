@@ -3,6 +3,7 @@ package org.spon.edolcore.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.event.model.ModelAvailableEvent;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -24,6 +26,7 @@ public class AgentUploadController {
 
     private final CameraSnapshotStore cameraSnapshotStore;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final PrinterConnectionConfigurationRepository printerConnectionConfigurationRepository;
 
     @PostMapping(
             value = "/upload",
@@ -31,11 +34,21 @@ public class AgentUploadController {
     )
     public ResponseEntity<String> upload(
             @RequestParam String fileName,
+            @RequestHeader("X-Agent-Id") String agentId,
             InputStream requestBody
     ) throws IOException {
-        Files.createDirectories(MODELS_DIRECTORY);
+        UUID printerId = printerConnectionConfigurationRepository
+                .findByAgentId(agentId)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "No printer configured for agent: " + agentId
+                        )
+                )
+                .getPrinter()
+                .getId();
+        Files.createDirectories(MODELS_DIRECTORY.resolve(printerId.toString()));
 
-        Path targetFile = MODELS_DIRECTORY.resolve(fileName);
+        Path targetFile = MODELS_DIRECTORY.resolve(printerId.toString()).resolve(fileName);
 
         Files.copy(
                 requestBody,
@@ -46,7 +59,7 @@ public class AgentUploadController {
         long size = Files.size(targetFile);
 
         applicationEventPublisher.publishEvent(
-                new ModelAvailableEvent(targetFile)
+                new ModelAvailableEvent(printerId, targetFile)
         );
 
         log.info(
@@ -68,14 +81,32 @@ public class AgentUploadController {
     ) throws IOException {
         byte[] image = requestBody.readAllBytes();
 
-        cameraSnapshotStore.store(image);
+        UUID printerId = resolvePrinterId(agentId);
+
+        cameraSnapshotStore.store(
+                printerId,
+                image
+        );
 
         log.debug(
-                "Camera snapshot uploaded: {} ({} bytes)",
+                "Camera snapshot uploaded: {} -> {} ({} bytes)",
                 agentId,
+                printerId,
                 image.length
         );
 
         return ResponseEntity.ok("OK");
+    }
+
+    private UUID resolvePrinterId(String agentId) {
+        return printerConnectionConfigurationRepository
+                .findByAgentId(agentId)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "No printer configured for agent: " + agentId
+                        )
+                )
+                .getPrinter()
+                .getId();
     }
 }

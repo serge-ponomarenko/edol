@@ -9,6 +9,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -20,16 +21,19 @@ public class MetadataParsedEventListener {
 
     @EventListener
     public void handle(MetadataParsedEvent event) {
-        PrinterState state = printerStateService.getState();
+        UUID printerId = event.printerId();
+
+        PrinterState state = printerStateService.getState(printerId);
 
         state.setPrinting(true);
 
-        agentCommandGateway.enableSnapshotScheduler();
+        agentCommandGateway.enableSnapshotScheduler(printerId);
 
         mqttMessagePublisher.publish(
                 "edolcore/print/metadata",
                 Map.of(
                         "event", "print.metadata.loaded",
+                        "printerId", printerId,
                         "sessionId", state.getSessionId(),
                         "fileName", event.filename()
                 )

@@ -13,6 +13,8 @@ public class MetadataAcquisitionEventListener {
 
     @EventListener
     public void handle(MetadataParsedEvent event) {
-        metadataAcquisitionService.stop();
+        metadataAcquisitionService.stop(
+                event.printerId()
+        );
     }
 }

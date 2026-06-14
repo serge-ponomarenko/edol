@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -15,8 +16,8 @@ public class MetadataRecoveryService {
 
     private final ApplicationEventPublisher events;
 
-    public void recoverMetadata(String gcodeFile) {
-        Path model = Path.of("models", gcodeFile);
+    public void recoverMetadata(UUID printerId, String gcodeFile) {
+        Path model = Path.of("models", printerId.toString(), gcodeFile);
 
         if (!Files.exists(model)) {
             log.warn(
@@ -32,7 +33,7 @@ public class MetadataRecoveryService {
         );
 
         events.publishEvent(
-                new ModelAvailableEvent(model)
+                new ModelAvailableEvent(printerId, model)
         );
     }
 }

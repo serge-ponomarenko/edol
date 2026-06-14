@@ -1,45 +1,63 @@
 package org.spon.edolcore.service.agent;
 
+import lombok.Data;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.model.dto.AgentHeartbeatDto;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Getter
+@RequiredArgsConstructor
 public class AgentStateService {
 
-    private volatile String agentId;
-    private volatile String printerSerial;
+    private final Map<UUID, AgentState> states =
+            new ConcurrentHashMap<>();
 
-    private volatile boolean wifiConnected;
-    private volatile boolean bambuConnected;
-    private volatile boolean bambuHealthy;
-    private volatile boolean cameraHealthy;
-    private volatile boolean edolConnected;
+    public void update(UUID printerId, AgentHeartbeatDto heartbeat) {
+        AgentState state =
+                states.computeIfAbsent(
+                        printerId,
+                        id -> new AgentState()
+                );
 
-    private volatile Instant lastHeartbeat;
+        state.setWifiConnected(heartbeat.isWifiConnected());
+        state.setBambuConnected(heartbeat.isBambuConnected());
+        state.setBambuHealthy(heartbeat.isBambuHealthy());
+        state.setCameraHealthy(heartbeat.isCameraHealthy());
+        state.setEdolConnected(heartbeat.isEdolConnected());
+        state.setLastHeartbeat(Instant.now());
 
-    public void update(AgentHeartbeatDto heartbeat) {
-        this.agentId = heartbeat.getAgentId();
-        this.printerSerial = heartbeat.getPrinterSerial();
-
-        this.wifiConnected = heartbeat.isWifiConnected();
-        this.bambuConnected = heartbeat.isBambuConnected();
-        this.bambuHealthy = heartbeat.isBambuHealthy();
-        this.cameraHealthy = heartbeat.isCameraHealthy();
-        this.edolConnected = heartbeat.isEdolConnected();
-
-        this.lastHeartbeat = Instant.now();
     }
 
-    public boolean isOnline() {
-        return lastHeartbeat != null
-                && Duration.between(lastHeartbeat, Instant.now()).toSeconds() < 60
-                && wifiConnected
-                && bambuConnected
-                && bambuHealthy;
+    public boolean isOnline(UUID printerId) {
+        AgentState state = states.get(printerId);
+
+        if (state == null) {
+            return false;
+        }
+
+        return state.getLastHeartbeat() != null
+                && Duration.between(state.getLastHeartbeat(), Instant.now()).toSeconds() < 60
+                && state.isWifiConnected()
+                && state.isBambuConnected()
+                && state.isBambuHealthy();
     }
+
+    @Data
+    private static class AgentState {
+        private boolean wifiConnected;
+        private boolean bambuConnected;
+        private boolean bambuHealthy;
+        private boolean cameraHealthy;
+        private boolean edolConnected;
+        private Instant lastHeartbeat;
+    }
+
 }

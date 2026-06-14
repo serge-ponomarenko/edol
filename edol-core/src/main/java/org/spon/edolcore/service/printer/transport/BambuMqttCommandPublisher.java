@@ -4,25 +4,38 @@ import lombok.RequiredArgsConstructor;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.spon.edolcore.exception.BambuMqttPublishException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class BambuMqttCommandPublisher {
 
-    private final BambuMqttClient bambuMqttClient;
+    private final BambuMqttConnectionManager connectionManager;
 
-    @Value("${bambu.serial}")
-    private String serial;
-
-    public void publish(String payload) {
+    public void publish(UUID printerId, String payload) {
         try {
+            BambuMqttConnection connection =
+                    connectionManager.getConnection(printerId);
+
             MqttMessage message = new MqttMessage(payload.getBytes());
             message.setQos(0);
 
-            bambuMqttClient.getClient().publish(
-                    "device/" + serial + "/request",
+            if (!connection.isConnected()) {
+                throw new BambuMqttPublishException(
+                        new IllegalStateException(
+                                "Printer " + printerId + " is not connected"
+                        )
+                );
+            }
+
+            connection.getClient().publish(
+                    "device/"
+                            + connection.getConfiguration()
+                            .getPrinter()
+                            .getSerialNumber()
+                            + "/request",
                     message
             );
 

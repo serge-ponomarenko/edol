@@ -7,6 +7,8 @@ import org.spon.edolcore.model.dto.AgentEventDto;
 import org.spon.edolcore.service.model.transfer.ModelTransferWorkflowService;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -15,7 +17,7 @@ public class AgentEventConsumer {
     private final ModelTransferWorkflowService modelTransferWorkflowService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public void consume(String payload) {
+    public void consume(UUID printerId, String payload) {
         try {
             AgentEventDto event =
                     objectMapper.readValue(
@@ -25,14 +27,17 @@ public class AgentEventConsumer {
 
             switch (event.getType()) {
                 case MODEL_UPLOAD_STARTED -> modelTransferWorkflowService.onUploadStarted(
+                        printerId,
                         event.getFileName()
                 );
 
                 case MODEL_UPLOAD_COMPLETED -> modelTransferWorkflowService.onUploadCompleted(
+                        printerId,
                         event.getFileName()
                 );
 
                 case MODEL_UPLOAD_FAILED -> modelTransferWorkflowService.onUploadFailed(
+                        printerId,
                         event.getFileName(),
                         event.getReason()
                 );

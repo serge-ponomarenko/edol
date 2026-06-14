@@ -1,47 +1,61 @@
 package org.spon.edolcore.service.camera;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.spon.edolcore.persistence.printer.Printer;
+import org.spon.edolcore.service.printer.PrinterService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class CameraBackgroundService {
 
-    private final CameraProvider cameraProvider;
     private final CameraSnapshotStore store;
-
-    @Value("${edol.printer.connection-mode}")
-    private String connectionMode;
-
-    @PostConstruct
-    public void init() {
-        if ("AGENT".equalsIgnoreCase(connectionMode)) {
-            log.info("Camera background capture disabled in AGENT mode");
-        } else {
-            log.info("Camera background reader started");
-        }
-    }
+    private final DefaultCameraProvider cameraProvider;
+    private final PrinterService printerService;
 
     @Scheduled(fixedDelay = 15000)
     public void capture() {
-        if ("AGENT".equalsIgnoreCase(connectionMode)) {
-            return;
-        }
+        for (Printer printer :
+                printerService.getEnabledPrinters()) {
 
-        try {
-            byte[] image = cameraProvider.capture();
+            UUID printerId =
+                    printer.getId();
 
-            if (image != null && image.length > 0) {
-                store.store(image);
+            try {
+
+                if (!cameraProvider.supports(
+                        printerId
+                )) {
+                    continue;
+                }
+
+                byte[] image =
+                        cameraProvider.capture(
+                                printerId
+                        );
+
+                if (image != null
+                        && image.length > 0) {
+
+                    store.store(
+                            printerId,
+                            image
+                    );
+                }
+
+            } catch (Exception e) {
+
+                log.error(
+                        "Camera capture failed for printer {}",
+                        printerId,
+                        e
+                );
             }
-
-        } catch (Exception e) {
-            log.error("Camera capture failed: {}", e.getMessage());
         }
     }
 }

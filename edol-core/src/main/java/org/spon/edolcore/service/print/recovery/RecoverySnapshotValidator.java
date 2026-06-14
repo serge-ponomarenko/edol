@@ -1,23 +1,27 @@
 package org.spon.edolcore.service.print.recovery;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.AmsSlot;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.service.PrinterStateService;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class RecoverySnapshotValidator {
 
     private final PrinterStateService printerStateService;
 
-    public boolean isRecoveryDecisionReady() {
-        return explainWhyRecoveryDecisionNotReady() == null;
+    public boolean isRecoveryDecisionReady(UUID printerId) {
+        return explainWhyRecoveryDecisionNotReady(printerId) == null;
     }
 
-    public String explainWhyNotReady() {
-        PrinterState state = printerStateService.getState();
+    public String explainWhyNotReady(UUID printerId) {
+        PrinterState state = printerStateService.getState(printerId);
 
         if (!isPrintStateRecoverable(state)) {
             return "Printer is not in recoverable state";
@@ -38,8 +42,13 @@ public class RecoverySnapshotValidator {
         return null;
     }
 
-    public String explainWhyRecoveryDecisionNotReady() {
-        PrinterState state = printerStateService.getState();
+    public String explainWhyRecoveryDecisionNotReady(UUID printerId) {
+        PrinterState state = printerStateService.getState(printerId);
+
+        log.info(
+                "VALIDATOR gcodeState={}",
+                state.getGcodeState()
+        );
 
         String gcodeState = state.getGcodeState();
 
@@ -53,7 +62,7 @@ public class RecoverySnapshotValidator {
             return null;
         }
 
-        return explainWhyNotReady();
+        return explainWhyNotReady(printerId);
     }
 
     private boolean isPrintStateRecoverable(PrinterState state) {

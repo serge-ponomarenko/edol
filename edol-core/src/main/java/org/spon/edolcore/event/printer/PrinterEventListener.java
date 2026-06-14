@@ -3,7 +3,6 @@ package org.spon.edolcore.event.printer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.ErrorCodes;
-import org.spon.edol.model.PrinterError;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.event.PrinterEvent;
 import org.spon.edolcore.service.MqttMessagePublisher;
@@ -16,7 +15,8 @@ import org.spon.edolcore.service.print.ActivePrintContext;
 import org.spon.edolcore.service.print.ActivePrintContextService;
 import org.spon.edolcore.service.print.SpoolFingerprintBuilder;
 import org.spon.edolcore.service.print.recovery.RecoveryStartupCoordinator;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.PrinterStateRuntime;
 import org.spon.edolcore.service.timelapse.TimelapseService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -34,6 +34,7 @@ public class PrinterEventListener {
     private static final int PROGRESS_LOG_STEP = 5;
     private static final int LAYER_LOG_STEP = 10;
     private static final String EVENT_KEY = "event";
+    private static final String PRINTER_ID_KEY = "printerId";
     private static final String SESSION_ID_KEY = "sessionId";
     private static final String PATH_KEY = "path";
     private static final String ERROR_CODE_KEY = "error-code";
@@ -51,49 +52,56 @@ public class PrinterEventListener {
     private final SpoolFingerprintBuilder spoolFingerprintBuilder;
     private final RecoveryStartupCoordinator recoveryStartupCoordinator;
     private final MetadataAcquisitionService metadataAcquisitionService;
-    private final PrinterService printerService;
+    private final PrinterRuntimeContextProvider printerRuntimeContextProvider;
 
-    private int lastLogProgressMilestone = -1;
-    private int lastLogLayerMilestone = -1;
+    private PrinterStateRuntime runtime(UUID printerId) {
+        return printerRuntimeContextProvider
+                .getContext(printerId)
+                .getPrinterStateRuntime();
+    }
 
     @EventListener
     public void handlePrinterEvent(PrinterEvent event) {
 
         log.info("PRINTER EVENT: {}", event.getType());
 
-        printerStateService.getState().setError(null);
+        UUID printerId = event.getPrinterId();
+
+        printerStateService.getState(printerId).setError(null);
 
         switch (event.getType()) {
 
-            case PRINTER_ONLINE -> handlePrinterOnline();
+            case PRINTER_ONLINE -> handlePrinterOnline(printerId);
 
-            case PRINTER_OFFLINE -> handlePrinterOffline();
+            case PRINTER_OFFLINE -> handlePrinterOffline(printerId);
 
-            case PRINT_STARTED -> handlePrintStarted(event);
+            case PRINT_STARTED -> handlePrintStarted(printerId);
 
-            case PRINT_RUNNING -> handlePrintRunning();
+            case PRINT_RUNNING -> handlePrintRunning(printerId);
 
-            case PRINT_PAUSED -> handlePrintPaused();
+            case PRINT_PAUSED -> handlePrintPaused(printerId);
 
             case PRINT_FINISHED -> handlePrintFinished(
+                    printerId,
                     "edolcore/print/finished",
                     "print.finished"
             );
 
             case PRINT_FAILED -> handlePrintFinished(
+                    printerId,
                     "edolcore/print/failed",
                     "print.failed"
             );
 
-            case PRINT_ERROR -> handlePrintError(event);
+            case PRINT_ERROR -> handlePrintError(printerId);
 
-            case LAYER_CHANGED -> handleLayerChanged();
+            case LAYER_CHANGED -> handleLayerChanged(printerId);
 
-            case PROGRESS_CHANGED -> handleProgressChanged();
+            case PROGRESS_CHANGED -> handleProgressChanged(printerId);
 
-            case AMS_STATUS_CHANGED -> handleAmsStatusChanged();
+            case AMS_STATUS_CHANGED -> handleAmsStatusChanged(printerId);
 
-            case AMS_SLOT_CHANGED -> handleAmdSlotChanged();
+            case AMS_SLOT_CHANGED -> handleAmdSlotChanged(printerId);
 
             case FILAMENT_CHANGED -> handleFilamentChanged();
 
@@ -101,39 +109,43 @@ public class PrinterEventListener {
 
     }
 
-    private void handlePrinterOnline() {
-        recoveryStartupCoordinator.startRecoveryIfNeeded();
+    private void handlePrinterOnline(UUID printerId) {
+        recoveryStartupCoordinator.startRecoveryIfNeeded(printerId);
 
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/printer/online",
-                        payload("printer.online")
+                        payload(
+                                printerId,
+                                "printer.online"
+                        )
                 ));
     }
 
-    private void handlePrinterOffline() {
+    private void handlePrinterOffline(UUID printerId) {
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/printer/offline",
-                        payload("printer.offline")
+                        payload(
+                                printerId,
+                                "printer.offline"
+                        )
                 ));
     }
 
-    private void handlePrintStarted(PrinterEvent event) {
-        log.info("Print started: {}", event.getFileName());
-        lastLogProgressMilestone = -1;
-        lastLogLayerMilestone = -1;
+    private void handlePrintStarted(UUID printerId) {
+        PrinterState state = printerStateService.getState(printerId);
+
+        log.info("Print started: {}", state.getCurrentTask());
+        runtime(printerId).setLastLogLayerMilestone(-1);
+        runtime(printerId).setLastLogProgressMilestone(-1);
 
         String sessionId = UUID.randomUUID().toString();
 
-        PrinterState state = printerStateService.getState();
-
         state.setSessionId(sessionId);
         state.setProgress(0);
-        cameraSnapshotStore.setCurrentSessionId(sessionId);
-        modelMetadataWorkflowService.setMetadataLoaded(false);
-
-        UUID printerId = printerService.getDefaultPrinter().getId();
+        cameraSnapshotStore.setCurrentSessionId(printerId, sessionId);
+        modelMetadataWorkflowService.setMetadataLoaded(printerId, false);
 
         activePrintContextService.save(
                 printerId,
@@ -160,7 +172,11 @@ public class PrinterEventListener {
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/started",
-                        payload("print.started", sessionId)
+                        payload(
+                                printerId,
+                                "print.started",
+                                SESSION_ID_KEY, sessionId
+                        )
                 ));
 
         CompletableFuture.runAsync(() -> {
@@ -169,7 +185,7 @@ public class PrinterEventListener {
                 // Some printers may reject FTPS access immediately after PRINT_STARTED.
                 Thread.sleep(1000);
 
-                metadataAcquisitionService.start();
+                metadataAcquisitionService.start(printerId);
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -181,39 +197,44 @@ public class PrinterEventListener {
         });
     }
 
-    private void handlePrintRunning() {
+    private void handlePrintRunning(UUID printerId) {
         log.info("Print running");
-        PrinterState state = printerStateService.getState();
+        PrinterState state = printerStateService.getState(printerId);
 
         if (state.isPrinting()) {
 
             mqttMessagePublisher.publish(
                     "edolcore/print/running",
-                    payload("print.running", state.getSessionId())
+                    payload(
+                            printerId,
+                            "print.running",
+                            SESSION_ID_KEY, state.getSessionId()
+                    )
             );
 
         }
     }
 
-    private void handlePrintPaused() {
+    private void handlePrintPaused(UUID printerId) {
         log.info("Print paused");
-        PrinterState state = printerStateService.getState();
+        PrinterState state = printerStateService.getState(printerId);
 
         mqttMessagePublisher.publish(
                 "edolcore/print/paused",
-                payload("print.paused", state.getSessionId())
+                payload(
+                        printerId,
+                        "print.paused",
+                        SESSION_ID_KEY, state.getSessionId()
+                )
         );
     }
 
-    private void handlePrintFinished(String topic, String eventName) {
-        metadataAcquisitionService.stop();
+    private void handlePrintFinished(UUID printerId, String topic, String eventName) {
+        metadataAcquisitionService.stop(printerId);
 
-        PrinterState state = printerStateService.getState();
+        PrinterState state = printerStateService.getState(printerId);
 
         if (state.getSessionId() != null) {
-            UUID printerId =
-                    printerService.getDefaultPrinter().getId();
-
             activePrintContextService.deleteByPrinterId(
                     printerId
             );
@@ -224,28 +245,28 @@ public class PrinterEventListener {
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         topic,
-                        payload(eventName, state.getSessionId())
+                        payload(
+                                printerId,
+                                eventName,
+                                SESSION_ID_KEY, state.getSessionId()
+                        )
                 ));
 
-        agentCommandGateway.disableSnapshotScheduler();
+        agentCommandGateway.disableSnapshotScheduler(printerId);
 
-        generateTimelapse(state);
+        generateTimelapse(printerId, state.getSessionId());
     }
 
-    private void handlePrintError(PrinterEvent event) {
-        Integer errorCode = event.getErrorCode();
+    private void handlePrintError(UUID printerId) {
+        PrinterState state = printerStateService.getState(printerId);
+        Integer errorCode = state.getError().getCode();
         log.error("❌ Printer error code: {}", errorCode);
-
-        PrinterState state = printerStateService.getState();
-        state.setError(new PrinterError(
-                errorCode,
-                ErrorCodes.errorMap.get(errorCode)
-        ));
 
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/error",
                         payload(
+                                printerId,
                                 "print.error",
                                 ERROR_CODE_KEY, errorCode,
                                 ERROR_MESSAGE_KEY, ErrorCodes.errorMap.get(errorCode)
@@ -253,50 +274,58 @@ public class PrinterEventListener {
                 ));
     }
 
-    private void handleLayerChanged() {
-        updateActivePrintContext();
+    private void handleLayerChanged(UUID printerId) {
+        updateActivePrintContext(printerId);
 
-        int layer = printerStateService.getState().getLayer();
-        if (isLayerLogMilestone(layer)) {
+        int layer = printerStateService.getState(printerId).getLayer();
+        if (isLayerLogMilestone(printerId, layer)) {
             log.info("Layer changed: {}", layer);
         }
     }
 
-    private void handleProgressChanged() {
-        updateActivePrintContext();
+    private void handleProgressChanged(UUID printerId) {
+        updateActivePrintContext(printerId);
 
-        PrinterState state = printerStateService.getState();
+        PrinterState state = printerStateService.getState(printerId);
         int progress = state.getProgress();
 
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/progress",
-                        payload("print.progress.changed", state.getSessionId())
+                        payload(
+                                printerId,
+                                "print.progress.changed",
+                                SESSION_ID_KEY, state.getSessionId()
+                        )
                 ));
 
-        if (isProgressLogMilestone(progress)) {
+        if (isProgressLogMilestone(printerId, progress)) {
             log.info("Progress: {}%", progress);
         }
     }
 
 
-    private void handleAmsStatusChanged() {
+    private void handleAmsStatusChanged(UUID printerId) {
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/ams",
-                        payload("ams.status.changed")
+                        payload(
+                                printerId,
+                                "ams.status.changed"
+                        )
                 ));
 
         log.info("AMS status changed");
     }
 
-    private void handleAmdSlotChanged() {
-        PrinterState state = printerStateService.getState();
+    private void handleAmdSlotChanged(UUID printerId) {
+        PrinterState state = printerStateService.getState(printerId);
 
         CompletableFuture.runAsync(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/ams",
                         payload(
+                                printerId,
                                 "ams.slot.changed",
                                 PREV_SLOT_KEY, state.getAms().getPreviousSlot(),
                                 CURR_SLOT_KEY, state.getAms().getActiveSlot()
@@ -308,25 +337,27 @@ public class PrinterEventListener {
                 state.getAms().getActiveSlot());
     }
 
-    private static void handleFilamentChanged() {
+    private void handleFilamentChanged() {
         log.info("AMS Filament changed");
     }
 
 
-    private void generateTimelapse(PrinterState state) {
-        String sessionId = state.getSessionId();
-
-        cameraSnapshotStore.setCurrentSessionId("default");
+    private void generateTimelapse(UUID printerId, String sessionId) {
+        cameraSnapshotStore.setCurrentSessionId(printerId, "default");
 
         CompletableFuture.runAsync(() -> {
             try {
-                File video = timelapseService.generate(sessionId);
+                File video = timelapseService.generate(printerId, sessionId);
                 if (video != null) {
 
                     CompletableFuture.runAsync(() ->
                             mqttMessagePublisher.publish(
                                     "edolcore/print/timelapse",
-                                    payload("print.timelapse", PATH_KEY, video.getAbsolutePath())
+                                    payload(
+                                            printerId,
+                                            "print.timelapse",
+                                            PATH_KEY, video.getAbsolutePath()
+                                    )
                             ));
 
                 }
@@ -336,30 +367,30 @@ public class PrinterEventListener {
         });
     }
 
-    private boolean isProgressLogMilestone(int progress) {
+    private boolean isProgressLogMilestone(UUID printerId, int progress) {
         int milestone = progress / PROGRESS_LOG_STEP;
 
-        if (milestone > lastLogProgressMilestone && milestone > 0) {
-            lastLogProgressMilestone = milestone;
+        if (milestone > runtime(printerId).getLastLogProgressMilestone() && milestone > 0) {
+            runtime(printerId).setLastLogProgressMilestone(milestone);
             return true;
         }
 
         return false;
     }
 
-    private boolean isLayerLogMilestone(int layer) {
+    private boolean isLayerLogMilestone(UUID printerId, int layer) {
         int milestone = layer / LAYER_LOG_STEP;
 
-        if (milestone > lastLogLayerMilestone && milestone > 0) {
-            lastLogLayerMilestone = milestone;
+        if (milestone > runtime(printerId).getLastLogLayerMilestone() && milestone > 0) {
+            runtime(printerId).setLastLogLayerMilestone(milestone);
             return true;
         }
 
         return false;
     }
 
-    private void updateActivePrintContext() {
-        PrinterState state = printerStateService.getState();
+    private void updateActivePrintContext(UUID printerId) {
+        PrinterState state = printerStateService.getState(printerId);
 
         if (state.getSessionId() == null) {
             return;
@@ -374,26 +405,35 @@ public class PrinterEventListener {
 
     }
 
-    private Map<String, Object> payload(String eventName) {
-        return Map.of(EVENT_KEY, eventName);
-    }
-
-    private Map<String, Object> payload(String eventName, String sessionId) {
+    private Map<String, Object> payload(
+            UUID printerId,
+            String eventName
+    ) {
         return Map.of(
-                EVENT_KEY, eventName,
-                SESSION_ID_KEY, sessionId
+                PRINTER_ID_KEY, printerId,
+                EVENT_KEY, eventName
         );
     }
 
-    private Map<String, Object> payload(String eventName, String key1, Object value1) {
+    private Map<String, Object> payload(
+            UUID printerId,
+            String eventName,
+            String key1, Object value1) {
         return Map.of(
+                PRINTER_ID_KEY, printerId,
                 EVENT_KEY, eventName,
                 key1, value1
         );
     }
 
-    private Map<String, Object> payload(String eventName, String key1, Object value1, String key2, Object value2) {
+    private Map<String, Object> payload(
+            UUID printerId,
+            String eventName,
+            String key1, Object value1,
+            String key2, Object value2
+    ) {
         return Map.of(
+                PRINTER_ID_KEY, printerId,
                 EVENT_KEY, eventName,
                 key1, value1,
                 key2, value2

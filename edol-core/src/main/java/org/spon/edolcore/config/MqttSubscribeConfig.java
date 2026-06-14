@@ -20,9 +20,6 @@ public class MqttSubscribeConfig {
     @Value("${mqttServer.url}")
     private String mqttServerUrl;
 
-    @Value("${edol.agent.id}")
-    private String agentId;
-
     @Bean
     public MqttPahoClientFactory mqttInboundClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
@@ -47,9 +44,9 @@ public class MqttSubscribeConfig {
                 new MqttPahoMessageDrivenChannelAdapter(
                         "edolcore-subscriber",
                         mqttInboundClientFactory(),
-                        TOPIC_PREFIX + agentId + "/printer/report",
-                        TOPIC_PREFIX + agentId + "/heartbeat",
-                        TOPIC_PREFIX + agentId + "/events"
+                        TOPIC_PREFIX + "+/printer/report",
+                        TOPIC_PREFIX + "+/heartbeat",
+                        TOPIC_PREFIX + "+/events"
                 );
 
         adapter.setOutputChannel(mqttInboundChannel());

@@ -6,48 +6,46 @@ import org.spon.edolcore.event.model.ModelTransferFailedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
+import java.util.UUID;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class ModelTransferWorkflowService {
 
-    private static final int MAX_RETRIES = 3;
-    private static final Duration RETRY_DELAY = Duration.ofSeconds(30);
+    private static final String PRINTER_ID_KEY = "printerId";
+    private static final String MODEL_FILE_NAME_KEY = "modelFileName";
 
     private final ApplicationEventPublisher applicationEventPublisher;
 
-    private volatile int retryCount;
-
-    public void onUploadStarted(String fileName) {
-        log.info(
-                "Model upload started: {}",
-                fileName
-        );
+    public void onUploadStarted(UUID printerId, String fileName) {
+        log.atInfo()
+                .addKeyValue(PRINTER_ID_KEY, printerId)
+                .addKeyValue(MODEL_FILE_NAME_KEY, fileName)
+                .log("Model upload started");
     }
 
-    public void onUploadCompleted(String fileName) {
-        log.info(
-                "Model upload completed: {}",
-                fileName
-        );
-
-        retryCount = 0;
+    public void onUploadCompleted(UUID printerId, String fileName) {
+        log.atInfo()
+                .addKeyValue(PRINTER_ID_KEY, printerId)
+                .addKeyValue(MODEL_FILE_NAME_KEY, fileName)
+                .log("Model upload completed");
     }
 
     public void onUploadFailed(
+            UUID printerId,
             String fileName,
             String reason
     ) {
-        log.error(
-                "Model upload failed: {} ({})",
-                fileName,
-                reason
-        );
+        log.atError()
+                .addKeyValue(PRINTER_ID_KEY, printerId)
+                .addKeyValue(MODEL_FILE_NAME_KEY, fileName)
+                .addKeyValue("reason", reason)
+                .log("Model upload failed");
 
         applicationEventPublisher.publishEvent(
                 new ModelTransferFailedEvent(
+                        printerId,
                         fileName,
                         reason
                 )

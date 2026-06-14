@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -23,11 +24,11 @@ public class TimelapseService {
     @Value("${camera.store-snapshots}")
     private boolean storeSnapshots;
 
-    public File generate(String jobId) {
+    public File generate(UUID printerId, String jobId) {
         if (!storeSnapshots) {
             return null;
         }
-        Path dir = Paths.get(snapshotDir, jobId);
+        Path dir = Paths.get(snapshotDir, printerId.toString(), jobId);
 
         String output = dir.resolve("job_" + jobId + ".mp4").toString();
 

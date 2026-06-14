@@ -27,6 +27,9 @@ public class PrinterBootstrap {
     @Value("${bambu.access-code}")
     private String accessCode;
 
+    @Value("${bambu.model-directory}")
+    private String modelDirectory;
+
     @Value("${edol.printer.connection-mode}")
     private String connectionMode;
 
@@ -67,6 +70,8 @@ public class PrinterBootstrap {
         if (printer.getConnectionMode() == PrinterConnectionMode.DIRECT) {
             configuration.setMqttHost(bambuHost);
             configuration.setFtpHost(bambuHost);
+            configuration.setFtpPort(990);
+            configuration.setModelDirectory(modelDirectory);
             configuration.setAccessCode(accessCode);
         }
 

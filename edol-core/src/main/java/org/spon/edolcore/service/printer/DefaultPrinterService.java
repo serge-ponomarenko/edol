@@ -5,6 +5,7 @@ import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.persistence.printer.PrinterRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -28,5 +29,13 @@ public class DefaultPrinterService implements PrinterService {
                         new IllegalArgumentException(
                                 "Printer not found: " + printerId
                         ));
+    }
+
+    @Override
+    public List<Printer> getEnabledPrinters() {
+        return printerRepository.findAll()
+                .stream()
+                .filter(Printer::isEnabled)
+                .toList();
     }
 }

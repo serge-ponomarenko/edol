@@ -32,6 +32,8 @@ public class PrinterConnectionConfiguration {
 
     private Integer ftpPort;
 
+    private String modelDirectory;
+
     private String accessCode;
 
     private String agentId;

@@ -21,7 +21,9 @@ public class ModelTransferFailedEventListener {
                 event.reason()
         );
 
-        metadataAcquisitionService.retryNow();
+        metadataAcquisitionService.retryNow(
+                event.printerId()
+        );
     }
 
 }

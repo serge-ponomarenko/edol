@@ -16,13 +16,9 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 
 @Service
-@ConditionalOnProperty(
-        value = "edol.printer.connection-mode",
-        havingValue = "DIRECT",
-        matchIfMissing = true
-)
 @Slf4j
 @RequiredArgsConstructor
 public class DirectModelTransferProvider implements ModelTransferProvider {
@@ -31,28 +27,19 @@ public class DirectModelTransferProvider implements ModelTransferProvider {
     private final CurlFtpsClient curlFtpsClient;
     private final ApplicationEventPublisher applicationEventPublisher;
 
-    @Value("${bambu.ftp-url}")
-    private String ip;
-
-    @Value("${bambu.model-directory}")
-    private String modelDirectory;
-
-    @Value("${bambu.access-code}")
-    private String accessCode;
-
     @Override
-    public void requestModel() {
-        PrinterState state = printerStateService.getState();
+    public void requestModel(UUID printerId) {
+        PrinterState state = printerStateService.getState(printerId);
 
         String fileName = state.getCurrentFile();
 
         if (fileName == null || fileName.isEmpty())
             throw new ModelNotLoadedException();
 
-        Path localFile = MODELS_DIR.resolve(fileName);
+        Path localFile = MODELS_DIR.resolve(printerId.toString()).resolve(fileName);
 
         try {
-            Files.createDirectories(MODELS_DIR);
+            Files.createDirectories(MODELS_DIR.resolve(printerId.toString()));
 
             log.info("Downloading model: {}", fileName);
 
@@ -68,7 +55,7 @@ public class DirectModelTransferProvider implements ModelTransferProvider {
             curlFtpsClient.download(ftpsConnection, modelDirectory + "/" + fileName, localFile.toString());
 
             applicationEventPublisher.publishEvent(
-                    new ModelAvailableEvent(localFile)
+                    new ModelAvailableEvent(printerId, localFile)
             );
         } catch (Exception e) {
             throw new ModelTransferException(fileName, e);

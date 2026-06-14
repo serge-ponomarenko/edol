@@ -28,6 +28,14 @@ public class InMemoryPrinterRuntimeRegistry
     }
 
     @Override
+    public PrinterRuntimeContext getOrCreate(UUID printerId) {
+        return contexts.computeIfAbsent(
+                printerId,
+                PrinterRuntimeContext::new
+        );
+    }
+
+    @Override
     public Collection<PrinterRuntimeContext> getAll() {
         return contexts.values();
     }

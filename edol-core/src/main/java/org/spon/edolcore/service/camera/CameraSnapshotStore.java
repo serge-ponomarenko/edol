@@ -1,16 +1,18 @@
 package org.spon.edolcore.service.camera;
 
 import jakarta.annotation.PostConstruct;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.CameraSnapshot;
+import org.spon.edolcore.service.printer.runtime.CameraRuntimeState;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -18,18 +20,15 @@ import java.nio.file.StandardOpenOption;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class CameraSnapshotStore {
 
-    @Getter
-    private volatile CameraSnapshot latest;
-    private volatile Path latestSnapshotFile;
-
-    private final LinkedList<CameraSnapshot> history = new LinkedList<>();
+    private final PrinterRuntimeContextProvider runtimeContextProvider;
 
     private static final int MAX_HISTORY = 50;
 
@@ -40,9 +39,6 @@ public class CameraSnapshotStore {
     private boolean storeSnapshots;
 
     private Path snapshotPath;
-
-    @Setter
-    private volatile String currentSessionId = "default";
 
     private static final DateTimeFormatter FILE_TIME =
             DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
@@ -56,31 +52,50 @@ public class CameraSnapshotStore {
         }
     }
 
-    public synchronized void store(byte[] image) {
+    public synchronized void store(
+            UUID printerId,
+            byte[] image
+    ) {
         CameraSnapshot snap = new CameraSnapshot(image);
 
-        latest = snap;
+        runtime(printerId).setLatest(snap);
 
-        history.addFirst(snap);
+        runtime(printerId).getHistory().addFirst(snap);
 
-        if (history.size() > MAX_HISTORY) {
-            history.removeLast();
+        if (runtime(printerId).getHistory().size() > MAX_HISTORY) {
+            runtime(printerId).getHistory().removeLast();
         }
 
-        if (!"default".equals(currentSessionId)) {      // do not store IDLE snapshots
-            saveToDisk(snap);
+        if (!"default".equals(getCurrentSessionId(printerId))) {      // do not store IDLE snapshots
+            saveToDisk(
+                    printerId,
+                    snap
+            );
         }
     }
 
-    private void saveToDisk(CameraSnapshot snap) {
+    private void saveToDisk(
+            UUID printerId,
+            CameraSnapshot snap
+    ) {
         try {
-            Path file = snapshotPath.resolve("latest.jpg");
+            Path printerDir = snapshotPath.resolve(printerId.toString());
+
+            Files.createDirectories(printerDir);
+
+            Path file = printerDir.resolve("latest.jpg");
             if (storeSnapshots) {
                 String fileName = FILE_TIME.format(
                         snap.getTimestamp().atZone(ZoneId.systemDefault())
                 ) + ".jpg";
 
-                Path jobDir = snapshotPath.resolve(currentSessionId);
+                Path jobDir =
+                        snapshotPath
+                                .resolve(printerId.toString())
+                                .resolve(
+                                        getCurrentSessionId(printerId)
+                                );
+
                 Files.createDirectories(jobDir);
 
                 file = jobDir.resolve(fileName);
@@ -90,10 +105,10 @@ public class CameraSnapshotStore {
                     StandardOpenOption.CREATE,
                     StandardOpenOption.WRITE);
 
-            latestSnapshotFile = file;
+            runtime(printerId).setLatestSnapshotFile(file);
 
-        } catch (Exception e) {
-            log.error("Failed to save snapshot: {}", e.getMessage());
+        } catch (IOException e) {
+            log.error("Failed to save snapshot", e);
         }
     }
 
@@ -104,43 +119,91 @@ public class CameraSnapshotStore {
         }
         long cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000;
 
-        Files.list(snapshotPath).forEach(jobDir -> {
-            try {
+        try (var printerDirs = Files.list(snapshotPath)) {
+            printerDirs.forEach(printerDir -> {
+                try {
+                    if (!Files.isDirectory(printerDir))
+                        return;
 
-                if (!Files.isDirectory(jobDir)) return;
+                    try (var sessionDirs = Files.list(printerDir)) {
+                        sessionDirs.forEach(sessionDir -> {
+                            try {
+                                if (!Files.isDirectory(sessionDir))
+                                    return;
 
-                long lastModified = Files.getLastModifiedTime(jobDir).toMillis();
+                                long lastModified =
+                                        Files.getLastModifiedTime(sessionDir).toMillis();
 
-                if (lastModified < cutoff) {
-                    deleteDirectory(jobDir);
-                    log.info("Deleted old snapshot folder: {}", jobDir);
+                                if (lastModified < cutoff) {
+                                    deleteDirectory(sessionDir);
+
+                                    log.info(
+                                            "Deleted old snapshot folder: {}",
+                                            sessionDir
+                                    );
+                                }
+                            } catch (IOException e) {
+                                log.warn(
+                                        "Cleanup failed for {}",
+                                        sessionDir,
+                                        e
+                                );
+                            }
+                        });
+                    }
+                } catch (IOException e) {
+                    log.warn(
+                            "Cleanup failed for printer directory {}",
+                            printerDir,
+                            e
+                    );
                 }
-
-            } catch (Exception e) {
-                log.warn("Cleanup failed for {}", jobDir, e);
-            }
-        });
+            });
+        }
     }
 
     private void deleteDirectory(Path dir) throws IOException {
-        Files.walk(dir)
-                .sorted(Comparator.reverseOrder())
-                .forEach(path -> {
-                    try {
-                        Files.delete(path);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+        try (var paths = Files.walk(dir)) {
+            paths.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
+        }
     }
 
-    public File getLatestSnapshotFile() {
-        if (latestSnapshotFile == null)
+    public File getLatestSnapshotFile(
+            UUID printerId
+    ) {
+        if (runtime(printerId).getLatestSnapshotFile() == null)
             return null;
-        return latestSnapshotFile.toFile();
+        return runtime(printerId).getLatestSnapshotFile().toFile();
     }
 
-    public List<CameraSnapshot> getHistory() {
-        return history;
+    public List<CameraSnapshot> getHistory(UUID printerId) {
+        return runtime(printerId).getHistory();
+    }
+
+    private CameraRuntimeState runtime(UUID printerId) {
+        return runtimeContextProvider
+                .getContext(printerId)
+                .getCameraRuntimeState();
+    }
+
+    public CameraSnapshot getLatest(UUID printerId) {
+        return runtime(printerId).getLatest();
+    }
+
+    public void setCurrentSessionId(UUID printerId, String sessionId) {
+        runtime(printerId).setCurrentSessionId(sessionId);
+    }
+
+    public String getCurrentSessionId(UUID printerId) {
+        return runtime(printerId).getCurrentSessionId();
     }
 }

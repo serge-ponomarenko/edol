@@ -324,22 +324,24 @@
                                                      th:each="spool, iter : ${entry.value}"
                                                      th:if="${iter.index < 5}">
 
-                                                    <div class="spool-mini-bar"
+                                                    <a class="spool-mini-bar"
+                                                         th:href="@{/s/{id}(id=${spool.id})}"
                                                          data-bs-placement="top"
                                                          data-bs-toggle="tooltip"
+                                                         data-bs-html="true"
                                                          th:attr="
-                                                            title=${'Spool #' + spool.id + ' • Remaining: '
+                                                            title=${'Spool #' + spool.id + '<br>Remaining: '
                                                             + #numbers.formatDecimal(spool.weightRemaining,0,0)
                                                             + ' / '
                                                             + #numbers.formatDecimal(spool.weightTotal,0,0)
-                                                            + ' g'}
-                                                            ">
+                                                            + ' g<br><br><b>Click to load spool in the AMS</b>'}
+                                                         ">
 
                                                         <div class="spool-mini-fill"
                                                              th:classappend="${spool.weightRemaining < 200} ? ' low' : ''"
                                                              th:style="'height:' + (${spool.weightRemaining} * 100 / ${spool.weightTotal}) + '%'">
                                                         </div>
-                                                    </div>
+                                                    </a>
 
                                                     <div class="spool-mini-label"
                                                          th:text="${#numbers.formatDecimal(spool.weightRemaining,0,0)}">

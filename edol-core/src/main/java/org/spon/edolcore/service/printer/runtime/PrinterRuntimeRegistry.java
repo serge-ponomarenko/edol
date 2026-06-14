@@ -7,6 +7,8 @@ public interface PrinterRuntimeRegistry {
 
     PrinterRuntimeContext get(UUID printerId);
 
+    PrinterRuntimeContext getOrCreate(UUID printerId);
+
     Collection<PrinterRuntimeContext> getAll();
 
     PrinterRuntimeContext create(UUID printerId);

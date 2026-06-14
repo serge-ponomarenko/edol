@@ -5,16 +5,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class MetadataAcquisitionService {
 
+    private static final String PRINTER_ID_KEY = "printerId";
     private static final long[] RETRY_DELAYS_SECONDS = {
             30,
             60,
@@ -25,98 +25,140 @@ public class MetadataAcquisitionService {
     private final ModelMetadataWorkflowService modelMetadataWorkflowService;
     private final TaskScheduler taskScheduler;
 
-    private final AtomicReference<ScheduledFuture<?>> retryTask = new AtomicReference<>();
+    private final ConcurrentHashMap<UUID, MetadataAcquisitionState> states =
+            new ConcurrentHashMap<>();
 
-    private final AtomicBoolean active = new AtomicBoolean(false);
-    private final AtomicInteger attempt = new AtomicInteger(0);
 
-    public void start() {
-        stop();
+    public void start(UUID printerId) {
+        stop(printerId);
 
-        active.set(true);
-        attempt.set(0);
+        MetadataAcquisitionState state = state(printerId);
 
-        log.info("Starting metadata acquisition");
+        state.setActive(true);
+        state.setAttempt(0);
 
-        attemptAcquisition();
+        log.atInfo()
+                .addKeyValue(PRINTER_ID_KEY, printerId)
+                .log("Starting metadata acquisition for printer");
+
+        attemptAcquisition(printerId);
     }
 
-    public void stop() {
-        if (!active.get() && retryTask.get() == null) {
+    public void stop(UUID printerId) {
+        MetadataAcquisitionState state = state(printerId);
+
+        ScheduledFuture<?> task = state.getRetryTask();
+
+        if (!state.isActive() && task == null) {
             return;
         }
 
-        active.set(false);
-        attempt.set(0);
-
-        ScheduledFuture<?> task = retryTask.getAndSet(null);
+        state.setActive(false);
+        state.setAttempt(0);
+        state.setRetryTask(null);
 
         if (task != null) {
             task.cancel(false);
         }
 
-        log.info("Stopped metadata acquisition");
+        log.atInfo()
+                .addKeyValue(PRINTER_ID_KEY, printerId)
+                .log("Stopped metadata acquisition for printer");
     }
 
-    public void retryNow() {
+    public void retryNow(UUID printerId) {
         scheduleRetry(
-                new IllegalStateException("Agent model transfer failed")
-        );
-    }
-
-    private void attemptAcquisition() {
-        if (!active.get()) {
-            return;
-        }
-
-        try {
-            log.info(
-                    "Attempting metadata acquisition (attempt #{})",
-                    attempt.get() + 1
-            );
-
-            modelMetadataWorkflowService.requestMetadata();
-        } catch (Exception e) {
-            scheduleRetry(e);
-        }
-    }
-
-    private void scheduleRetry(Exception exception) {
-        if (!active.get()) {
-            return;
-        }
-
-        int failedAttempt = attempt.get() + 1;
-        long delaySeconds = getRetryDelaySeconds();
-
-        log.warn(
-                "Metadata acquisition attempt #{} failed. Retrying in {} seconds",
-                failedAttempt,
-                delaySeconds,
-                exception
-        );
-
-        retryTask.set(taskScheduler.schedule(
-                        this::attemptAcquisition,
-                        java.time.Instant.now().plusSeconds(delaySeconds)
+                printerId,
+                new IllegalStateException(
+                        "Agent model transfer failed"
                 )
         );
     }
 
-    private long getRetryDelaySeconds() {
-        long delay;
+    private void attemptAcquisition(UUID printerId) {
+        MetadataAcquisitionState state = state(printerId);
 
-        int attemptValue = attempt.get();
-
-        if (attemptValue < RETRY_DELAYS_SECONDS.length) {
-            delay = RETRY_DELAYS_SECONDS[attemptValue];
-        } else {
-            delay = RETRY_DELAYS_SECONDS[RETRY_DELAYS_SECONDS.length - 1];
+        if (!state.isActive()) {
+            return;
         }
 
-        attempt.incrementAndGet();
+        try {
+            log.atInfo()
+                    .addKeyValue(PRINTER_ID_KEY, printerId)
+                    .addKeyValue("attempt", state.getAttempt() + 1)
+                    .log("Attempting metadata acquisition");
+
+            modelMetadataWorkflowService.requestMetadata(
+                    printerId
+            );
+
+        } catch (Exception e) {
+            scheduleRetry(
+                    printerId,
+                    e
+            );
+        }
+    }
+
+    private void scheduleRetry(
+            UUID printerId,
+            Exception exception
+    ) {
+        MetadataAcquisitionState state = state(printerId);
+
+        if (!state.isActive()) {
+            return;
+        }
+
+        int failedAttempt = state.getAttempt() + 1;
+
+        long delaySeconds =
+                getRetryDelaySeconds(printerId);
+
+        log.atWarn()
+                .addKeyValue(PRINTER_ID_KEY, printerId)
+                .addKeyValue("attempt", failedAttempt)
+                .addKeyValue("retryingIn", delaySeconds)
+                .addKeyValue("exception", exception)
+                .log("Metadata acquisition failed");
+
+        state.setRetryTask(
+                taskScheduler.schedule(
+                        () -> attemptAcquisition(printerId),
+                        java.time.Instant.now()
+                                .plusSeconds(delaySeconds)
+                )
+        );
+    }
+
+    private long getRetryDelaySeconds(
+            UUID printerId
+    ) {
+        MetadataAcquisitionState state =
+                state(printerId);
+
+        long delay;
+
+        int attempt = state.getAttempt();
+
+        if (attempt < RETRY_DELAYS_SECONDS.length) {
+            delay = RETRY_DELAYS_SECONDS[attempt];
+        } else {
+            delay = RETRY_DELAYS_SECONDS[
+                    RETRY_DELAYS_SECONDS.length - 1
+                    ];
+        }
+
+        state.setAttempt(attempt + 1);
 
         return delay;
+    }
+
+    private MetadataAcquisitionState state(UUID printerId) {
+        return states.computeIfAbsent(
+                printerId,
+                id -> new MetadataAcquisitionState()
+        );
     }
 
 }

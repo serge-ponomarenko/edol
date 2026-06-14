@@ -1,8 +1,10 @@
 package org.spon.edolcore.service.printer.telemetry;
 
+import java.util.UUID;
+
 public interface PrinterTelemetryProvider {
 
-    void connect();
+    void connect(UUID printerId);
 
-    boolean isConnected();
+    boolean isConnected(UUID printerId);
 }

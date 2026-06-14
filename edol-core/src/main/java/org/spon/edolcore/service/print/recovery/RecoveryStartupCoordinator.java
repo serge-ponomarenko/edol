@@ -5,10 +5,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.event.PrinterEventType;
 import org.spon.edolcore.event.recovery.RecoverySnapshotReadyEvent;
 import org.spon.edolcore.service.PrinterStateService;
+import org.spon.edolcore.service.printer.PrinterService;
 import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -20,33 +22,38 @@ public class RecoveryStartupCoordinator {
     private final ActivePrintRecoveryService activePrintRecoveryService;
     private final PrinterCommandGateway printerCommandGateway;
     private final PrinterStateService printerStateService;
+    private final PrinterService printerService;
 
     private final AtomicBoolean recoveryStarted = new AtomicBoolean(false);
 
-    public void startRecoveryIfNeeded() {
+    public void startRecoveryIfNeeded(UUID printerId) {
         if (!recoveryStarted.compareAndSet(false, true)) {
             return;
         }
         log.info("Starting recovery after printer connectivity established");
-        Thread.ofVirtual().start(this::runRecoveryWorkflow);
+        Thread.ofVirtual().start(() -> runRecoveryWorkflow(printerId));
     }
 
-    private void runRecoveryWorkflow() {
-        startupSynchronizationService.beginRecoverySynchronization();
+    private void runRecoveryWorkflow(UUID printerId) {
+        startupSynchronizationService.beginRecoverySynchronization(printerId);
 
         try {
             log.info("Starting recovery synchronization");
-            printerCommandGateway.pushAll();
+            printerCommandGateway.pushAll(
+                    printerService.getPrinter(printerId).getId()
+            );
         } catch (Exception e) {
             log.error("Recovery startup failed", e);
-            startupSynchronizationService.completeRecoverySynchronization();
+            startupSynchronizationService.completeRecoverySynchronization(printerId);
         }
     }
 
-    @EventListener(RecoverySnapshotReadyEvent.class)
-    public void onRecoverySnapshotReady() {
+    @EventListener
+    public void onRecoverySnapshotReady(RecoverySnapshotReadyEvent event) {
+        UUID printerId = event.getPrinterId();
+
         try {
-            RecoveryResult result = activePrintRecoveryService.recover();
+            RecoveryResult result = activePrintRecoveryService.recover(printerId);
 
             log.info("Recovery finished with result {}", result);
 
@@ -57,6 +64,7 @@ public class RecoveryStartupCoordinator {
                     );
 
                     printerStateService.publish(
+                            printerId,
                             PrinterEventType.PRINT_STARTED
                     );
                 }
@@ -69,7 +77,7 @@ public class RecoveryStartupCoordinator {
         } catch (Exception e) {
             log.error("Recovery workflow failed", e);
         } finally {
-            startupSynchronizationService.completeRecoverySynchronization();
+            startupSynchronizationService.completeRecoverySynchronization(printerId);
             log.info("Recovery synchronization completed");
         }
     }

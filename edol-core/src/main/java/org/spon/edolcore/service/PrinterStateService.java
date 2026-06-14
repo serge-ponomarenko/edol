@@ -1,6 +1,7 @@
 package org.spon.edolcore.service;
 
 
+
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -12,11 +13,14 @@ import org.spon.edolcore.event.PrinterEvent;
 import org.spon.edolcore.event.PrinterEventType;
 import org.spon.edolcore.event.printer.PrinterStateUpdatedEvent;
 import org.spon.edolcore.service.print.recovery.StartupSynchronizationService;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.PrinterStateRuntime;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @RequiredArgsConstructor
@@ -66,44 +70,50 @@ public class PrinterStateService {
     private static final String STATE_PREPARE = "PREPARE";
     private static final String STATE_RUNNING = "RUNNING";
 
-    private final PrinterState state = new PrinterState();
     private final ApplicationEventPublisher events;
     private final StartupSynchronizationService startupSynchronizationService;
+    private final PrinterRuntimeContextProvider runtimeContextProvider;
 
-    private String lastState = STATE_IDLE;
-    private int lastError = 0;
-    private int lastAmsStatus = -1;
-    private int lastActiveSlot = -1;
-    private int lastProgress = -1;
-    private int lastLayer = -1;
-    private List<AmsSlot> previousAmsSlots = new ArrayList<>();
 
-    public synchronized void update(JsonNode print) {
+    private PrinterStateRuntime runtime(UUID printerId) {
+        return runtimeContextProvider
+                .getContext(printerId)
+                .getPrinterStateRuntime();
+    }
 
+    public PrinterState getState(UUID printerId) {
+        return runtime(printerId).getState();
+    }
+
+    public synchronized void update(
+            @SuppressWarnings("unused")
+            UUID printerId,
+            JsonNode print
+    ) {
         List<PrinterEvent> pendingEvents = new ArrayList<>();
         List<AmsEvent> pendingAmsEvents = new ArrayList<>();
 
-        updateGcodeState(print, pendingEvents);
-        updateProgress(print, pendingEvents);
-        updateLayer(print, pendingEvents);
-        updateError(print, pendingEvents);
-        updateAmsStatus(print, pendingEvents);
-        updateAms(print, pendingAmsEvents);
-        updateAmsMapping(print);
-        updateExtTray(print);
-        updateAmsActiveSlot(print, pendingEvents);
-        updateScalarFields(print);
+        updateGcodeState(printerId, print, pendingEvents);
+        updateProgress(printerId, print, pendingEvents);
+        updateLayer(printerId, print, pendingEvents);
+        updateError(printerId, print, pendingEvents);
+        updateAmsStatus(printerId, print, pendingEvents);
+        updateAms(printerId, print, pendingAmsEvents);
+        updateAmsMapping(printerId, print);
+        updateExtTray(printerId, print);
+        updateAmsActiveSlot(printerId, print, pendingEvents);
+        updateScalarFields(printerId, print);
 
-        if (!startupSynchronizationService.isRecoverySynchronizationActive()) {
+        if (!startupSynchronizationService.isRecoverySynchronizationActive(printerId)) {
             pendingEvents.forEach(events::publishEvent);
             pendingAmsEvents.forEach(events::publishEvent);
         }
 
-        events.publishEvent(new PrinterStateUpdatedEvent());
+        events.publishEvent(new PrinterStateUpdatedEvent(printerId));
 
     }
 
-    private void updateAms(JsonNode print, List<AmsEvent> pendingAmsEvents) {
+    private void updateAms(UUID printerId, JsonNode print, List<AmsEvent> pendingAmsEvents) {
         if (!print.has(FIELD_AMS))
             return;
 
@@ -117,15 +127,15 @@ public class PrinterStateService {
         applyAmsEnvironment(ams, amsState);
 
         List<AmsSlot> slots = buildAmsSlots(ams);
-        detectAmsSlotChanges(slots, pendingAmsEvents);
+        detectAmsSlotChanges(printerId, slots, pendingAmsEvents);
         amsState.setSlots(slots);
-        previousAmsSlots = slots;
+        previousAmsSlots(printerId, slots);
         applyAmsActiveSlot(amsNode, amsState);
 
-        state.setAms(amsState);
+        getState(printerId).setAms(amsState);
     }
 
-    private void updateExtTray(JsonNode print) {
+    private void updateExtTray(UUID printerId, JsonNode print) {
         if (!print.has(FIELD_VT_TRAY))
             return;
 
@@ -134,101 +144,132 @@ public class PrinterStateService {
 
         applyTrayMetadata(vtTrayNode, extTray);
 
-        state.setExtTray(extTray);
+        getState(printerId).setExtTray(extTray);
     }
 
-    private void detectStateEvents(String oldState, String newState, List<PrinterEvent> pendingEvents) {
+    private void detectStateEvents(UUID printerId, String oldState, String newState, List<PrinterEvent> pendingEvents) {
+        if (oldState == null) {
+            oldState = STATE_IDLE;
+        }
+
         if (oldState.equals(newState))
             return;
 
         if (isPrintStartedTransition(oldState, newState)) {
-            pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_STARTED));
+            pendingEvents.add(createPrintEvent(printerId, PrinterEventType.PRINT_STARTED));
         }
         if (isPrintRunningTransition(oldState, newState)) {
-            pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_RUNNING));
+            pendingEvents.add(createPrintEvent(printerId, PrinterEventType.PRINT_RUNNING));
         }
         if (isPrintPausedTransition(oldState, newState)) {
-            pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_PAUSED));
+            pendingEvents.add(createPrintEvent(printerId, PrinterEventType.PRINT_PAUSED));
         }
         if (isPrintFinishedTransition(oldState, newState)) {
-            pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_FINISHED));
+            pendingEvents.add(createPrintEvent(printerId, PrinterEventType.PRINT_FINISHED));
         }
         if (isPrintFailedTransition(oldState, newState)) {
-            pendingEvents.add(createPrintEvent(PrinterEventType.PRINT_FAILED));
+            pendingEvents.add(createPrintEvent(printerId, PrinterEventType.PRINT_FAILED));
         }
 
     }
 
-    private void updateGcodeState(JsonNode print, List<PrinterEvent> pendingEvents) {
+    private void updateGcodeState(UUID printerId, JsonNode print, List<PrinterEvent> pendingEvents) {
         if (!print.has(FIELD_GCODE_STATE))
             return;
 
         String newState = print.get(FIELD_GCODE_STATE).asText();
 
-        if (newState.equals(lastState))
+        if (newState.equals(lastState(printerId)))
             return;
 
-        log.info("### G-code new state: {}. Old state: {}", newState, lastState);
-        detectStateEvents(lastState, newState, pendingEvents);
-        state.setGcodeState(newState);
-        lastState = newState;
+        log.info("### G-code new state: {}. Old state: {}", newState, lastState(printerId));
+        detectStateEvents(printerId, lastState(printerId), newState, pendingEvents);
+        getState(printerId).setGcodeState(newState);
+        lastState(printerId, newState);
     }
 
-    private void updateProgress(JsonNode print, List<PrinterEvent> pendingEvents) {
+    private void updateProgress(UUID printerId, JsonNode print, List<PrinterEvent> pendingEvents) {
         if (!print.has(FIELD_MC_PERCENT))
             return;
 
         int progress = print.get(FIELD_MC_PERCENT).asInt();
 
-        if (progress == lastProgress)
+        if (progress == lastProgress(printerId))
             return;
 
-        state.setProgress(progress);
-        pendingEvents.add(new PrinterEvent(PrinterEventType.PROGRESS_CHANGED, state.getCurrentFile(), null, progress, null));
-        lastProgress = progress;
+        getState(printerId).setProgress(progress);
+        pendingEvents.add(
+                createPrintEvent(
+                        printerId,
+                        PrinterEventType.PROGRESS_CHANGED
+                )
+        );
+        lastProgress(printerId, progress);
     }
 
-    private void updateLayer(JsonNode print, List<PrinterEvent> pendingEvents) {
+    private void updateLayer(UUID printerId, JsonNode print, List<PrinterEvent> pendingEvents) {
         if (!print.has(FIELD_LAYER_NUM))
             return;
 
         int layer = print.get(FIELD_LAYER_NUM).asInt();
 
-        if (layer == lastLayer)
+        if (layer == lastLayer(printerId))
             return;
 
-        state.setLayer(layer);
-        pendingEvents.add(new PrinterEvent(PrinterEventType.LAYER_CHANGED, state.getCurrentFile(), layer, null, null));
-        lastLayer = layer;
+        getState(printerId).setLayer(layer);
+        pendingEvents.add(
+                createPrintEvent(
+                        printerId,
+                        PrinterEventType.LAYER_CHANGED
+                )
+        );
+        lastLayer(printerId, layer);
     }
 
-    private void updateError(JsonNode print, List<PrinterEvent> pendingEvents) {
+    private void updateError(UUID printerId, JsonNode print, List<PrinterEvent> pendingEvents) {
         if (!print.has(FIELD_PRINT_ERROR))
             return;
 
-        int error = print.get(FIELD_PRINT_ERROR).asInt();
+        int errorCode = print.get(FIELD_PRINT_ERROR).asInt();
 
-        if (error == 0 || error == lastError)
+        if (errorCode == 0 || errorCode == lastError(printerId))
             return;
 
-        pendingEvents.add(new PrinterEvent(PrinterEventType.PRINT_ERROR, state.getCurrentFile(), null, null, error));
-        lastError = error;
+        getState(printerId).setError(
+                new PrinterError(
+                        errorCode,
+                        ErrorCodes.errorMap.get(errorCode)
+                )
+        );
+
+        pendingEvents.add(
+                createPrintEvent(
+                        printerId,
+                        PrinterEventType.PRINT_ERROR
+                )
+        );
+        lastError(printerId, errorCode);
     }
 
-    private void updateAmsStatus(JsonNode print, List<PrinterEvent> pendingEvents) {
+    private void updateAmsStatus(UUID printerId, JsonNode print, List<PrinterEvent> pendingEvents) {
         if (!print.has(FIELD_AMS_STATUS))
             return;
 
         int amsStatus = print.get(FIELD_AMS_STATUS).asInt();
 
-        if (amsStatus == lastAmsStatus)
+        if (amsStatus == lastAmsStatus(printerId))
             return;
 
-        pendingEvents.add(new PrinterEvent(PrinterEventType.AMS_STATUS_CHANGED, state.getCurrentFile(), null, null, null));
-        lastAmsStatus = amsStatus;
+        pendingEvents.add(
+                createPrintEvent(
+                        printerId,
+                        PrinterEventType.AMS_STATUS_CHANGED
+                )
+        );
+        lastAmsStatus(printerId, amsStatus);
     }
 
-    private void updateAmsMapping(JsonNode print) {
+    private void updateAmsMapping(UUID printerId, JsonNode print) {
         if (!print.has(FIELD_AMS_MAPPING))
             return;
 
@@ -237,10 +278,10 @@ public class PrinterStateService {
         for (JsonNode node : amsMapping) {
             amsMappingList.add(node.asInt());
         }
-        state.setAmsMapping(amsMappingList);
+        getState(printerId).setAmsMapping(amsMappingList);
     }
 
-    private void updateAmsActiveSlot(JsonNode print, List<PrinterEvent> pendingEvents) {
+    private void updateAmsActiveSlot(UUID printerId, JsonNode print, List<PrinterEvent> pendingEvents) {
         if (!print.has(FIELD_AMS))
             return;
 
@@ -250,61 +291,66 @@ public class PrinterStateService {
 
         int active = amsNode.get(FIELD_TRAY_NOW).asInt();
 
-        state.getAms().setActiveSlot(active);
-        state.setExternalSpoolUsed(active == 254);
+        getState(printerId).getAms().setActiveSlot(active);
+        getState(printerId).setExternalSpoolUsed(active == 254);
 
-        if (active == lastActiveSlot)
+        if (active == lastActiveSlot(printerId))
             return;
 
-        pendingEvents.add(new PrinterEvent(PrinterEventType.AMS_SLOT_CHANGED, state.getCurrentFile(), null, null, null));
-        state.getAms().setPreviousSlot(lastActiveSlot);
-        lastActiveSlot = active;
+        pendingEvents.add(
+                createPrintEvent(
+                        printerId,
+                        PrinterEventType.AMS_SLOT_CHANGED
+                )
+        );
+        getState(printerId).getAms().setPreviousSlot(lastActiveSlot(printerId));
+        lastActiveSlot(printerId, active);
     }
 
-    private void updateScalarFields(JsonNode print) {
+    private void updateScalarFields(UUID printerId, JsonNode print) {
         if (
                 print.has(FIELD_COMMAND_NAME)
                         && print.get(FIELD_COMMAND_NAME).asText().equals(PROJECT_FILE)
                         && print.has(FIELD_FILE_NAME)
         ) {
-            state.setCurrentFile(print.get(FIELD_FILE_NAME).asText());
+            getState(printerId).setCurrentFile(print.get(FIELD_FILE_NAME).asText());
         }
 
         if (
-                STATE_RUNNING.equals(state.getGcodeState())
-                        && (state.getCurrentFile() == null || state.getCurrentFile().isEmpty())
+                STATE_RUNNING.equals(getState(printerId).getGcodeState())
+                        && (getState(printerId).getCurrentFile() == null || getState(printerId).getCurrentFile().isEmpty())
                         && print.has(FIELD_SUBTASK_NAME)
         ) {
-            state.setCurrentFile(print.get(FIELD_SUBTASK_NAME).asText() + ".gcode.3mf");
+            getState(printerId).setCurrentFile(print.get(FIELD_SUBTASK_NAME).asText() + ".gcode.3mf");
         }
 
         if (print.has(FIELD_SUBTASK_NAME)) {
-            state.setCurrentTask(print.get(FIELD_SUBTASK_NAME).asText());
+            getState(printerId).setCurrentTask(print.get(FIELD_SUBTASK_NAME).asText());
         }
 
         if (print.has(FIELD_TOTAL_LAYER_NUM))
-            state.setTotalLayers(print.get(FIELD_TOTAL_LAYER_NUM).asInt());
+            getState(printerId).setTotalLayers(print.get(FIELD_TOTAL_LAYER_NUM).asInt());
 
         if (print.has(FIELD_MC_REMAINING_TIME))
-            state.setRemainingTime(print.get(FIELD_MC_REMAINING_TIME).asInt());
+            getState(printerId).setRemainingTime(print.get(FIELD_MC_REMAINING_TIME).asInt());
 
         if (print.has(FIELD_NOZZLE_TEMPER))
-            state.setNozzleTemp(print.get(FIELD_NOZZLE_TEMPER).asDouble());
+            getState(printerId).setNozzleTemp(print.get(FIELD_NOZZLE_TEMPER).asDouble());
 
         if (print.has(FIELD_NOZZLE_TARGET_TEMPER))
-            state.setNozzleTargetTemp(print.get(FIELD_NOZZLE_TARGET_TEMPER).asDouble());
+            getState(printerId).setNozzleTargetTemp(print.get(FIELD_NOZZLE_TARGET_TEMPER).asDouble());
 
         if (print.has(FIELD_BED_TEMPER))
-            state.setBedTemp(print.get(FIELD_BED_TEMPER).asDouble());
+            getState(printerId).setBedTemp(print.get(FIELD_BED_TEMPER).asDouble());
 
         if (print.has(FIELD_BED_TARGET_TEMPER))
-            state.setBedTargetTemp(print.get(FIELD_BED_TARGET_TEMPER).asDouble());
+            getState(printerId).setBedTargetTemp(print.get(FIELD_BED_TARGET_TEMPER).asDouble());
 
         if (print.has(FIELD_WIFI_SIGNAL))
-            state.setWifiSignal(print.get(FIELD_WIFI_SIGNAL).asText());
+            getState(printerId).setWifiSignal(print.get(FIELD_WIFI_SIGNAL).asText());
 
         if (print.has(FIELD_SPD_MAG))
-            state.setSpeed(print.get(FIELD_SPD_MAG).asInt());
+            getState(printerId).setSpeed(print.get(FIELD_SPD_MAG).asInt());
     }
 
     private boolean isPrintStartedTransition(String oldState, String newState) {
@@ -372,22 +418,22 @@ public class PrinterStateService {
         return slots;
     }
 
-    private void detectAmsSlotChanges(List<AmsSlot> slots, List<AmsEvent> pendingAmsEvents) {
-        if (previousAmsSlots.equals(slots))
+    private void detectAmsSlotChanges(UUID printerId, List<AmsSlot> slots, List<AmsEvent> pendingAmsEvents) {
+        if (previousAmsSlots(printerId).equals(slots))
             return;
 
-        previousAmsSlots.forEach(previousSlot -> {
+        previousAmsSlots(printerId).forEach(previousSlot -> {
             int slotId = previousSlot.getId();
             AmsSlot currentSlot = slots.get(slotId);
 
             if (previousSlot.isEmpty() && !currentSlot.isEmpty()) {
-                log.warn("[AMS] New Spool has been loaded into slot {}", slotId);
-                pendingAmsEvents.add(new AmsEvent(AmsEventType.AMS_SLOT_LOADED, slotId));
+                log.info("[AMS] New Spool has been loaded into slot {}", slotId);
+                pendingAmsEvents.add(new AmsEvent(printerId, AmsEventType.AMS_SLOT_LOADED, slotId));
             }
 
             if (!previousSlot.isEmpty() && currentSlot.isEmpty()) {
-                log.warn("[AMS] Spool has been unloaded from slot {}", slotId);
-                pendingAmsEvents.add(new AmsEvent(AmsEventType.AMS_SLOT_UNLOADED, slotId));
+                log.info("[AMS] Spool has been unloaded from slot {}", slotId);
+                pendingAmsEvents.add(new AmsEvent(printerId, AmsEventType.AMS_SLOT_UNLOADED, slotId));
             }
         });
     }
@@ -437,18 +483,71 @@ public class PrinterStateService {
     ) {
     }
 
-    private PrinterEvent createPrintEvent(PrinterEventType type) {
+    private PrinterEvent createPrintEvent(UUID printerId, PrinterEventType type) {
         return new PrinterEvent(
-                type,
-                state.getCurrentFile(),
-                null,
-                null,
-                null
+                printerId,
+                type
         );
     }
 
-    public void publish(PrinterEventType type) {
-        events.publishEvent(createPrintEvent(type));
+    public void publish(UUID printerId, PrinterEventType type) {
+        events.publishEvent(createPrintEvent(printerId, type));
+    }
+
+    private String lastState(UUID printerId) {
+        return runtime(printerId).getLastState();
+    }
+
+    private void lastState(UUID printerId, String value) {
+        runtime(printerId).setLastState(value);
+    }
+
+    private int lastError(UUID printerId) {
+        return runtime(printerId).getLastError();
+    }
+
+    private void lastError(UUID printerId, int value) {
+        runtime(printerId).setLastError(value);
+    }
+
+    private int lastAmsStatus(UUID printerId) {
+        return runtime(printerId).getLastAmsStatus();
+    }
+
+    private void lastAmsStatus(UUID printerId, int value) {
+        runtime(printerId).setLastAmsStatus(value);
+    }
+
+    private int lastActiveSlot(UUID printerId) {
+        return runtime(printerId).getLastActiveSlot();
+    }
+
+    private void lastActiveSlot(UUID printerId, int value) {
+        runtime(printerId).setLastActiveSlot(value);
+    }
+
+    private int lastProgress(UUID printerId) {
+        return runtime(printerId).getLastProgress();
+    }
+
+    private void lastProgress(UUID printerId, int value) {
+        runtime(printerId).setLastProgress(value);
+    }
+
+    private int lastLayer(UUID printerId) {
+        return runtime(printerId).getLastLayer();
+    }
+
+    private void lastLayer(UUID printerId, int value) {
+        runtime(printerId).setLastLayer(value);
+    }
+
+    private List<AmsSlot> previousAmsSlots(UUID printerId) {
+        return runtime(printerId).getPreviousAmsSlots();
+    }
+
+    private void previousAmsSlots(UUID printerId, List<AmsSlot> slots) {
+        runtime(printerId).setPreviousAmsSlots(slots);
     }
 
 }

@@ -7,6 +7,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -22,11 +24,13 @@ public class ModelAvailableEventListener {
                 event.modelFile().getFileName()
         );
 
+        UUID printerId = event.printerId();
+
         try {
-            modelMetadataWorkflowService.parseMetadata(event.modelFile());
+            modelMetadataWorkflowService.parseMetadata(printerId, event.modelFile());
 
             applicationEventPublisher.publishEvent(
-                    new MetadataParsedEvent(event.modelFile().getFileName().toString())
+                    new MetadataParsedEvent(printerId, event.modelFile().getFileName().toString())
             );
 
         } catch (Exception e) {

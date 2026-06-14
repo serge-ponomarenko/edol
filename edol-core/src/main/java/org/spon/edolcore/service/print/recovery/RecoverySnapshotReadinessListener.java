@@ -8,6 +8,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -17,33 +19,35 @@ public class RecoverySnapshotReadinessListener {
     private final RecoverySnapshotValidator recoverySnapshotValidator;
     private final ApplicationEventPublisher events;
 
-    @EventListener(PrinterStateUpdatedEvent.class)
-    public void onPrinterStateUpdated() {
-        if (!startupSynchronizationService.isRecoverySynchronizationActive()) {
+    @EventListener
+    public void onPrinterStateUpdated(PrinterStateUpdatedEvent event) {
+        if (!startupSynchronizationService.isRecoverySynchronizationActive(event.getPrinterId())) {
             return;
         }
 
+        UUID printerId = event.getPrinterId();
+
         log.info(
                 "Recovery validator reason: {}",
-                recoverySnapshotValidator.explainWhyRecoveryDecisionNotReady()
+                recoverySnapshotValidator.explainWhyRecoveryDecisionNotReady(printerId)
         );
 
         log.info(
                 "Recovery snapshot already published={}",
-                startupSynchronizationService.isSnapshotReadyPublished()
+                startupSynchronizationService.isSnapshotReadyPublished(printerId)
         );
-        if (!recoverySnapshotValidator.isRecoveryDecisionReady()) {
+        if (!recoverySnapshotValidator.isRecoveryDecisionReady(printerId)) {
             return;
         }
 
-        if (!startupSynchronizationService.markSnapshotReadyPublished()) {
+        if (!startupSynchronizationService.markSnapshotReadyPublished(printerId)) {
             return;
         }
 
         log.info("Recovery snapshot ready");
 
         events.publishEvent(
-                new RecoverySnapshotReadyEvent()
+                new RecoverySnapshotReadyEvent(printerId)
         );
     }
 }

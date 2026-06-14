@@ -1,8 +1,12 @@
 package org.spon.edolcore.event.printer;
 
-import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-@NoArgsConstructor
+import java.util.UUID;
+
+@AllArgsConstructor
 public class PrinterStateUpdatedEvent {
-
+    @Getter
+    private UUID printerId;
 }

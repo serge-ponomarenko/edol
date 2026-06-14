@@ -8,6 +8,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 @Component
@@ -22,13 +23,16 @@ public class AmsEventListener {
     public void handleAmsEvent(AmsEvent event) {
         log.info("AMS EVENT: {}", event.getType());
 
-        printerStateService.getState().setError(null);
+        UUID printerId = event.getPrinterId();
+
+        printerStateService.getState(printerId).setError(null);
 
         switch (event.getType()) {
             case AMS_SLOT_UNLOADED -> CompletableFuture.runAsync(() ->
                     mqttMessagePublisher.publish(
                             "edolcore/ams",
                             Map.of(
+                                    "printerId", printerId,
                                     "event", "ams.slot.unloaded",
                                     "slot", event.getSlot()
                             )
@@ -39,6 +43,7 @@ public class AmsEventListener {
                     mqttMessagePublisher.publish(
                             "edolcore/ams",
                             Map.of(
+                                    "printerId", printerId,
                                     "event", "ams.slot.loaded",
                                     "slot", event.getSlot()
                             )
