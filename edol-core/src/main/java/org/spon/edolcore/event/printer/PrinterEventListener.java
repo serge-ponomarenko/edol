@@ -163,6 +163,10 @@ public class PrinterEventListener {
         cameraSnapshotStore.setCurrentSessionId(printerId, sessionId);
         modelMetadataWorkflowService.setMetadataLoaded(printerId, false);
 
+        activePrintContextService.deleteByPrinterId(
+                printerId
+        );
+
         activePrintContextService.save(
                 printerId,
                 ActivePrintContext.builder()

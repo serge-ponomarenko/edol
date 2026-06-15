@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class ActivePrintContextService {
 
@@ -48,7 +49,6 @@ public class ActivePrintContextService {
         return repository.count();
     }
 
-    @Transactional
     public void save(
             UUID printerId,
             ActivePrintContext context
