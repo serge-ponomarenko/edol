@@ -8,6 +8,7 @@ import org.spon.edolcore.persistence.printer.PrinterConnectionMode;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityStateService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +23,7 @@ public class BambuTelemetryConsumer {
     private final PrinterService printerService;
     private final ObjectMapper mapper = new ObjectMapper();
     private final LogContextFactory logContextFactory;
+    private final PrinterConnectivityStateService printerConnectivityStateService;
 
     @Value("${bambu.show-raw-mqtt}")
     private boolean showRawMqttMessages;
@@ -30,6 +32,8 @@ public class BambuTelemetryConsumer {
             UUID printerId,
             byte[] payload
     ) {
+        printerConnectivityStateService.setConnected(printerId);
+
         try {
             JsonNode root = mapper.readTree(payload);
 
