@@ -10,4 +10,6 @@ public class RecoveryRuntimeState {
     private boolean recoverySynchronizationActive;
 
     private boolean snapshotReadyPublished;
+
+    private boolean recoveryStarted;
 }

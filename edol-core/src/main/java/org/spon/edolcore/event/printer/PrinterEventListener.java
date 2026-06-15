@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 @Component
 @Slf4j
@@ -55,6 +55,8 @@ public class PrinterEventListener {
     private final MetadataAcquisitionService metadataAcquisitionService;
     private final PrinterRuntimeContextProvider printerRuntimeContextProvider;
     private final LogContextFactory logContextFactory;
+    private final ExecutorService timelapseExecutor;
+    private final ExecutorService virtualThreadExecutor;
 
     private PrinterStateRuntime runtime(UUID printerId) {
         return printerRuntimeContextProvider
@@ -120,7 +122,7 @@ public class PrinterEventListener {
     private void handlePrinterOnline(UUID printerId) {
         recoveryStartupCoordinator.startRecoveryIfNeeded(printerId);
 
-        CompletableFuture.runAsync(() ->
+        virtualThreadExecutor.submit(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/printer/online",
                         payload(
@@ -131,7 +133,7 @@ public class PrinterEventListener {
     }
 
     private void handlePrinterOffline(UUID printerId) {
-        CompletableFuture.runAsync(() ->
+        virtualThreadExecutor.submit(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/printer/offline",
                         payload(
@@ -189,7 +191,7 @@ public class PrinterEventListener {
                         .build()
         );
 
-        CompletableFuture.runAsync(() ->
+        virtualThreadExecutor.submit(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/started",
                         payload(
@@ -199,7 +201,7 @@ public class PrinterEventListener {
                         )
                 ));
 
-        CompletableFuture.runAsync(() -> {
+        virtualThreadExecutor.submit(() -> {
             try {
                 // Small delay before model acquisition.
                 // Some printers may reject FTPS access immediately after PRINT_STARTED.
@@ -276,7 +278,7 @@ public class PrinterEventListener {
 
         state.setPrinting(false);
 
-        CompletableFuture.runAsync(() ->
+        virtualThreadExecutor.submit(() ->
                 mqttMessagePublisher.publish(
                         topic,
                         payload(
@@ -306,7 +308,7 @@ public class PrinterEventListener {
                         ErrorCodes.errorMap.get(errorCode)
                 );
 
-        CompletableFuture.runAsync(() ->
+        virtualThreadExecutor.submit(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/error",
                         payload(
@@ -341,7 +343,7 @@ public class PrinterEventListener {
         PrinterState state = printerStateService.getState(printerId);
         int progress = state.getProgress();
 
-        CompletableFuture.runAsync(() ->
+        virtualThreadExecutor.submit(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/progress",
                         payload(
@@ -366,7 +368,7 @@ public class PrinterEventListener {
 
 
     private void handleAmsStatusChanged(UUID printerId) {
-        CompletableFuture.runAsync(() ->
+        virtualThreadExecutor.submit(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/ams",
                         payload(
@@ -379,7 +381,7 @@ public class PrinterEventListener {
     private void handleAmdSlotChanged(UUID printerId) {
         PrinterState state = printerStateService.getState(printerId);
 
-        CompletableFuture.runAsync(() ->
+        virtualThreadExecutor.submit(() ->
                 mqttMessagePublisher.publish(
                         "edolcore/print/ams",
                         payload(
@@ -420,21 +422,18 @@ public class PrinterEventListener {
     private void generateTimelapse(UUID printerId, String sessionId) {
         cameraSnapshotStore.setCurrentSessionId(printerId, "default");
 
-        CompletableFuture.runAsync(() -> {
+        timelapseExecutor.submit(() -> {
             try {
                 File video = timelapseService.generate(printerId, sessionId);
                 if (video != null) {
-
-                    CompletableFuture.runAsync(() ->
-                            mqttMessagePublisher.publish(
-                                    "edolcore/print/timelapse",
-                                    payload(
-                                            printerId,
-                                            "print.timelapse",
-                                            PATH_KEY, video.getAbsolutePath()
-                                    )
-                            ));
-
+                    mqttMessagePublisher.publish(
+                            "edolcore/print/timelapse",
+                            payload(
+                                    printerId,
+                                    "print.timelapse",
+                                    PATH_KEY, video.getAbsolutePath()
+                            )
+                    );
                 }
             } catch (Exception e) {
                 logContextFactory

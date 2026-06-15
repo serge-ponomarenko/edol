@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 
 @Service
 @Slf4j
@@ -19,6 +20,7 @@ public class CameraBackgroundService {
     private final DefaultCameraProvider cameraProvider;
     private final PrinterService printerService;
     private final LogContextFactory logContextFactory;
+    private final ExecutorService virtualThreadExecutor;
 
     @Scheduled(fixedDelay = 15000)
     public void capture() {
@@ -28,39 +30,40 @@ public class CameraBackgroundService {
             UUID printerId =
                     printer.getId();
 
-            try {
-
-                if (!cameraProvider.supports(
-                        printerId
-                )) {
-                    continue;
-                }
-
-                byte[] image =
-                        cameraProvider.capture(
-                                printerId
-                        );
-
-                if (image != null
-                        && image.length > 0) {
-
-                    store.store(
-                            printerId,
-                            image
-                    );
-                }
-
-            } catch (Exception e) {
-                logContextFactory
-                        .printer(
-                                log.atError(),
-                                printerId
-                        )
-                        .log(
-                                "Camera capture failed ",
-                                e
-                        );
+            if (!cameraProvider.supports(
+                    printerId
+            )) {
+                continue;
             }
+
+            virtualThreadExecutor.submit(() -> {
+                try {
+                    byte[] image =
+                            cameraProvider.capture(
+                                    printerId
+                            );
+
+                    if (image != null
+                            && image.length > 0) {
+
+                        store.store(
+                                printerId,
+                                image
+                        );
+                    }
+
+                } catch (Exception e) {
+                    logContextFactory
+                            .printer(
+                                    log.atError(),
+                                    printerId
+                            )
+                            .log(
+                                    "Camera capture failed ",
+                                    e
+                            );
+                }
+            });
         }
     }
 }

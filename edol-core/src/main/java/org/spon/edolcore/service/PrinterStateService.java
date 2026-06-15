@@ -86,32 +86,32 @@ public class PrinterStateService {
         return runtime(printerId).getState();
     }
 
-    public synchronized void update(
-            @SuppressWarnings("unused")
+    public void update(
             UUID printerId,
             JsonNode print
     ) {
-        List<PrinterEvent> pendingEvents = new ArrayList<>();
-        List<AmsEvent> pendingAmsEvents = new ArrayList<>();
+        synchronized (runtime(printerId)) {
+            List<PrinterEvent> pendingEvents = new ArrayList<>();
+            List<AmsEvent> pendingAmsEvents = new ArrayList<>();
 
-        updateGcodeState(printerId, print, pendingEvents);
-        updateProgress(printerId, print, pendingEvents);
-        updateLayer(printerId, print, pendingEvents);
-        updateError(printerId, print, pendingEvents);
-        updateAmsStatus(printerId, print, pendingEvents);
-        updateAms(printerId, print, pendingAmsEvents);
-        updateAmsMapping(printerId, print);
-        updateExtTray(printerId, print);
-        updateAmsActiveSlot(printerId, print, pendingEvents);
-        updateScalarFields(printerId, print);
+            updateGcodeState(printerId, print, pendingEvents);
+            updateProgress(printerId, print, pendingEvents);
+            updateLayer(printerId, print, pendingEvents);
+            updateError(printerId, print, pendingEvents);
+            updateAmsStatus(printerId, print, pendingEvents);
+            updateAms(printerId, print, pendingAmsEvents);
+            updateAmsMapping(printerId, print);
+            updateExtTray(printerId, print);
+            updateAmsActiveSlot(printerId, print, pendingEvents);
+            updateScalarFields(printerId, print);
 
-        if (!startupSynchronizationService.isRecoverySynchronizationActive(printerId)) {
-            pendingEvents.forEach(events::publishEvent);
-            pendingAmsEvents.forEach(events::publishEvent);
+            if (!startupSynchronizationService.isRecoverySynchronizationActive(printerId)) {
+                pendingEvents.forEach(events::publishEvent);
+                pendingAmsEvents.forEach(events::publishEvent);
+            }
+
+            events.publishEvent(new PrinterStateUpdatedEvent(printerId));
         }
-
-        events.publishEvent(new PrinterStateUpdatedEvent(printerId));
-
     }
 
     private void updateAms(UUID printerId, JsonNode print, List<AmsEvent> pendingAmsEvents) {

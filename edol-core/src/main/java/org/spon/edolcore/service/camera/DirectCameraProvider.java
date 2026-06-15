@@ -41,6 +41,7 @@ class DirectCameraProvider implements CameraProvider {
                              cfg.getMqttHost(),
                              PORT
                      )) {
+            socket.setSoTimeout(5000); // 5 seconds read timeout to prevent hang
             SSLParameters sslParameters = new SSLParameters();
             sslParameters.setEndpointIdentificationAlgorithm(null);
             socket.setSSLParameters(sslParameters);

@@ -38,8 +38,10 @@ public class MetadataAcquisitionService {
 
         MetadataAcquisitionState state = state(printerId);
 
-        state.setActive(true);
-        state.setAttempt(0);
+        synchronized (state) {
+            state.setActive(true);
+            state.setAttempt(0);
+        }
 
         logMessage(printerId, "Starting metadata acquisition for printer");
 
@@ -49,22 +51,25 @@ public class MetadataAcquisitionService {
     public void stop(UUID printerId) {
         MetadataAcquisitionState state = state(printerId);
 
-        ScheduledFuture<?> task = state.getRetryTask();
+        ScheduledFuture<?> task;
 
-        if (!state.isActive() && task == null) {
-            return;
+        synchronized (state) {
+            task = state.getRetryTask();
+
+            if (!state.isActive() && task == null) {
+                return;
+            }
+
+            state.setActive(false);
+            state.setAttempt(0);
+            state.setRetryTask(null);
         }
-
-        state.setActive(false);
-        state.setAttempt(0);
-        state.setRetryTask(null);
 
         if (task != null) {
             task.cancel(false);
         }
 
         logMessage(printerId, "Stopped metadata acquisition for printer");
-
     }
 
     public void retryNow(UUID printerId) {
@@ -79,8 +84,10 @@ public class MetadataAcquisitionService {
     private void attemptAcquisition(UUID printerId) {
         MetadataAcquisitionState state = state(printerId);
 
-        if (!state.isActive()) {
-            return;
+        synchronized (state) {
+            if (!state.isActive()) {
+                return;
+            }
         }
 
         try {
@@ -104,14 +111,17 @@ public class MetadataAcquisitionService {
     ) {
         MetadataAcquisitionState state = state(printerId);
 
-        if (!state.isActive()) {
-            return;
+        int failedAttempt;
+        long delaySeconds;
+
+        synchronized (state) {
+            if (!state.isActive()) {
+                return;
+            }
+
+            failedAttempt = state.getAttempt() + 1;
+            delaySeconds = getRetryDelaySeconds(state);
         }
-
-        int failedAttempt = state.getAttempt() + 1;
-
-        long delaySeconds =
-                getRetryDelaySeconds(printerId);
 
         logContextFactory
                 .session(
@@ -126,21 +136,21 @@ public class MetadataAcquisitionService {
                         exception
                 );
 
-        state.setRetryTask(
+        ScheduledFuture<?> retryTask =
                 taskScheduler.schedule(
                         () -> attemptAcquisition(printerId),
                         java.time.Instant.now()
                                 .plusSeconds(delaySeconds)
-                )
-        );
+                );
+
+        synchronized (state) {
+            state.setRetryTask(retryTask);
+        }
     }
 
     private long getRetryDelaySeconds(
-            UUID printerId
+            MetadataAcquisitionState state
     ) {
-        MetadataAcquisitionState state =
-                state(printerId);
-
         long delay;
 
         int attempt = state.getAttempt();

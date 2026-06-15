@@ -54,18 +54,20 @@ public class CameraSnapshotStore {
         }
     }
 
-    public synchronized void store(
+    public void store(
             UUID printerId,
             byte[] image
     ) {
         CameraSnapshot snap = new CameraSnapshot(image);
+        CameraRuntimeState stateRuntime = runtime(printerId);
 
-        runtime(printerId).setLatest(snap);
+        synchronized (stateRuntime) {
+            stateRuntime.setLatest(snap);
+            stateRuntime.getHistory().addFirst(snap);
 
-        runtime(printerId).getHistory().addFirst(snap);
-
-        if (runtime(printerId).getHistory().size() > MAX_HISTORY) {
-            runtime(printerId).getHistory().removeLast();
+            if (stateRuntime.getHistory().size() > MAX_HISTORY) {
+                stateRuntime.getHistory().removeLast();
+            }
         }
 
         if (!"default".equals(getCurrentSessionId(printerId))) {      // do not store IDLE snapshots

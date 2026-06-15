@@ -8,11 +8,13 @@ import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.printer.PrinterService;
 import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.RecoveryRuntimeState;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutorService;
 
 @Slf4j
 @Service
@@ -24,14 +26,22 @@ public class RecoveryStartupCoordinator {
     private final PrinterCommandGateway printerCommandGateway;
     private final PrinterStateService printerStateService;
     private final PrinterService printerService;
-
-    private final AtomicBoolean recoveryStarted = new AtomicBoolean(false);
+    private final PrinterRuntimeContextProvider printerRuntimeContextProvider;
     private final LogContextFactory logContextFactory;
+    private final ExecutorService virtualThreadExecutor;
 
     public void startRecoveryIfNeeded(UUID printerId) {
-        if (!recoveryStarted.compareAndSet(false, true)) {
-            return;
+        RecoveryRuntimeState runtimeState = printerRuntimeContextProvider
+                .getContext(printerId)
+                .getRecoveryRuntimeState();
+
+        synchronized (runtimeState) {
+            if (runtimeState.isRecoveryStarted()) {
+                return;
+            }
+            runtimeState.setRecoveryStarted(true);
         }
+
         logContextFactory
                 .printer(
                         log.atInfo(),
@@ -41,7 +51,7 @@ public class RecoveryStartupCoordinator {
                         "Starting recovery after printer connectivity established"
                 );
 
-        Thread.ofVirtual().start(() -> runRecoveryWorkflow(printerId));
+        virtualThreadExecutor.submit(() -> runRecoveryWorkflow(printerId));
     }
 
     private void runRecoveryWorkflow(UUID printerId) {

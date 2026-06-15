@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 
 @Component
 @RequiredArgsConstructor
@@ -19,6 +20,7 @@ public class PrinterTelemetryReconnectScheduler {
     private final DefaultPrinterTelemetryProvider telemetryProvider;
     private final PrinterService printerService;
     private final LogContextFactory logContextFactory;
+    private final ExecutorService virtualThreadExecutor;
 
     @Scheduled(fixedDelay = 30000)
     public void reconnect() {
@@ -30,19 +32,20 @@ public class PrinterTelemetryReconnectScheduler {
             if (!telemetryProvider.isConnected(
                     printerId
             )) {
+                virtualThreadExecutor.submit(() -> {
+                    logContextFactory
+                            .printer(
+                                    log.atInfo(),
+                                    printerId
+                            )
+                            .log(
+                                    "Attempting to connect printer"
+                            );
 
-                logContextFactory
-                        .printer(
-                                log.atInfo(),
-                                printerId
-                        )
-                        .log(
-                                "Attempting to connect printer"
-                        );
-
-                telemetryProvider.connect(
-                        printerId
-                );
+                    telemetryProvider.connect(
+                            printerId
+                    );
+                });
             }
         }
     }

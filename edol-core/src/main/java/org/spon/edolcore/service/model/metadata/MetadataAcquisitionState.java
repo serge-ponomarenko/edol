@@ -9,6 +9,7 @@ import java.util.concurrent.ScheduledFuture;
 @Setter
 public class MetadataAcquisitionState {
 
+    // Access guarded by synchronized(state) in MetadataAcquisitionService.
     private ScheduledFuture<?> retryTask;
 
     private boolean active;
