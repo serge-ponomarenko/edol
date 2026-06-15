@@ -17,15 +17,17 @@ public class ActivePrintContextService {
 
     private final ActivePrintContextRepository repository;
 
-    public void updateRuntimeState(
+    public void updateRecoverySnapshot(
             UUID sessionId,
             int layer,
+            int totalLayers,
             int progress,
             int remainingTime
     ) {
         repository.findById(sessionId)
                 .ifPresent(context -> {
                     context.setSavedLayer(layer);
+                    context.setTotalLayers(totalLayers);
                     context.setSavedProgress(progress);
                     context.setRemainingTime(remainingTime);
                     context.setLastUpdatedAt(Instant.now());

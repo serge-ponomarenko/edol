@@ -478,9 +478,10 @@ public class PrinterEventListener {
             return;
         }
 
-        activePrintContextService.updateRuntimeState(
+        activePrintContextService.updateRecoverySnapshot(
                 UUID.fromString(state.getSessionId()),
                 state.getLayer(),
+                state.getTotalLayers(),
                 state.getProgress(),
                 state.getRemainingTime()
         );
