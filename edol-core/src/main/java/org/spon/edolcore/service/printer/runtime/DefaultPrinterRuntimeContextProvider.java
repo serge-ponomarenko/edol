@@ -14,6 +14,6 @@ public class DefaultPrinterRuntimeContextProvider
 
     @Override
     public PrinterRuntimeContext getContext(UUID printerId) {
-        return runtimeRegistry.getOrCreate(printerId);
+        return runtimeRegistry.get(printerId);
     }
 }

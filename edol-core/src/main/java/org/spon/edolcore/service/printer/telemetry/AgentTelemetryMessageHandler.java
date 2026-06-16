@@ -7,6 +7,7 @@ import org.spon.edolcore.model.dto.AgentHeartbeatDto;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
 import org.spon.edolcore.service.agent.AgentStateService;
 import org.spon.edolcore.service.agent.event.AgentEventConsumer;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeRegistry;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Service;
@@ -24,10 +25,10 @@ public class AgentTelemetryMessageHandler {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final PrinterConnectionConfigurationRepository configurationRepository;
+    private final PrinterRuntimeRegistry runtimeRegistry;
 
     @ServiceActivator(inputChannel = "mqttInboundChannel")
     public void handle(Message<?> message) throws Exception {
-
         String topic = (String) message.getHeaders().get("mqtt_receivedTopic");
 
         Object payload = message.getPayload();
@@ -42,6 +43,10 @@ public class AgentTelemetryMessageHandler {
                 resolvePrinterId(
                         extractAgentId(topic)
                 );
+
+        if (!runtimeRegistry.exists(printerId)) {
+            return;
+        }
 
         if (topic.endsWith("/printer/report")) {
             agentTelemetryConsumer.consume(

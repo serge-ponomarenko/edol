@@ -33,9 +33,6 @@ public class DefaultPrinterService implements PrinterService {
 
     @Override
     public List<Printer> getEnabledPrinters() {
-        return printerRepository.findAll()
-                .stream()
-                .filter(Printer::isEnabled)
-                .toList();
+        return printerRepository.findByEnabledTrue();
     }
 }

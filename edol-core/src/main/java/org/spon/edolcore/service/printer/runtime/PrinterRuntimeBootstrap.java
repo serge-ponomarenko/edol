@@ -19,8 +19,7 @@ public class PrinterRuntimeBootstrap {
 
     @EventListener(ApplicationReadyEvent.class)
     public void bootstrap() {
-
-        printerRepository.findAll()
+        printerRepository.findByEnabledTrue()
                 .forEach(printer -> {
                     runtimeRegistry.create(printer.getId());
 

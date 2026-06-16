@@ -45,8 +45,12 @@ public class BambuMqttConnection implements MqttCallback {
                 return;
             }
 
+            String connectUrl =
+                    "ssl://" +
+                            configuration.getMqttHost() + ":" + configuration.getMqttPort();
+
             client = new MqttClient(
-                    configuration.getMqttHost(),
+                    connectUrl,
                     mqttConfiguration.clientId()
             );
 
