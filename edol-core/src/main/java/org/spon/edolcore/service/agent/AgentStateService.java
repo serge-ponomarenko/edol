@@ -44,10 +44,77 @@ public class AgentStateService {
         }
 
         return state.getLastHeartbeat() != null
-                && Duration.between(state.getLastHeartbeat(), Instant.now()).toSeconds() < 60
-                && state.isWifiConnected()
+                && Duration.between(
+                state.getLastHeartbeat(),
+                Instant.now()
+        ).toSeconds() < 60;
+    }
+
+    public boolean isHealthy(UUID printerId) {
+        AgentState state = states.get(printerId);
+
+        if (state == null) {
+            return false;
+        }
+
+        return state.isWifiConnected()
                 && state.isBambuConnected()
                 && state.isBambuHealthy();
+    }
+
+    public void suppressOffline(
+            UUID printerId,
+            Duration duration
+    ) {
+        AgentState state =
+                states.computeIfAbsent(
+                        printerId,
+                        id -> new AgentState()
+                );
+
+        state.setSuppressOfflineUntil(
+                Instant.now().plus(duration)
+        );
+    }
+
+    public void clearOfflineSuppression(
+            UUID printerId
+    ) {
+        AgentState state = states.get(printerId);
+
+        if (state == null) {
+            return;
+        }
+
+        state.setSuppressOfflineUntil(null);
+    }
+
+    public boolean isOfflineSuppressed(
+            UUID printerId
+    ) {
+        AgentState state = states.get(printerId);
+
+        if (state == null) {
+            return false;
+        }
+
+        Instant suppressUntil =
+                state.getSuppressOfflineUntil();
+
+        return suppressUntil != null
+                && suppressUntil.isAfter(
+                Instant.now()
+        );
+    }
+
+    public void recordActivity(UUID printerId) {
+        AgentState state =
+                states.computeIfAbsent(
+                        printerId,
+                        id -> new AgentState()
+                );
+
+        state.setLastHeartbeat(Instant.now());
     }
 
     @Data
@@ -58,6 +125,7 @@ public class AgentStateService {
         private boolean cameraHealthy;
         private boolean edolConnected;
         private Instant lastHeartbeat;
+        private Instant suppressOfflineUntil;
     }
 
 }

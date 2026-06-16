@@ -67,11 +67,13 @@ public class PrinterEventListener {
     @EventListener
     public void handlePrinterEvent(PrinterEvent event) {
         UUID printerId = event.getPrinterId();
+        PrinterState printerState = printerStateService.getState(printerId);
 
         logContextFactory
-                .printer(
+                .session(
                         log.atInfo(),
-                        printerId
+                        printerId,
+                        printerState.getSessionId()
                 )
                 .log(
                         "PRINTER EVENT: {}", event.getType()

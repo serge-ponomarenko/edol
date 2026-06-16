@@ -5,9 +5,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.model.dto.AgentEventDto;
 import org.spon.edolcore.service.LogContextFactory;
+import org.spon.edolcore.service.agent.AgentStateService;
 import org.spon.edolcore.service.model.transfer.ModelTransferWorkflowService;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.UUID;
 
 @Service
@@ -18,6 +20,7 @@ public class AgentEventConsumer {
     private final ModelTransferWorkflowService modelTransferWorkflowService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final LogContextFactory logContextFactory;
+    private final AgentStateService agentStateService;
 
     public void consume(UUID printerId, String payload) {
         try {
@@ -28,21 +31,40 @@ public class AgentEventConsumer {
                     );
 
             switch (event.getType()) {
-                case MODEL_UPLOAD_STARTED -> modelTransferWorkflowService.onUploadStarted(
-                        printerId,
-                        event.getFileName()
-                );
+                case MODEL_UPLOAD_STARTED -> {
+                    agentStateService.suppressOffline(
+                            printerId,
+                            Duration.ofMinutes(5)
+                    );
 
-                case MODEL_UPLOAD_COMPLETED -> modelTransferWorkflowService.onUploadCompleted(
-                        printerId,
-                        event.getFileName()
-                );
+                    modelTransferWorkflowService.onUploadStarted(
+                            printerId,
+                            event.getFileName()
+                    );
+                }
 
-                case MODEL_UPLOAD_FAILED -> modelTransferWorkflowService.onUploadFailed(
-                        printerId,
-                        event.getFileName(),
-                        event.getReason()
-                );
+                case MODEL_UPLOAD_COMPLETED -> {
+                    agentStateService.clearOfflineSuppression(
+                            printerId
+                    );
+
+                    modelTransferWorkflowService.onUploadCompleted(
+                            printerId,
+                            event.getFileName()
+                    );
+                }
+
+                case MODEL_UPLOAD_FAILED -> {
+                    agentStateService.clearOfflineSuppression(
+                            printerId
+                    );
+
+                    modelTransferWorkflowService.onUploadFailed(
+                            printerId,
+                            event.getFileName(),
+                            event.getReason()
+                    );
+                }
             }
 
         } catch (Exception e) {

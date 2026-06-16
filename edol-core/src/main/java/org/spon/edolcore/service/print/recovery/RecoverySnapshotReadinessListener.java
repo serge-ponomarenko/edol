@@ -31,7 +31,7 @@ public class RecoverySnapshotReadinessListener {
 
         logContextFactory
                 .printer(
-                        log.atInfo(),
+                        log.atDebug(),
                         printerId
                 )
                 .log(
@@ -41,7 +41,7 @@ public class RecoverySnapshotReadinessListener {
 
         logContextFactory
                 .printer(
-                        log.atInfo(),
+                        log.atDebug(),
                         printerId
                 )
                 .log(

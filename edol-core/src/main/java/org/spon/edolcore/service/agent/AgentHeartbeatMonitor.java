@@ -21,17 +21,16 @@ public class AgentHeartbeatMonitor {
     @Scheduled(fixedDelay = 10000, initialDelay = 4000)
     public void monitor() {
         for (Printer printer : printerService.getEnabledPrinters()) {
+            if (printer.getConnectionMode() == PrinterConnectionMode.AGENT) {
+                UUID printerId = printer.getId();
 
-            if (printer.getConnectionMode() != PrinterConnectionMode.AGENT) {
-                continue;
-            }
-
-            UUID printerId = printer.getId();
-
-            if (agentStateService.isOnline(printerId)) {
-                connectivityStateService.setConnected(printerId);
-            } else {
-                connectivityStateService.setDisconnected(printerId);
+                if (!agentStateService.isOfflineSuppressed(printerId)) {
+                    if (agentStateService.isOnline(printerId)) {
+                        connectivityStateService.setConnected(printerId);
+                    } else {
+                        connectivityStateService.setDisconnected(printerId);
+                    }
+                }
             }
         }
     }
