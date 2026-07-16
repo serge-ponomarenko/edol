@@ -1,7 +1,6 @@
 package org.spon.edolcore.service;
 
 
-
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +38,6 @@ public class PrinterStateService {
     private static final String FIELD_NOZZLE_TARGET_TEMPER = "nozzle_target_temper";
     private static final String FIELD_BED_TEMPER = "bed_temper";
     private static final String FIELD_BED_TARGET_TEMPER = "bed_target_temper";
-    private static final String FIELD_GCODE_FILE = "gcode_file";
     private static final String FIELD_SUBTASK_NAME = "subtask_name";
     private static final String FIELD_WIFI_SIGNAL = "wifi_signal";
     private static final String FIELD_SPD_MAG = "spd_mag";
@@ -278,11 +276,10 @@ public class PrinterStateService {
         if (print.has(FIELD_BED_TARGET_TEMPER))
             state.setBedTargetTemp(print.get(FIELD_BED_TARGET_TEMPER).asDouble());
 
-        if (print.has(FIELD_GCODE_FILE))
-            state.setCurrentFile(print.get(FIELD_GCODE_FILE).asText());
-
-        if (print.has(FIELD_SUBTASK_NAME))
+        if (print.has(FIELD_SUBTASK_NAME)) {
             state.setCurrentTask(print.get(FIELD_SUBTASK_NAME).asText());
+            state.setCurrentFile(print.get(FIELD_SUBTASK_NAME).asText() + ".gcode.3mf");
+        }
 
         if (print.has(FIELD_WIFI_SIGNAL))
             state.setWifiSignal(print.get(FIELD_WIFI_SIGNAL).asText());
