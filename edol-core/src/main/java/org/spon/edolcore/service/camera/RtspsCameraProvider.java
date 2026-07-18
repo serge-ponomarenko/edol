@@ -25,7 +25,7 @@ class RtspsCameraProvider implements CameraProvider {
 
     private static final int RTSP_PORT = 322;
 
-    @Value("${bambu.host}")
+    @Value("${bambu.camera-url}")
     private String bambuHost;
     @Value("${bambu.access-code}")
     private String accessCode;
