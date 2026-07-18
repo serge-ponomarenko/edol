@@ -1,6 +1,7 @@
 package org.spon.edolcore.service.camera;
 
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -8,19 +9,14 @@ import org.springframework.stereotype.Service;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class CameraBackgroundService {
 
-    private final CameraService cameraService;
+    private final CameraProvider cameraProvider;
     private final CameraSnapshotStore store;
 
     @Value("${edol.printer.connection-mode}")
     private String connectionMode;
-
-    public CameraBackgroundService(CameraService cameraService,
-                                   CameraSnapshotStore store) {
-        this.cameraService = cameraService;
-        this.store = store;
-    }
 
     @PostConstruct
     public void init() {
@@ -38,7 +34,7 @@ public class CameraBackgroundService {
         }
 
         try {
-            byte[] image = cameraService.captureImage();
+            byte[] image = cameraProvider.capture();
 
             if (image != null && image.length > 0) {
                 store.store(image);

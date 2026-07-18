@@ -2,6 +2,7 @@ package org.spon.edolcore.service.camera;
 
 import org.spon.edolcore.util.SslUtil;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import javax.net.ssl.SSLParameters;
@@ -15,7 +16,12 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
 @Service
-public class CameraService {
+@ConditionalOnProperty(
+        value = "edol.printer.camera-provider",
+        havingValue = "LEGACY",
+        matchIfMissing = true
+)
+public class LegacyCameraProvider implements CameraProvider {
 
     @Value("${bambu.camera-url}")
     private String ip;
@@ -25,7 +31,12 @@ public class CameraService {
 
     private static final int PORT = 6000;
 
-    public byte[] captureImage() throws Exception {
+    @Override
+    public boolean supports() {
+        return true;
+    }
+
+    public byte[] capture() throws Exception {
         SSLSocketFactory factory = SslUtil.createTrustAllSocketFactory();
 
         try (SSLSocket socket = (SSLSocket) factory.createSocket(ip, PORT)) {

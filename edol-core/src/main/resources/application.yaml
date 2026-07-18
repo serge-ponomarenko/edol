@@ -26,6 +26,7 @@ app:
 edol:
   printer:
     connection-mode: ${CONNECTION_MODE:"DIRECT"}        # DIRECT or AGENT
+    camera-provider: ${CAMERA_PROVIDER:"LEGACY"}        # LEGACY or RTSPS
   agent:
     id: agent-dev
 

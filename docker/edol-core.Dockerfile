@@ -29,7 +29,9 @@ FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends \
+        ffmpeg \
+        curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
