@@ -10,29 +10,32 @@ public final class PrinterCommandPayloadFactory {
     private static final String PAUSE_PAYLOAD = """
             {
               "print": {
-                "command": "pause"
+                "command": "pause",
+                "sequence_id": "0"
               }
             }
             """;
     private static final String RESUME_PAYLOAD = """
             {
               "print": {
-                "command": "resume"
+                "command": "resume",
+                "sequence_id": "0"
               }
             }
             """;
     private static final String STOP_PAYLOAD = """
             {
               "print": {
-                "command": "stop"
+                "command": "stop",
+                "sequence_id": "0"
               }
             }
             """;
     private static final String PUSH_ALL_PAYLOAD = """
             {
                 "pushing": {
-                    "sequence_id": "0",
                     "command": "pushall",
+                    "sequence_id": "0",
                     "version": 1,
                     "push_target": 1
                 }
@@ -42,6 +45,7 @@ public final class PrinterCommandPayloadFactory {
             {
                 "print": {
                     "command": "skip_objects",
+                    "sequence_id": "0",
                     "timestamp": %d,
                     "obj_list": [
                         %s
@@ -53,6 +57,7 @@ public final class PrinterCommandPayloadFactory {
             {
                 "print": {
                     "command": "ams_filament_setting",
+                    "sequence_id": "0",
                     "ams_id": %d,
                     "tray_id": %d,
                     "tray_info_idx": "%s",
