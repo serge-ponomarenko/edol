@@ -43,33 +43,5 @@ jobs:
 
             cd docker
             docker compose down || true
-            
-            # ===== BACKUP DATABASE =====
-            echo "Creating deployment backup..."
-  
-            DB_DIR="../../db-files"
-            BACKUP_DIR="../../db-files/backups"
-            
-            mkdir -p "$BACKUP_DIR"
-            
-            TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-            DB_FILE="$DB_DIR/edol-hub-db.mv.db"
-            
-            if [ -f "$DB_FILE" ]; then
-            BACKUP_FILE="$BACKUP_DIR/edol-hub-db_$TIMESTAMP.mv.db"
-          
-            echo "Creating database backup:"
-            echo "$BACKUP_FILE"
-          
-            cp "$DB_FILE" "$BACKUP_FILE"
-            else
-            echo "Database file not found. Skipping backup."
-            fi
-            
-            # Remove old backups, keep latest 20
-            ls -1t "$BACKUP_DIR"/edol-hub-db_*.mv.db | tail -n +21 | xargs -r rm --
-            
-            echo "Backup completed."
-            # ==========================
-  
+
             docker compose up --build -d

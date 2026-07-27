@@ -30,7 +30,6 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable) // disable for simplicity
                 .authorizeHttpRequests(auth -> auth
                                 .requestMatchers(
-                                        "/h2-console/**",
                                         "/actuator/health"
                                 ).permitAll()
                                 .anyRequest()
@@ -38,9 +37,6 @@ public class SecurityConfig {
                         //.authenticated()
                 )
                 .httpBasic(withDefaults());
-
-        // Required for H2 console
-        http.headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable));
 
         return http.build();
     }

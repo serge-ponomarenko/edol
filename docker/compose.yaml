@@ -18,7 +18,6 @@ services:
     ports:
       - "8091:8080"
     volumes:
-      - ../../db-files:/app/db-files
       - ../../models:/app/models
       - ../../camera_snapshots:/app/camera_snapshots
       - ../../logs:/app/logs
@@ -34,12 +33,13 @@ services:
     env_file:
       - ../../.env_edol_hub
     depends_on:
+      postgres:
+        condition: service_healthy
       mqtt:
         condition: service_healthy
     ports:
       - "8090:8090"
     volumes:
-      - ../../db-files:/app/db-files
       - ../../logs:/app/logs
     restart: unless-stopped
 
