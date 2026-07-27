@@ -14,8 +14,8 @@ public class MaintenanceExecution {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "maintenance_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "maintenance_id", nullable = false)
     private MaintenanceDefinition maintenance;
 
     private LocalDateTime executedAt;

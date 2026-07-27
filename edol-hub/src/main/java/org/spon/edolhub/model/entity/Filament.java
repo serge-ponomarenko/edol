@@ -19,14 +19,14 @@ public class Filament {
     // Example: JAMG HE PETG Basic - comes from Printer
     private String fullId;
 
-    @ManyToOne
-    @JoinColumn(name = "vendor_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "vendor_id", nullable = false)
     private Vendor vendor;
 
     private String printerFilamentProfileId;
 
-    @ManyToOne
-    @JoinColumn(name = "material_type_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "material_type_id", nullable = false)
     private MaterialType materialType;
 
     // Example: Basic, Matte, Silk

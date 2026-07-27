@@ -68,7 +68,6 @@ public class PrintJob {
     @Column
     private Integer remainingTime;
 
-    @Lob
     @Column(name = "plate_image")
     private byte[] plateImage;
 

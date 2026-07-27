@@ -15,8 +15,17 @@ spring:
     hibernate:
       ddl-auto: validate
 
+    properties:
+      hibernate:
+        default_schema: core
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
   flyway:
     enabled: true
+    schemas:
+      - core
+    default-schema: core
+    create-schemas: true
 
 app:
   zone-id: Europe/Kiev
