@@ -7,15 +7,13 @@ logging:
 spring:
 
   datasource:
-    url: jdbc:h2:file:./db-files/edol-core-db;AUTO_SERVER=TRUE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
 
   jpa:
     hibernate:
       ddl-auto: validate
-    open-in-view: false
 
   flyway:
     enabled: true

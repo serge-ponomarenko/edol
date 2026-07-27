@@ -11,6 +11,8 @@ services:
     env_file:
       - ../../.env_edol_core
     depends_on:
+      postgres:
+        condition: service_healthy
       mqtt:
         condition: service_healthy
     ports:
@@ -85,3 +87,38 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+
+  postgres:
+    image: postgres:17
+    container_name: edol-postgres
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: Europe/Kyiv
+
+    env_file:
+      - ../../.env
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - ../../postgres:/var/lib/postgresql/data
+
+    restart: unless-stopped
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  default:
+    name: edol-network
