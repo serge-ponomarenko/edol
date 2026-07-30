@@ -23,10 +23,6 @@ public class RecoverySnapshotValidator {
             return "Printer is not in recoverable state";
         }
 
-        if (!hasCurrentFile(state)) {
-            return "Missing currentFile";
-        }
-
         if (!hasCurrentTask(state)) {
             return "Missing currentTask";
         }
@@ -71,11 +67,6 @@ public class RecoverySnapshotValidator {
             case "PREPARE", "RUNNING", "PAUSE" -> true;
             default -> false;
         };
-    }
-
-    private boolean hasCurrentFile(PrinterState state) {
-        return state.getCurrentFile() != null
-                && !state.getCurrentFile().isBlank();
     }
 
     private boolean hasCurrentTask(PrinterState state) {

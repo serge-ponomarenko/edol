@@ -63,7 +63,7 @@ public class ActivePrintContextService {
         ActivePrintContextEntity entity = new ActivePrintContextEntity();
 
         entity.setSessionId(context.getSessionId());
-        entity.setGcodeFile(context.getGcodeFile());
+        entity.setGcodeFile(context.getFileName());
         entity.setSubtaskName(context.getSubtaskName());
         entity.setTotalLayers(context.getTotalLayers());
 
@@ -83,7 +83,7 @@ public class ActivePrintContextService {
     private ActivePrintContext toDomain(ActivePrintContextEntity entity) {
         return ActivePrintContext.builder()
                 .sessionId(entity.getSessionId())
-                .gcodeFile(entity.getGcodeFile())
+                .fileName(entity.getGcodeFile())
                 .subtaskName(entity.getSubtaskName())
                 .totalLayers(entity.getTotalLayers())
                 .savedLayer(entity.getSavedLayer())

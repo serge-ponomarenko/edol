@@ -12,7 +12,7 @@ public class ActivePrintContext {
 
     private UUID sessionId;
 
-    private String gcodeFile;
+    private String fileName;
     private String subtaskName;
 
     private Integer totalLayers;

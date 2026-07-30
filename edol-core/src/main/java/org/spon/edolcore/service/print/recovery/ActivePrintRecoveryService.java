@@ -45,7 +45,6 @@ public class ActivePrintRecoveryService {
                         Recovery comparison
                         
                         Persisted:
-                          file={}
                           task={}
                           layers={}
                           layer={}
@@ -53,21 +52,18 @@ public class ActivePrintRecoveryService {
                           fingerprint={}
                         
                         Current:
-                          file={}
                           task={}
                           layers={}
                           layer={}
                           progress={}
                           fingerprint={}
                         """,
-                context.getGcodeFile(),
                 context.getSubtaskName(),
                 context.getTotalLayers(),
                 context.getSavedLayer(),
                 context.getSavedProgress(),
                 context.getSpoolFingerprint(),
 
-                state.getCurrentFile(),
                 state.getCurrentTask(),
                 state.getTotalLayers(),
                 state.getLayer(),
@@ -101,7 +97,7 @@ public class ActivePrintRecoveryService {
         );
 
         metadataRecoveryService.recoverMetadata(
-                context.getGcodeFile()
+                context.getFileName()
         );
 
         cameraSnapshotStore.setCurrentSessionId(
@@ -128,18 +124,6 @@ public class ActivePrintRecoveryService {
             ActivePrintContext context,
             PrinterState state
     ) {
-        if (safeNotEquals(
-                context.getGcodeFile(),
-                state.getCurrentFile()
-        )) {
-            log.warn(
-                    "Recovery mismatch: gcodeFile persisted='{}', current='{}'",
-                    context.getGcodeFile(),
-                    state.getCurrentFile()
-            );
-            return false;
-        }
-
         if (safeNotEquals(
                 context.getSubtaskName(),
                 state.getCurrentTask()

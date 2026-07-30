@@ -24,6 +24,7 @@ import java.util.List;
 @Service
 public class PrinterStateService {
 
+    private static final String FIELD_COMMAND_NAME = "command";
     private static final String FIELD_GCODE_STATE = "gcode_state";
     private static final String FIELD_MC_PERCENT = "mc_percent";
     private static final String FIELD_LAYER_NUM = "layer_num";
@@ -39,6 +40,7 @@ public class PrinterStateService {
     private static final String FIELD_BED_TEMPER = "bed_temper";
     private static final String FIELD_BED_TARGET_TEMPER = "bed_target_temper";
     private static final String FIELD_SUBTASK_NAME = "subtask_name";
+    private static final String FIELD_FILE_NAME = "file";
     private static final String FIELD_WIFI_SIGNAL = "wifi_signal";
     private static final String FIELD_SPD_MAG = "spd_mag";
     private static final String FIELD_TRAY_NOW = "tray_now";
@@ -54,6 +56,8 @@ public class PrinterStateService {
     private static final String FIELD_HUMIDITY_RAW = "humidity_raw";
     private static final String FIELD_AMS_TRAY = "tray";
     private static final String FIELD_AMS_LIST = "ams";
+
+    private static final String PROJECT_FILE = "project_file";
 
     private static final String STATE_IDLE = "IDLE";
     private static final String STATE_FINISH = "FINISH";
@@ -258,6 +262,26 @@ public class PrinterStateService {
     }
 
     private void updateScalarFields(JsonNode print) {
+        if (
+                print.has(FIELD_COMMAND_NAME)
+                        && print.get(FIELD_COMMAND_NAME).asText().equals(PROJECT_FILE)
+                        && print.has(FIELD_FILE_NAME)
+        ) {
+            state.setCurrentFile(print.get(FIELD_FILE_NAME).asText());
+        }
+
+        if (
+                STATE_RUNNING.equals(state.getGcodeState())
+                        && (state.getCurrentFile() == null || state.getCurrentFile().isEmpty())
+                        && print.has(FIELD_SUBTASK_NAME)
+        ) {
+            state.setCurrentFile(print.get(FIELD_SUBTASK_NAME).asText() + ".gcode.3mf");
+        }
+
+        if (print.has(FIELD_SUBTASK_NAME)) {
+            state.setCurrentTask(print.get(FIELD_SUBTASK_NAME).asText());
+        }
+
         if (print.has(FIELD_TOTAL_LAYER_NUM))
             state.setTotalLayers(print.get(FIELD_TOTAL_LAYER_NUM).asInt());
 
@@ -275,11 +299,6 @@ public class PrinterStateService {
 
         if (print.has(FIELD_BED_TARGET_TEMPER))
             state.setBedTargetTemp(print.get(FIELD_BED_TARGET_TEMPER).asDouble());
-
-        if (print.has(FIELD_SUBTASK_NAME)) {
-            state.setCurrentTask(print.get(FIELD_SUBTASK_NAME).asText());
-            state.setCurrentFile(print.get(FIELD_SUBTASK_NAME).asText() + ".gcode.3mf");
-        }
 
         if (print.has(FIELD_WIFI_SIGNAL))
             state.setWifiSignal(print.get(FIELD_WIFI_SIGNAL).asText());

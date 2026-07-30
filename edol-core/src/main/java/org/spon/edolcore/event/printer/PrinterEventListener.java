@@ -134,7 +134,7 @@ public class PrinterEventListener {
         activePrintContextService.save(
                 ActivePrintContext.builder()
                         .sessionId(UUID.fromString(sessionId))
-                        .gcodeFile(state.getCurrentFile())
+                        .fileName(state.getCurrentFile())
                         .subtaskName(state.getCurrentTask())
                         .totalLayers(state.getTotalLayers())
                         .savedLayer(state.getLayer())
