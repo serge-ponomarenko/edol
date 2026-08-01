@@ -122,6 +122,13 @@ public class FilamentSpoolController {
         }
 
         if (spool.getId() != null) {
+            filamentSpoolRepository.findById(spool.getId()).ifPresent(oldSpool -> {
+                if (oldSpool.getStatus() == FilamentSpool.FilamentSpoolStatus.SEALED
+                        && spool.getStatus() == FilamentSpool.FilamentSpoolStatus.ACTIVE
+                        && spool.getOpenedAt() == null) {
+                    spool.setOpenedAt(LocalDateTime.now());
+                }
+            });
             filamentSpoolRepository.save(spool);
         } else {
             for (int i = 0; i < quantity; i++) {
@@ -147,9 +154,9 @@ public class FilamentSpoolController {
         copy.setStoreUrl(spool.getStoreUrl());
 
         copy.setPurchasedAt(spool.getPurchasedAt());
-        copy.setOpenedAt(spool.getOpenedAt());
-        copy.setLastUsedAt(spool.getLastUsedAt());
-        copy.setLastDriedAt(spool.getLastDriedAt());
+        //copy.setOpenedAt(spool.getOpenedAt());
+        //copy.setLastUsedAt(spool.getLastUsedAt());
+        //copy.setLastDriedAt(spool.getLastDriedAt());
 
         copy.setStatus(spool.getStatus());
 

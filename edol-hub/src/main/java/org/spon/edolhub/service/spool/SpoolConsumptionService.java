@@ -56,8 +56,10 @@ public class SpoolConsumptionService {
                 spool.setStatus(
                         FilamentSpool.FilamentSpoolStatus.EMPTY
                 );
-
             } else {
+                if (spool.getStatus() == FilamentSpool.FilamentSpoolStatus.SEALED) {
+                    spool.setOpenedAt(LocalDateTime.now());
+                }
                 spool.setStatus(
                         FilamentSpool.FilamentSpoolStatus.ACTIVE
                 );

@@ -13,12 +13,14 @@ public class OldestOpenedSpoolResolutionStrategy
 
     @Override
     public Comparator<FilamentSpool> comparator() {
-        return Comparator.comparing(
-                FilamentSpool::getOpenedAt,
-                Comparator.nullsLast(
-                        Comparator.naturalOrder()
+        return Comparator
+                .comparing(
+                        FilamentSpool::getOpenedAt,
+                        Comparator.nullsLast(
+                                Comparator.naturalOrder()
+                        )
                 )
-        );
+                .thenComparing(FilamentSpool::getId);
     }
 
 }
