@@ -8,21 +8,17 @@ spring:
   threads:
     virtual:
       enabled: true
-
   datasource:
     url: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
-
   jpa:
     hibernate:
       ddl-auto: validate
-
     properties:
       hibernate:
         default_schema: core
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
   flyway:
     enabled: true
     schemas:
@@ -33,13 +29,6 @@ spring:
 app:
   zone-id: Europe/Kiev
 
-edol:
-  printer:
-    connection-mode: ${CONNECTION_MODE:"DIRECT"}        # DIRECT or AGENT
-    camera-provider: ${CAMERA_PROVIDER:"LEGACY"}        # LEGACY or RTSPS
-  agent:
-    id: ${AGENT_ID:"agent-dev"}
-
 mqttServer:
   url: tcp://mqtt:1883
 
@@ -49,12 +38,6 @@ bot:
 
 bambu:
   client-id: edol-core
-  host: ${BAMBU_CONNECT_URL}
-  ftp-url: ${BAMBU_FTP_URL}
-  model-directory: ${BAMBU_MODEL_DIRECTORY:""}   # In some cases it's root and in some cases it is "cache"
-  camera-url: ${CAMERA_URL}
-  serial: ${BAMBU_SERIAL}
-  access-code: ${BAMBU_ACCESS_CODE}
   connection-timeout: 5  # seconds
   show-raw-mqtt: ${BAMBU_SHOW_RAW_MQTT:false}
 

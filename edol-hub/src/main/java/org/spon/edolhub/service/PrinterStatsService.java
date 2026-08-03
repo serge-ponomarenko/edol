@@ -1,11 +1,11 @@
 package org.spon.edolhub.service;
 
 import jakarta.annotation.PostConstruct;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.entity.PrinterStats;
 import org.spon.edolhub.repository.PrinterStatsRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 

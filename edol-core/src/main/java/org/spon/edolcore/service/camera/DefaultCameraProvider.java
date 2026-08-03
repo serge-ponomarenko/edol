@@ -2,7 +2,8 @@ package org.spon.edolcore.service.camera;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.persistence.printer.Printer;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.persistence.printer.PrinterCameraProvider;
+import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -15,8 +16,9 @@ import java.util.UUID;
 public class DefaultCameraProvider
         implements CameraProvider {
 
-    private final PrinterService printerService;
-    private final DirectCameraProvider directCameraProvider;
+    private final PrinterManagementService printerManagementService;
+    private final LegacyCameraProvider legacyCameraProvider;
+    private final RtspsCameraProvider rtspsCameraProvider;
     private final AgentCameraProvider agentCameraProvider;
 
     @Override
@@ -35,12 +37,18 @@ public class DefaultCameraProvider
             UUID printerId
     ) {
         Printer printer =
-                printerService.getPrinter(printerId);
+                printerManagementService.getPrinter(printerId);
 
         return switch (
                 printer.getConnectionMode()
                 ) {
-            case DIRECT -> directCameraProvider;
+            case DIRECT -> {
+                if (printer.getCameraProvider() == PrinterCameraProvider.LEGACY) {
+                    yield legacyCameraProvider;
+                } else {
+                    yield rtspsCameraProvider;
+                }
+            }
             case AGENT -> agentCameraProvider;
         };
     }

@@ -1,6 +1,5 @@
 package org.spon.edolhub.service;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.dto.MaintenanceStatusDto;
 import org.spon.edolhub.model.entity.MaintenanceDefinition;
@@ -8,6 +7,7 @@ import org.spon.edolhub.model.entity.MaintenanceExecution;
 import org.spon.edolhub.repository.MaintenanceDefinitionRepository;
 import org.spon.edolhub.repository.MaintenanceExecutionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;

@@ -1,12 +1,12 @@
 package org.spon.edolhub.service.spool;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.model.entity.JobSpoolUsage;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;

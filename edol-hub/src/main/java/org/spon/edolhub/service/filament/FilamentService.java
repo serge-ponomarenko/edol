@@ -1,6 +1,5 @@
 package org.spon.edolhub.service.filament;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolhub.model.entity.Filament;
@@ -11,6 +10,7 @@ import org.spon.edolhub.repository.MaterialTypeRepository;
 import org.spon.edolhub.repository.VendorRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.Optional;

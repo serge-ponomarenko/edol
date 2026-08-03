@@ -1,10 +1,10 @@
 package org.spon.edolcore.service.print;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.persistence.print.ActivePrintContextEntity;
 import org.spon.edolcore.persistence.print.ActivePrintContextRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Optional;

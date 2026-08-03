@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.persistence.printer.PrinterConnectionMode;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityStateService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,7 +20,7 @@ import java.util.UUID;
 public class BambuTelemetryConsumer {
 
     private final PrinterStateService stateService;
-    private final PrinterService printerService;
+    private final PrinterManagementService printerManagementService;
     private final ObjectMapper mapper = new ObjectMapper();
     private final LogContextFactory logContextFactory;
     private final PrinterConnectivityStateService printerConnectivityStateService;
@@ -37,7 +37,7 @@ public class BambuTelemetryConsumer {
         try {
             JsonNode root = mapper.readTree(payload);
 
-            PrinterConnectionMode connectionMode = printerService
+            PrinterConnectionMode connectionMode = printerManagementService
                     .getPrinter(printerId)
                     .getConnectionMode();
 

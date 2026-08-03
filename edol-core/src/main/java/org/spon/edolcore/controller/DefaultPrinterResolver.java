@@ -1,7 +1,7 @@
 package org.spon.edolcore.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -10,10 +10,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DefaultPrinterResolver {
 
-    private final PrinterService printerService;
+    private final PrinterManagementService printerManagementService;
 
     public UUID resolve() {
-        return printerService
+        return printerManagementService
                 .getDefaultPrinter()
                 .getId();
     }

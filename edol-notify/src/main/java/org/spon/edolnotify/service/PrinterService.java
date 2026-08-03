@@ -15,7 +15,7 @@ public class PrinterService {
 
     public PrinterState getState() {
         return edolCoreClient.get()
-                .uri("/printer/state")
+                .uri("/api/printers/state-default")
                 .retrieve()
                 .body(PrinterState.class);
     }
@@ -29,36 +29,36 @@ public class PrinterService {
 
     public void sendStopCommand() {
         edolCoreClient.post()
-                .uri("/printer/request/stop")
+                .uri("/api/request/stop")
                 .retrieve()
-                .toBodilessEntity();;
+                .toBodilessEntity();
     }
 
     public void sendResumeCommand() {
         edolCoreClient.post()
-                .uri("/printer/request/resume")
+                .uri("/api/request/resume")
                 .retrieve()
-                .toBodilessEntity();;
+                .toBodilessEntity();
     }
 
     public void sendPauseCommand() {
         edolCoreClient.post()
-                .uri("/printer/request/pause")
+                .uri("/api/request/pause")
                 .retrieve()
-                .toBodilessEntity();;
+                .toBodilessEntity();
     }
 
     public void sendFetchMetadataCommand() {
         edolCoreClient.post()
-                .uri("/printer/request/fetchmetadata")
+                .uri("/api/request/fetchmetadata")
                 .retrieve()
-                .toBodilessEntity();;
+                .toBodilessEntity();
     }
 
     public void sendPushAllCommand() {
         edolCoreClient.post()
-                .uri("/printer/request/pushall")
+                .uri("/api/request/pushall")
                 .retrieve()
-                .toBodilessEntity();;
+                .toBodilessEntity();
     }
 }

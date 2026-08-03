@@ -1,8 +1,7 @@
 package org.spon.edolcore.persistence.printer;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -11,6 +10,9 @@ import java.util.UUID;
 @Table(name = "printers")
 @Getter
 @Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class Printer {
 
     @Id
@@ -36,6 +38,10 @@ public class Printer {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PrinterConnectionMode connectionMode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private PrinterCameraProvider cameraProvider;
 
     @Column(nullable = false)
     private boolean enabled;

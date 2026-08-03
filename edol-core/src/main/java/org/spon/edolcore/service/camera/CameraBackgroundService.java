@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.service.LogContextFactory;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -18,14 +18,14 @@ public class CameraBackgroundService {
 
     private final CameraSnapshotStore store;
     private final DefaultCameraProvider cameraProvider;
-    private final PrinterService printerService;
+    private final PrinterManagementService printerManagementService;
     private final LogContextFactory logContextFactory;
     private final ExecutorService virtualThreadExecutor;
 
     @Scheduled(fixedDelay = 15000)
     public void capture() {
         for (Printer printer :
-                printerService.getEnabledPrinters()) {
+                printerManagementService.getEnabledPrinters()) {
 
             UUID printerId =
                     printer.getId();

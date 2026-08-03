@@ -1,8 +1,7 @@
 package org.spon.edolcore.persistence.printer;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.util.UUID;
 
@@ -10,6 +9,9 @@ import java.util.UUID;
 @Table(name = "printer_connection_configurations")
 @Getter
 @Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class PrinterConnectionConfiguration {
 
     @Id

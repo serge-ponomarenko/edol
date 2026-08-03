@@ -14,14 +14,16 @@ import org.springframework.stereotype.Component;
 public class PrinterRuntimeBootstrap {
 
     private final PrinterRepository printerRepository;
-    private final PrinterRuntimeRegistry runtimeRegistry;
+    private final PrinterRuntimeLifecycleService runtimeLifecycleService;
     private final LogContextFactory logContextFactory;
 
     @EventListener(ApplicationReadyEvent.class)
     public void bootstrap() {
         printerRepository.findByEnabledTrue()
                 .forEach(printer -> {
-                    runtimeRegistry.create(printer.getId());
+                    runtimeLifecycleService.startRuntime(
+                            printer.getId()
+                    );
 
                     logContextFactory
                             .printer(

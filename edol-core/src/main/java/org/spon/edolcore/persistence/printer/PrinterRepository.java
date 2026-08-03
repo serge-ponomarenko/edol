@@ -16,4 +16,8 @@ public interface PrinterRepository
     Optional<Printer> findFirstByOrderByDisplayIdAsc();
 
     List<Printer> findByEnabledTrue();
+
+    boolean existsBySerialNumber(String serial);
+
+    boolean existsByDisplayId(String displayId);
 }

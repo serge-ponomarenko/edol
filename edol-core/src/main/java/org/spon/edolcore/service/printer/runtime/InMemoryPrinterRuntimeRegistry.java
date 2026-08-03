@@ -2,7 +2,7 @@ package org.spon.edolcore.service.printer.runtime;
 
 import org.springframework.stereotype.Service;
 
-import java.util.Collection;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -28,8 +28,8 @@ public class InMemoryPrinterRuntimeRegistry
     }
 
     @Override
-    public Collection<PrinterRuntimeContext> getAll() {
-        return contexts.values();
+    public Map<UUID, PrinterRuntimeContext> getAll() {
+        return contexts;
     }
 
     @Override

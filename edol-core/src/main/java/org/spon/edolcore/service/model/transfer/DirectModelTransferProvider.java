@@ -6,11 +6,11 @@ import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.event.model.ModelAvailableEvent;
 import org.spon.edolcore.exception.ModelNotLoadedException;
 import org.spon.edolcore.exception.ModelTransferException;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.printer.ftps.CurlFtpsClient;
 import org.spon.edolcore.service.printer.ftps.FtpsConnection;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +24,7 @@ import java.util.UUID;
 public class DirectModelTransferProvider implements ModelTransferProvider {
 
     private final PrinterStateService printerStateService;
+    private final PrinterConnectionConfigurationRepository configurationRepository;
     private final CurlFtpsClient curlFtpsClient;
     private final ApplicationEventPublisher applicationEventPublisher;
 
@@ -43,14 +44,23 @@ public class DirectModelTransferProvider implements ModelTransferProvider {
 
             Files.deleteIfExists(localFile);
 
+            PrinterConnectionConfiguration configuration =
+                    configurationRepository
+                            .findByPrinterId(printerId)
+                            .orElseThrow(() ->
+                                    new IllegalStateException(
+                                            "Printer configuration not found: " + printerId
+                                    )
+                            );
+
             FtpsConnection ftpsConnection = new FtpsConnection(
-                    ip,
+                    configuration.getFtpHost(),
                     990,
                     "bblp",
-                    accessCode
+                    configuration.getAccessCode()
             );
 
-            curlFtpsClient.download(ftpsConnection, modelDirectory + "/" + fileName, localFile.toString());
+            curlFtpsClient.download(ftpsConnection, configuration.getModelDirectory() + "/" + fileName, localFile.toString());
 
             applicationEventPublisher.publishEvent(
                     new ModelAvailableEvent(printerId, localFile)

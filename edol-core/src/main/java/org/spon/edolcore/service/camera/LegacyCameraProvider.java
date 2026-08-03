@@ -1,61 +1,71 @@
 package org.spon.edolcore.service.camera;
 
+import lombok.RequiredArgsConstructor;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
 import org.spon.edolcore.util.SslUtil;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.util.UUID;
 
 @Service
-@ConditionalOnProperty(
-        value = "edol.printer.camera-provider",
-        havingValue = "LEGACY",
-        matchIfMissing = true
-)
-public class LegacyCameraProvider implements CameraProvider {
-
-    @Value("${bambu.camera-url}")
-    private String ip;
-
-    @Value("${bambu.access-code}")
-    private String password;
+@RequiredArgsConstructor
+class LegacyCameraProvider implements CameraProvider {
 
     private static final int PORT = 6000;
 
-    @Override
-    public boolean supports() {
-        return true;
-    }
+    private final PrinterConnectionConfigurationRepository configurationRepository;
 
-    public byte[] capture() throws Exception {
+    @Override
+    public byte[] capture(UUID printerId)
+            throws NoSuchAlgorithmException, KeyManagementException, IOException {
         SSLSocketFactory factory = SslUtil.createTrustAllSocketFactory();
 
-        try (SSLSocket socket = (SSLSocket) factory.createSocket(ip, PORT)) {
-            socket.setSSLParameters(new SSLParameters() {{
-                setEndpointIdentificationAlgorithm(null);
-            }});
+        PrinterConnectionConfiguration cfg =
+                configuration(printerId);
+
+        try (SSLSocket socket =
+                     (SSLSocket) factory.createSocket(
+                             cfg.getMqttHost(),
+                             PORT
+                     )) {
+            socket.setSoTimeout(5000); // 5 seconds read timeout to prevent hang
+            SSLParameters sslParameters = new SSLParameters();
+            sslParameters.setEndpointIdentificationAlgorithm(null);
+            socket.setSSLParameters(sslParameters);
 
             socket.startHandshake();
 
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
 
-            sendAuth(out);
+            sendAuth(
+                    out,
+                    cfg.getAccessCode()
+            );
 
             return readFrame(in);
         }
     }
 
-    private void sendAuth(OutputStream out) throws IOException {
+    @Override
+    public boolean supports(UUID printerId) {
+        return true;
+    }
+
+    private void sendAuth(OutputStream out, String accessCode) throws IOException {
         ByteBuffer buf = ByteBuffer.allocate(80);
         buf.order(ByteOrder.LITTLE_ENDIAN);
 
@@ -65,13 +75,17 @@ public class LegacyCameraProvider implements CameraProvider {
         buf.putInt(0);         // reserved
 
         writeFixedString(buf, "bblp", 32);
-        writeFixedString(buf, password, 32);
+        writeFixedString(
+                buf,
+                accessCode,
+                32
+        );
 
         out.write(buf.array());
         out.flush();
     }
 
-    private byte[] readFrame(InputStream in) throws Exception {
+    private byte[] readFrame(InputStream in) throws IOException {
         byte[] header = readFully(in, 16);
 
         ByteBuffer headerBuf =
@@ -79,12 +93,10 @@ public class LegacyCameraProvider implements CameraProvider {
 
         int payloadSize = headerBuf.getInt();
 
-        byte[] jpeg = readFully(in, payloadSize);
-
-        return jpeg;
+        return readFully(in, payloadSize);
     }
 
-    private byte[] readFully(InputStream in, int size) throws Exception {
+    private byte[] readFully(InputStream in, int size) throws IOException {
         byte[] data = new byte[size];
         int offset = 0;
 
@@ -93,7 +105,7 @@ public class LegacyCameraProvider implements CameraProvider {
             int read = in.read(data, offset, size - offset);
 
             if (read == -1)
-                throw new RuntimeException("Stream closed");
+                throw new EOFException("Stream closed");
 
             offset += read;
         }
@@ -111,5 +123,18 @@ public class LegacyCameraProvider implements CameraProvider {
         for (int i = len; i < size; i++) {
             buf.put((byte) 0);
         }
+    }
+
+    private PrinterConnectionConfiguration configuration(
+            UUID printerId
+    ) {
+        return configurationRepository
+                .findByPrinterId(printerId)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Configuration not found for printer "
+                                        + printerId
+                        )
+                );
     }
 }

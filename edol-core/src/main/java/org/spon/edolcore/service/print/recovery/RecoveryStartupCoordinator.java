@@ -6,7 +6,7 @@ import org.spon.edolcore.event.PrinterEventType;
 import org.spon.edolcore.event.recovery.RecoverySnapshotReadyEvent;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
 import org.spon.edolcore.service.printer.runtime.RecoveryRuntimeState;
@@ -25,7 +25,7 @@ public class RecoveryStartupCoordinator {
     private final ActivePrintRecoveryService activePrintRecoveryService;
     private final PrinterCommandGateway printerCommandGateway;
     private final PrinterStateService printerStateService;
-    private final PrinterService printerService;
+    private final PrinterManagementService printerManagementService;
     private final PrinterRuntimeContextProvider printerRuntimeContextProvider;
     private final LogContextFactory logContextFactory;
     private final ExecutorService virtualThreadExecutor;
@@ -67,7 +67,7 @@ public class RecoveryStartupCoordinator {
                             "Starting recovery synchronization"
                     );
             printerCommandGateway.pushAll(
-                    printerService.getPrinter(printerId).getId()
+                    printerManagementService.getPrinter(printerId).getId()
             );
         } catch (Exception e) {
             logContextFactory

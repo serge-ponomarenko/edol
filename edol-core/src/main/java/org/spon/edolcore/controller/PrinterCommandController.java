@@ -3,121 +3,37 @@ package org.spon.edolcore.controller;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.model.dto.SpoolChangeRequestDto;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
 import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
-import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityProvider;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.CacheControl;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @RestController
-@RequestMapping("/printer")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 @Slf4j
-public class PrinterController {
+public class PrinterCommandController {
 
     private final LogContextFactory logContextFactory;
-    ResponseEntity<Map<String, Object>> okResponseEntity =
+
+    private final PrinterStateService printerStateService;
+    private final PrinterCommandGateway printerCommandGateway;
+    private final DefaultPrinterResolver defaultPrinterResolver;
+    private final ModelMetadataWorkflowService modelMetadataWorkflowService;
+
+    private static final ResponseEntity<Map<String, Object>> okResponseEntity =
             ResponseEntity.ok().body(Map.of(
                     "status", "ok"
             ));
 
-    private final PrinterStateService printerStateService;
-    private final PrinterConnectivityProvider connectivityProvider;
-    private final ModelMetadataWorkflowService modelMetadataWorkflowService;
-    private final PrinterCommandGateway printerCommandGateway;
-    private final DefaultPrinterResolver defaultPrinterResolver;
-
-
-    @GetMapping("/state")
-    public PrinterState getState() {
-        return getState(
-                defaultPrinterResolver.resolve()
-        );
-    }
-
-    @GetMapping("/api/printers/{printerId}/state")
-    public PrinterState getState(
-            @PathVariable UUID printerId
-    ) {
-        if (connectivityProvider.isConnected(printerId)) {
-            return printerStateService.getState(printerId);
-        }
-
-        PrinterState printerState = new PrinterState();
-        printerState.setOnline(false);
-
-        return printerState;
-    }
-
-    @GetMapping("/connection")
-    public boolean isConnected() {
-        return isConnected(
-                defaultPrinterResolver.resolve()
-        );
-    }
-
-    @GetMapping("/api/printers/{printerId}/connection")
-    public boolean isConnected(
-            @PathVariable UUID printerId
-    ) {
-        return connectivityProvider.isConnected(printerId);
-    }
-
-    @GetMapping(value = "/modelimage", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<Resource> getModelImage() {
-        return getModelImage(
-                defaultPrinterResolver.resolve()
-        );
-    }
-
-    @GetMapping(
-            value = "/api/printers/{printerId}/modelimage",
-            produces = MediaType.IMAGE_PNG_VALUE
-    )
-    public ResponseEntity<Resource> getModelImage(
-            @PathVariable UUID printerId
-    ) {
-        return getImageResponseEntity(
-                printerId,
-                "plate"
-        );
-    }
-
-    @GetMapping(value = "/modeltopimage", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<Resource> getModelTopImage() {
-        return getModelImage(
-                defaultPrinterResolver.resolve()
-        );
-    }
-
-    @GetMapping(
-            value = "/api/printers/{printerId}/modeltopimage",
-            produces = MediaType.IMAGE_PNG_VALUE
-    )
-    public ResponseEntity<Resource> getModelTopImage(
-            @PathVariable UUID printerId
-    ) {
-        return getImageResponseEntity(
-                printerId,
-                "top"
-        );
-    }
-
+    @Deprecated(forRemoval = true)
     @PostMapping("/request/skip-objects")
     public ResponseEntity<Map<String, Object>> skipObjects(@RequestBody SkipObjectsRequest request) {
         return skipObjects(
@@ -126,7 +42,7 @@ public class PrinterController {
         );
     }
 
-    @PostMapping("/api/printers/{printerId}/request/skip-objects")
+    @PostMapping("/printers/{printerId}/commands/skip-objects")
     public ResponseEntity<Map<String, Object>> skipObjects(
             @PathVariable UUID printerId,
             @RequestBody SkipObjectsRequest request
@@ -156,6 +72,7 @@ public class PrinterController {
         return okResponseEntity;
     }
 
+    @Deprecated(forRemoval = true)
     @PostMapping("/request/spool-change")
     public ResponseEntity<Map<String, Object>> spoolChange(@RequestBody SpoolChangeRequestDto request) {
         return spoolChange(
@@ -164,7 +81,7 @@ public class PrinterController {
         );
     }
 
-    @PostMapping("/api/printers/{printerId}/request/spool-change")
+    @PostMapping("/printers/{printerId}/commands/spool-change")
     public ResponseEntity<Map<String, Object>> spoolChange(
             @PathVariable UUID printerId,
             @RequestBody SpoolChangeRequestDto request
@@ -186,15 +103,16 @@ public class PrinterController {
         return okResponseEntity;
     }
 
+    @Deprecated(forRemoval = true)
     @PostMapping("/request/pause")
-    public ResponseEntity<Map<String, Object>> pausePrint() {
-        return pausePrint(
+    public ResponseEntity<Map<String, Object>> pause() {
+        return pause(
                 defaultPrinterResolver.resolve()
         );
     }
 
-    @PostMapping("/api/printers/{printerId}/request/pause")
-    public ResponseEntity<Map<String, Object>> pausePrint(
+    @PostMapping("/printers/{printerId}/commands/pause")
+    public ResponseEntity<Map<String, Object>> pause(
             @PathVariable UUID printerId
     ) {
         printerCommandGateway.pause(printerId);
@@ -211,15 +129,16 @@ public class PrinterController {
         return okResponseEntity;
     }
 
+    @Deprecated(forRemoval = true)
     @PostMapping("/request/resume")
-    public ResponseEntity<Map<String, Object>> resumePrint() {
-        return resumePrint(
+    public ResponseEntity<Map<String, Object>> resume() {
+        return resume(
                 defaultPrinterResolver.resolve()
         );
     }
 
-    @PostMapping("/api/printers/{printerId}/request/resume")
-    public ResponseEntity<Map<String, Object>> resumePrint(
+    @PostMapping("/printers/{printerId}/commands/resume")
+    public ResponseEntity<Map<String, Object>> resume(
             @PathVariable UUID printerId
     ) {
         printerCommandGateway.resume(printerId);
@@ -236,15 +155,16 @@ public class PrinterController {
         return okResponseEntity;
     }
 
+    @Deprecated(forRemoval = true)
     @PostMapping("/request/stop")
-    public ResponseEntity<Map<String, Object>> stopPrint() {
-        return stopPrint(
+    public ResponseEntity<Map<String, Object>> stop() {
+        return stop(
                 defaultPrinterResolver.resolve()
         );
     }
 
-    @PostMapping("/api/printers/{printerId}/request/stop")
-    public ResponseEntity<Map<String, Object>> stopPrint(
+    @PostMapping("/printers/{printerId}/commands/stop")
+    public ResponseEntity<Map<String, Object>> stop(
             @PathVariable UUID printerId
     ) {
         printerCommandGateway.stop(printerId);
@@ -261,6 +181,7 @@ public class PrinterController {
         return okResponseEntity;
     }
 
+    @Deprecated(forRemoval = true)
     @PostMapping("/request/pushall")
     public ResponseEntity<Map<String, Object>> pushAll() {
         return pushAll(
@@ -268,7 +189,7 @@ public class PrinterController {
         );
     }
 
-    @PostMapping("/api/printers/{printerId}/request/pushall")
+    @PostMapping("/printers/{printerId}/commands/pushall")
     public ResponseEntity<Map<String, Object>> pushAll(
             @PathVariable UUID printerId
     ) {
@@ -286,45 +207,20 @@ public class PrinterController {
         return okResponseEntity;
     }
 
+    @Deprecated(forRemoval = true)
     @PostMapping("/request/fetchmetadata")
-    public ResponseEntity<Map<String, Object>> fetchMetadata() {
-        return fetchMetadata(
+    public ResponseEntity<Map<String, Object>> requestMetadata() {
+        return requestMetadata(
                 defaultPrinterResolver.resolve()
         );
     }
 
-    @PostMapping("/api/printers/{printerId}/request/fetchmetadata")
-    public ResponseEntity<Map<String, Object>> fetchMetadata(
+    @PostMapping("/printers/{printerId}/commands/fetchmetadata")
+    public ResponseEntity<Map<String, Object>> requestMetadata(
             @PathVariable UUID printerId
     ) {
         modelMetadataWorkflowService.requestMetadata(printerId);
         return okResponseEntity;
-    }
-
-
-    private ResponseEntity<Resource> getImageResponseEntity(
-            UUID printerId,
-            String imageName
-    ) {
-        Path platePath = Path.of(
-                "models",
-                printerId.toString(),
-                "metadata",
-                imageName + "_" + printerStateService
-                        .getState(printerId)
-                        .getPlateIndex() + ".png"
-        );
-
-        if (!Files.exists(platePath) || !modelMetadataWorkflowService.isMetadataLoaded(printerId)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Resource resource = new FileSystemResource(platePath);
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.IMAGE_PNG)
-                .cacheControl(CacheControl.maxAge(60, TimeUnit.SECONDS))
-                .body(resource);
     }
 
     @Data

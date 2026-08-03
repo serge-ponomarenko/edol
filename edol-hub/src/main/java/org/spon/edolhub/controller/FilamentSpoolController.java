@@ -59,6 +59,7 @@ public class FilamentSpoolController {
 
         Map<Filament, List<FilamentSpool>> groupedSpools =
                 spools.stream()
+                        .sorted(Comparator.comparing(FilamentSpool::getId))
                         .collect(Collectors.groupingBy(
                                 FilamentSpool::getFilament,
                                 () -> new TreeMap<>(Comparator.comparing(Filament::getId)),

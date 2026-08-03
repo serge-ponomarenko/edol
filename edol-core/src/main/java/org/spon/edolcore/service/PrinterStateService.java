@@ -1,7 +1,6 @@
 package org.spon.edolcore.service;
 
 
-
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +12,7 @@ import org.spon.edolcore.event.PrinterEvent;
 import org.spon.edolcore.event.PrinterEventType;
 import org.spon.edolcore.event.printer.PrinterStateUpdatedEvent;
 import org.spon.edolcore.service.print.recovery.StartupSynchronizationService;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContext;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
 import org.spon.edolcore.service.printer.runtime.PrinterStateRuntime;
 import org.springframework.context.ApplicationEventPublisher;
@@ -84,6 +84,16 @@ public class PrinterStateService {
 
     public PrinterState getState(UUID printerId) {
         return runtime(printerId).getState();
+    }
+
+    public List<PrinterState> getAllStates() {
+        return runtimeContextProvider
+                .getAllContexts()
+                .values()
+                .stream()
+                .map(PrinterRuntimeContext::getPrinterStateRuntime)
+                .map(PrinterStateRuntime::getState)
+                .toList();
     }
 
     public void update(

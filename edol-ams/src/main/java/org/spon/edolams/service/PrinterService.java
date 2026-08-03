@@ -16,7 +16,7 @@ public class PrinterService {
 
     public PrinterState getState() {
         return edolCoreClient.get()
-                .uri("/printer/state")
+                .uri("/api/printers/state-default")
                 .retrieve()
                 .body(PrinterState.class);
     }

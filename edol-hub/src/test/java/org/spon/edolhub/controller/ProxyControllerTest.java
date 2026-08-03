@@ -46,7 +46,7 @@ class ProxyControllerTest {
             Map<String, Object> body = Map.of("obj", "test");
             ResponseEntity<String> coreResponse = ResponseEntity.ok("done");
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/request/skip-objects"),
+                    eq("http://edolcore:8080/api/request/skip-objects"),
                     eq(HttpMethod.POST),
                     any(HttpEntity.class),
                     eq(String.class)
@@ -67,7 +67,7 @@ class ProxyControllerTest {
         @DisplayName("proxies pause request")
         void proxiesPause() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/request/pause"),
+                    eq("http://edolcore:8080/api/request/pause"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -82,7 +82,7 @@ class ProxyControllerTest {
         @DisplayName("returns 502 when core unavailable")
         void returnsBadGateway() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/request/pause"),
+                    eq("http://edolcore:8080/api/request/pause"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -103,7 +103,7 @@ class ProxyControllerTest {
         @DisplayName("proxies resume request")
         void proxiesResume() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/request/resume"),
+                    eq("http://edolcore:8080/api/request/resume"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -118,7 +118,7 @@ class ProxyControllerTest {
         @DisplayName("returns 502 when core unavailable")
         void returnsBadGateway() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/request/resume"),
+                    eq("http://edolcore:8080/api/request/resume"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -139,7 +139,7 @@ class ProxyControllerTest {
         @DisplayName("proxies stop request")
         void proxiesStop() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/request/stop"),
+                    eq("http://edolcore:8080/api/request/stop"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -154,7 +154,7 @@ class ProxyControllerTest {
         @DisplayName("returns 502 when core unavailable")
         void returnsBadGateway() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/request/stop"),
+                    eq("http://edolcore:8080/api/request/stop"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -176,7 +176,7 @@ class ProxyControllerTest {
         void proxiesTopImage() {
             byte[] imageData = "image".getBytes();
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/modeltopimage"),
+                    eq("http://edolcore:8080/api/modeltopimage"),
                     eq(HttpMethod.GET),
                     isNull(),
                     eq(byte[].class)
@@ -198,7 +198,7 @@ class ProxyControllerTest {
         void proxiesModelImage() {
             byte[] imageData = "model".getBytes();
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/modelimage"),
+                    eq("http://edolcore:8080/api/modelimage"),
                     eq(HttpMethod.GET),
                     isNull(),
                     eq(byte[].class)
@@ -214,7 +214,7 @@ class ProxyControllerTest {
         @DisplayName("returns 404 when core unavailable")
         void returnsNotFound() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/modelimage"),
+                    eq("http://edolcore:8080/api/modelimage"),
                     eq(HttpMethod.GET),
                     isNull(),
                     eq(byte[].class)

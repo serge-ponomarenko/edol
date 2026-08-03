@@ -50,7 +50,7 @@ public class SpoolChangeController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid color");
         }
 
-        String url = edolCoreUrl + "/printer/request/spool-change";
+        String url = edolCoreUrl + "/api/request/spool-change";
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

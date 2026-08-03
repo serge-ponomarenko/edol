@@ -89,7 +89,7 @@ class SpoolChangeControllerTest {
         void sendsRequestAndRedirects() {
             when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/printer/request/spool-change"),
+                    eq("http://edolcore:8080/api/request/spool-change"),
                     eq(HttpMethod.POST),
                     any(HttpEntity.class),
                     eq(String.class)
@@ -99,7 +99,7 @@ class SpoolChangeControllerTest {
 
             assertThat(view).isEqualTo("redirect:/s/1");
             verify(restTemplate).exchange(
-                    eq("http://edolcore:8080/printer/request/spool-change"),
+                    eq("http://edolcore:8080/api/request/spool-change"),
                     eq(HttpMethod.POST),
                     requestCaptor.capture(),
                     eq(String.class)

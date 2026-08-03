@@ -2,7 +2,7 @@ package org.spon.edolcore.service.printer.telemetry;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.persistence.printer.Printer;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -12,7 +12,7 @@ import java.util.UUID;
 public class DefaultPrinterTelemetryProvider
         implements PrinterTelemetryProvider {
 
-    private final PrinterService printerService;
+    private final PrinterManagementService printerManagementService;
     private final DirectPrinterTelemetryProvider directProvider;
     private final AgentPrinterTelemetryProvider agentProvider;
 
@@ -31,7 +31,7 @@ public class DefaultPrinterTelemetryProvider
             UUID printerId
     ) {
         Printer printer =
-                printerService.getPrinter(printerId);
+                printerManagementService.getPrinter(printerId);
 
         return switch (
                 printer.getConnectionMode()

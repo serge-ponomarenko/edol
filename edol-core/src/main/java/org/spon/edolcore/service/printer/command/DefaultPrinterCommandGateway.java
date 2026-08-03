@@ -3,7 +3,7 @@ package org.spon.edolcore.service.printer.command;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.model.dto.SpoolChangeRequestDto;
 import org.spon.edolcore.persistence.printer.PrinterConnectionMode;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,7 +14,7 @@ import java.util.UUID;
 public class DefaultPrinterCommandGateway
         implements PrinterCommandGateway {
 
-    private final PrinterService printerService;
+    private final PrinterManagementService printerManagementService;
 
     private final DirectPrinterCommandGateway directGateway;
     private final AgentPrinterCommandGateway agentGateway;
@@ -86,7 +86,7 @@ public class DefaultPrinterCommandGateway
     }
 
     private boolean isDirect(UUID printerId) {
-        return printerService.getPrinter(printerId)
+        return printerManagementService.getPrinter(printerId)
                 .getConnectionMode() == PrinterConnectionMode.DIRECT;
     }
 }

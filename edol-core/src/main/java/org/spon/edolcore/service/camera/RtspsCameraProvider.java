@@ -5,59 +5,56 @@ import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
+import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(
-        value = "edol.printer.camera-provider",
-        havingValue = "RTSPS"
-)
 class RtspsCameraProvider implements CameraProvider {
 
     private static final int RTSP_PORT = 322;
 
-    @Value("${bambu.camera-url}")
-    private String bambuHost;
-    @Value("${bambu.access-code}")
-    private String accessCode;
+    private final PrinterConnectionConfigurationRepository configurationRepository;
 
     @Override
-    public byte[] capture() {
+    public boolean supports(UUID printerId) {
+        return true;
+    }
 
+    @Override
+    public byte[] capture(UUID printerId) {
+        PrinterConnectionConfiguration configuration = configuration(printerId);
         String uri =
                 "rtsps://bblp:%s@%s:%d/streaming/live/1"
                         .formatted(
-                                accessCode,
-                                bambuHost,
+                                configuration.getAccessCode(),
+                                configuration.getMqttHost(),
                                 RTSP_PORT
                         );
 
-        log.info("Opening RTSPS stream: {}", uri.replace(accessCode, "********"));
+        log.info("Opening RTSPS stream: {}", uri.replace(configuration.getAccessCode(), "********"));
 
-        FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(uri);
+        try (
+                FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(uri);
+                Java2DFrameConverter converter = new Java2DFrameConverter()
+        ) {
+            grabber.setOption("rtsp_transport", "tcp");
 
-        grabber.setOption("rtsp_transport", "tcp");
+            // 5 sec
+            grabber.setOption("stimeout", "5000000");
 
-        // 5 sec
-        grabber.setOption("stimeout", "5000000");
+            // reduce latency
+            grabber.setOption("fflags", "nobuffer");
+            grabber.setOption("flags", "low_delay");
 
-        // reduce latency
-        grabber.setOption("fflags", "nobuffer");
-        grabber.setOption("flags", "low_delay");
-
-        Java2DFrameConverter converter =
-                new Java2DFrameConverter();
-
-        try {
             grabber.start();
 
             Frame frame = null;
@@ -95,22 +92,20 @@ class RtspsCameraProvider implements CameraProvider {
         } catch (IOException e) {
             log.error("Error!", e);
             throw new RuntimeException(e);
-        } finally {
-            try {
-                grabber.stop();
-            } catch (Exception ignored) {
-            }
-            try {
-                grabber.close();
-            } catch (Exception ignored) {
-            }
-            converter.close();
         }
     }
 
-    @Override
-    public boolean supports() {
-        return false;
+    private PrinterConnectionConfiguration configuration(
+            UUID printerId
+    ) {
+        return configurationRepository
+                .findByPrinterId(printerId)
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Configuration not found for printer "
+                                        + printerId
+                        )
+                );
     }
 
 }

@@ -11,4 +11,6 @@ public interface PrinterConnectionConfigurationRepository
     Optional<PrinterConnectionConfiguration> findByPrinterId(UUID printerId);
 
     Optional<PrinterConnectionConfiguration> findByAgentId(String agentId);
+
+    void deleteByPrinterId(UUID printerId);
 }

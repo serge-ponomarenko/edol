@@ -2,9 +2,8 @@ package org.spon.edolcore.service.printer.transport;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.service.LogContextFactory;
-import org.spon.edolcore.service.printer.PrinterService;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeLifecycleService;
 import org.spon.edolcore.service.printer.telemetry.DefaultPrinterTelemetryProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -18,17 +17,14 @@ import java.util.concurrent.ExecutorService;
 public class PrinterTelemetryReconnectScheduler {
 
     private final DefaultPrinterTelemetryProvider telemetryProvider;
-    private final PrinterService printerService;
+    private final PrinterRuntimeLifecycleService runtimeLifecycleService;
     private final LogContextFactory logContextFactory;
     private final ExecutorService virtualThreadExecutor;
 
     @Scheduled(fixedDelay = 30000)
     public void reconnect() {
-        for (Printer printer :
-                printerService.getEnabledPrinters()) {
-
-            UUID printerId = printer.getId();
-
+        for (UUID printerId :
+                runtimeLifecycleService.getActivePrinterIds()) {
             if (!telemetryProvider.isConnected(
                     printerId
             )) {

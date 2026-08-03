@@ -8,6 +8,7 @@ import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.File;
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @RestController
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class CameraController {
 
@@ -23,6 +25,7 @@ public class CameraController {
     private final ModelMetadataWorkflowService modelMetadataWorkflowService;
     private final DefaultPrinterResolver defaultPrinterResolver;
 
+    @Deprecated(forRemoval = true)
     @GetMapping(
             value = "/camera/latest",
             produces = MediaType.IMAGE_JPEG_VALUE
@@ -34,7 +37,7 @@ public class CameraController {
     }
 
     @GetMapping(
-            value = "/api/printers/{printerId}/camera/latest",
+            value = "/printers/{printerId}/camera/snapshot",
             produces = MediaType.IMAGE_JPEG_VALUE
     )
     public byte[] latest(
@@ -50,6 +53,7 @@ public class CameraController {
         return snap.getImage();
     }
 
+    @Deprecated(forRemoval = true)
     @GetMapping("/camera/status-image")
     public Path getLatestStatusImagePath() {
         return getLatestStatusImagePath(

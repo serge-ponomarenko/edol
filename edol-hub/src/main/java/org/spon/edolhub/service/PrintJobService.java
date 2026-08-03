@@ -1,6 +1,5 @@
 package org.spon.edolhub.service;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
@@ -15,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
@@ -251,7 +251,7 @@ public class PrintJobService {
     public void fetchAndSave(PrinterState printerState) {
         PrintJob job = printJobRepository.findBySessionId(printerState.getSessionId()).orElseThrow();
 
-        String url = edolCoreUrl + "/printer/modelimage";
+        String url = edolCoreUrl + "/api/modelimage";
 
         ResponseEntity<byte[]> response = restTemplate.exchange(
                 url,
