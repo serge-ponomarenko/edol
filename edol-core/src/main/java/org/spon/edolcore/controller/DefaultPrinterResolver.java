@@ -1,7 +1,7 @@
 package org.spon.edolcore.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.spon.edolcore.service.printer.PrinterManagementService;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;

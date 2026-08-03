@@ -3,7 +3,7 @@ package org.spon.edolcore.service.printer.command;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.model.dto.SpoolChangeRequestDto;
 import org.spon.edolcore.persistence.printer.PrinterConnectionMode;
-import org.spon.edolcore.service.printer.PrinterManagementService;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

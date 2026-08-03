@@ -2,7 +2,7 @@ package org.spon.edolcore.service.model.transfer;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.persistence.printer.Printer;
-import org.spon.edolcore.service.printer.PrinterManagementService;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;

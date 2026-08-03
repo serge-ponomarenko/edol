@@ -3,7 +3,7 @@ package org.spon.edolcore.service.printer.connectivity;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.service.agent.AgentStateService;
-import org.spon.edolcore.service.printer.PrinterManagementService;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.spon.edolcore.service.printer.transport.BambuMqttConnectionManager;
 import org.springframework.stereotype.Service;
 

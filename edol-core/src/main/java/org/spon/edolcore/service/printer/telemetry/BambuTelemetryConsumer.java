@@ -7,8 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.persistence.printer.PrinterConnectionMode;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
-import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityStateService;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 

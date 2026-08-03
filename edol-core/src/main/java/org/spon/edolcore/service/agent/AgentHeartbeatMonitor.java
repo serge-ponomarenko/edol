@@ -3,8 +3,8 @@ package org.spon.edolcore.service.agent;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.persistence.printer.PrinterConnectionMode;
-import org.spon.edolcore.service.printer.PrinterManagementService;
 import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityStateService;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 

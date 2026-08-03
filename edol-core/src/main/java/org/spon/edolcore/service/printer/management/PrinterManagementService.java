@@ -1,4 +1,4 @@
-package org.spon.edolcore.service.printer;
+package org.spon.edolcore.service.printer.management;
 
 import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;

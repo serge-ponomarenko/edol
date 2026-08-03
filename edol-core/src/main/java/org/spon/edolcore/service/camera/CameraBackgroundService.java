@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.service.LogContextFactory;
-import org.spon.edolcore.service.printer.PrinterManagementService;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 

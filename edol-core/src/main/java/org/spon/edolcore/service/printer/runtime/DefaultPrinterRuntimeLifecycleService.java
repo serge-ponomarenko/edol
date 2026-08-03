@@ -4,8 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.service.model.metadata.MetadataRuntimeCoordinator;
 import org.springframework.stereotype.Service;
 
-import java.util.Collection;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -17,43 +15,29 @@ public class DefaultPrinterRuntimeLifecycleService
     private final MetadataRuntimeCoordinator metadataRuntimeCoordinator;
 
     @Override
+    public void createRuntime(UUID printerId) {
+        runtimeRegistry.create(printerId);
+    }
+
+    @Override
     public void startRuntime(UUID printerId) {
-        createRuntime(printerId);
+        // TODO: Runtime startup will be implemented in the next milestone.
     }
 
     @Override
     public void stopRuntime(UUID printerId) {
-        metadataRuntimeCoordinator.stop(
-                printerId
-        );
-
-        removeRuntime(
-                printerId
-        );
+        metadataRuntimeCoordinator.stop(printerId);
     }
 
-    private void createRuntime(UUID printerId) {
-        runtimeRegistry.create(printerId);
-    }
-
-    private void removeRuntime(UUID printerId) {
+    @Override
+    public void destroyRuntime(UUID printerId) {
         runtimeRegistry.remove(printerId);
     }
 
     @Override
-    public boolean runtimeExists(UUID printerId) {
-        return runtimeRegistry.exists(printerId);
+    public void restartRuntime(UUID printerId) {
+        stopRuntime(printerId);
+        startRuntime(printerId);
     }
 
-    @Override
-    public Map<UUID, PrinterRuntimeContext> getRuntimeContexts() {
-        return runtimeRegistry.getAll();
-    }
-
-    @Override
-    public Collection<UUID> getActivePrinterIds() {
-        return runtimeRegistry.getAll()
-                .keySet()
-                .stream().toList();
-    }
 }
