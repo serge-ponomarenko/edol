@@ -2,6 +2,7 @@ package org.spon.edolcore.service.printer.runtime;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.service.model.metadata.MetadataRuntimeCoordinator;
+import org.spon.edolcore.service.printer.telemetry.DefaultPrinterTelemetryProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -13,6 +14,7 @@ public class DefaultPrinterRuntimeLifecycleService
 
     private final PrinterRuntimeRegistry runtimeRegistry;
     private final MetadataRuntimeCoordinator metadataRuntimeCoordinator;
+    private final DefaultPrinterTelemetryProvider telemetryProvider;
 
     @Override
     public void createRuntime(UUID printerId) {
@@ -21,12 +23,13 @@ public class DefaultPrinterRuntimeLifecycleService
 
     @Override
     public void startRuntime(UUID printerId) {
-        // TODO: Runtime startup will be implemented in the next milestone.
+        telemetryProvider.connect(printerId);
     }
 
     @Override
     public void stopRuntime(UUID printerId) {
         metadataRuntimeCoordinator.stop(printerId);
+        telemetryProvider.disconnect(printerId);
     }
 
     @Override

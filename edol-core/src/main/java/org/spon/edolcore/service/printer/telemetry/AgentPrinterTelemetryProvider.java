@@ -10,7 +10,7 @@ public class AgentPrinterTelemetryProvider
 
     @Override
     public void connect(UUID printerId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        // no-op
     }
 
     @Override
