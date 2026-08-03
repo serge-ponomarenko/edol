@@ -19,6 +19,11 @@ public class DirectPrinterTelemetryProvider
     }
 
     @Override
+    public void disconnect(UUID printerId) {
+        connectionManager.disconnect(printerId);
+    }
+
+    @Override
     public boolean isConnected(UUID printerId) {
         return connectionManager.isConnected(printerId);
     }

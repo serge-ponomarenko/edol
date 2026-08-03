@@ -6,5 +6,8 @@ public interface PrinterTelemetryProvider {
 
     void connect(UUID printerId);
 
+    void disconnect(UUID printerId);
+
     boolean isConnected(UUID printerId);
+
 }

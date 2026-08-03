@@ -21,6 +21,10 @@ public class PrinterRuntimeBootstrap {
     public void bootstrap() {
         printerRepository.findByEnabledTrue()
                 .forEach(printer -> {
+                    runtimeLifecycleService.createRuntime(
+                            printer.getId()
+                    );
+
                     runtimeLifecycleService.startRuntime(
                             printer.getId()
                     );
@@ -31,7 +35,7 @@ public class PrinterRuntimeBootstrap {
                                     printer.getId()
                             )
                             .log(
-                                    "Runtime context initialized: {}", printer.getDisplayId()
+                                    "Printer runtime initialized: {}", printer.getDisplayId()
                             );
                 });
     }

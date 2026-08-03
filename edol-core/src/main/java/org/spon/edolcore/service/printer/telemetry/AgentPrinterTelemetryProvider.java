@@ -14,6 +14,11 @@ public class AgentPrinterTelemetryProvider
     }
 
     @Override
+    public void disconnect(UUID printerId) {
+        // no-op
+    }
+
+    @Override
     public boolean isConnected(UUID printerId) {
         return true;
     }

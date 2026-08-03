@@ -22,6 +22,11 @@ public class DefaultPrinterTelemetryProvider
     }
 
     @Override
+    public void disconnect(UUID printerId) {
+        provider(printerId).disconnect(printerId);
+    }
+
+    @Override
     public boolean isConnected(UUID printerId) {
         return provider(printerId)
                 .isConnected(printerId);
