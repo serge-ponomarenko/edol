@@ -11,42 +11,42 @@ import java.util.concurrent.ConcurrentMap;
 public class InMemoryPrinterRuntimeRegistry
         implements PrinterRuntimeRegistry {
 
-    private final ConcurrentMap<UUID, PrinterRuntimeContext> contexts =
+    private final ConcurrentMap<UUID, PrinterRuntime> runtimes =
             new ConcurrentHashMap<>();
 
     @Override
-    public PrinterRuntimeContext get(UUID printerId) {
-        PrinterRuntimeContext context = contexts.get(printerId);
+    public PrinterRuntime get(UUID printerId) {
+        PrinterRuntime runtime = runtimes.get(printerId);
 
-        if (context == null) {
+        if (runtime == null) {
             throw new IllegalArgumentException(
-                    "Runtime context not found for printer: " + printerId
+                    "Runtime not found for printer: " + printerId
             );
         }
 
-        return context;
+        return runtime;
     }
 
     @Override
-    public Map<UUID, PrinterRuntimeContext> getAll() {
-        return contexts;
+    public Map<UUID, PrinterRuntime> getAll() {
+        return runtimes;
     }
 
     @Override
-    public PrinterRuntimeContext create(UUID printerId) {
-        return contexts.computeIfAbsent(
+    public PrinterRuntime create(UUID printerId) {
+        return runtimes.computeIfAbsent(
                 printerId,
-                PrinterRuntimeContext::new
+                PrinterRuntime::new
         );
     }
 
     @Override
     public void remove(UUID printerId) {
-        contexts.remove(printerId);
+        runtimes.remove(printerId);
     }
 
     @Override
     public boolean exists(UUID printerId) {
-        return contexts.containsKey(printerId);
+        return runtimes.containsKey(printerId);
     }
 }

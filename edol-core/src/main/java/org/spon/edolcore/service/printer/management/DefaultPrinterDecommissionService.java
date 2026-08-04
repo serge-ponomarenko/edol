@@ -1,9 +1,11 @@
 package org.spon.edolcore.service.printer.management;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
 import org.spon.edolcore.persistence.printer.PrinterRepository;
+import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.printer.management.exception.PrinterNotFoundException;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeLifecycleService;
 import org.springframework.stereotype.Service;
@@ -14,12 +16,14 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class DefaultPrinterDecommissionService
         implements PrinterDecommissionService {
 
     private final PrinterRepository printerRepository;
     private final PrinterConnectionConfigurationRepository configurationRepository;
     private final PrinterRuntimeLifecycleService runtimeLifecycleService;
+    private final LogContextFactory logContextFactory;
 
     @Override
     public void decommissionPrinter(UUID printerId) {
@@ -38,6 +42,15 @@ public class DefaultPrinterDecommissionService
         configurationRepository.deleteByPrinterId(printerId);
 
         printerRepository.delete(printer);
+
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printer.getId()
+                )
+                .log(
+                        "Printer has been removed: {}", printer.getDisplayId()
+                );
     }
 
 }

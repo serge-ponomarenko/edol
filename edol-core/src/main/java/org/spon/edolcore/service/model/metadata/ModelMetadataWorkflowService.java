@@ -10,7 +10,7 @@ import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.model.transfer.DefaultModelTransferProvider;
 import org.spon.edolcore.service.printer.runtime.MetadataRuntimeState;
-import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
@@ -28,7 +28,7 @@ public class ModelMetadataWorkflowService {
     private final PrinterStateService printerStateService;
     private final ProjectSettingsParserService projectSettingsParserService;
     private final PlateParserService plateParserService;
-    private final PrinterRuntimeContextProvider runtimeContextProvider;
+    private final PrinterRuntimeQueryService runtimeQueryService;
     private final LogContextFactory logContextFactory;
 
     public void requestMetadata(UUID printerId) {
@@ -134,8 +134,9 @@ public class ModelMetadataWorkflowService {
     }
 
     private MetadataRuntimeState runtime(UUID printerId) {
-        return runtimeContextProvider
-                .getContext(printerId)
+        return runtimeQueryService
+                .getRuntime(printerId)
+                .getContext()
                 .getMetadataRuntimeState();
     }
 }

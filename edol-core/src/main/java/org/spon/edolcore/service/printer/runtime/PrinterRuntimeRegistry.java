@@ -5,11 +5,11 @@ import java.util.UUID;
 
 public interface PrinterRuntimeRegistry {
 
-    PrinterRuntimeContext get(UUID printerId);
+    PrinterRuntime get(UUID printerId);
 
-    Map<UUID, PrinterRuntimeContext> getAll();
+    Map<UUID, PrinterRuntime> getAll();
 
-    PrinterRuntimeContext create(UUID printerId);
+    PrinterRuntime create(UUID printerId);
 
     void remove(UUID printerId);
 

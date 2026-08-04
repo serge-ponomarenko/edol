@@ -12,8 +12,9 @@ import org.spon.edolcore.event.PrinterEvent;
 import org.spon.edolcore.event.PrinterEventType;
 import org.spon.edolcore.event.printer.PrinterStateUpdatedEvent;
 import org.spon.edolcore.service.print.recovery.StartupSynchronizationService;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntime;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContext;
-import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.spon.edolcore.service.printer.runtime.PrinterStateRuntime;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -72,13 +73,14 @@ public class PrinterStateService {
 
     private final ApplicationEventPublisher events;
     private final StartupSynchronizationService startupSynchronizationService;
-    private final PrinterRuntimeContextProvider runtimeContextProvider;
+    private final PrinterRuntimeQueryService runtimeQueryService;
     private final LogContextFactory logContextFactory;
 
 
     private PrinterStateRuntime runtime(UUID printerId) {
-        return runtimeContextProvider
-                .getContext(printerId)
+        return runtimeQueryService
+                .getRuntime(printerId)
+                .getContext()
                 .getPrinterStateRuntime();
     }
 
@@ -87,10 +89,10 @@ public class PrinterStateService {
     }
 
     public List<PrinterState> getAllStates() {
-        return runtimeContextProvider
-                .getAllContexts()
-                .values()
+        return runtimeQueryService
+                .getRuntimes()
                 .stream()
+                .map(PrinterRuntime::getContext)
                 .map(PrinterRuntimeContext::getPrinterStateRuntime)
                 .map(PrinterStateRuntime::getState)
                 .toList();

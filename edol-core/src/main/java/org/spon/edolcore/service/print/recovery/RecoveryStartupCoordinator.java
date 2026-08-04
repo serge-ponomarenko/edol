@@ -8,7 +8,7 @@ import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
 import org.spon.edolcore.service.printer.management.PrinterManagementService;
-import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.spon.edolcore.service.printer.runtime.RecoveryRuntimeState;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -26,13 +26,14 @@ public class RecoveryStartupCoordinator {
     private final PrinterCommandGateway printerCommandGateway;
     private final PrinterStateService printerStateService;
     private final PrinterManagementService printerManagementService;
-    private final PrinterRuntimeContextProvider printerRuntimeContextProvider;
+    private final PrinterRuntimeQueryService runtimeQueryService;
     private final LogContextFactory logContextFactory;
     private final ExecutorService virtualThreadExecutor;
 
     public void startRecoveryIfNeeded(UUID printerId) {
-        RecoveryRuntimeState runtimeState = printerRuntimeContextProvider
-                .getContext(printerId)
+        RecoveryRuntimeState runtimeState = runtimeQueryService
+                .getRuntime(printerId)
+                .getContext()
                 .getRecoveryRuntimeState();
 
         synchronized (runtimeState) {

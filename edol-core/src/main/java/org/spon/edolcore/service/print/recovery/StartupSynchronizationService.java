@@ -2,7 +2,7 @@ package org.spon.edolcore.service.print.recovery;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.spon.edolcore.service.printer.runtime.RecoveryRuntimeState;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +13,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StartupSynchronizationService {
 
-    private final PrinterRuntimeContextProvider runtimeContextProvider;
+    private final PrinterRuntimeQueryService runtimeQueryService;
 
     public void beginRecoverySynchronization(UUID printerId) {
         RecoveryRuntimeState runtime = runtime(printerId);
@@ -46,8 +46,9 @@ public class StartupSynchronizationService {
     }
 
     private RecoveryRuntimeState runtime(UUID printerId) {
-        return runtimeContextProvider
-                .getContext(printerId)
+        return runtimeQueryService
+                .getRuntime(printerId)
+                .getContext()
                 .getRecoveryRuntimeState();
     }
 

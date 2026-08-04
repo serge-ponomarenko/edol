@@ -16,7 +16,7 @@ import org.spon.edolcore.service.print.ActivePrintContext;
 import org.spon.edolcore.service.print.ActivePrintContextService;
 import org.spon.edolcore.service.print.SpoolFingerprintBuilder;
 import org.spon.edolcore.service.print.recovery.RecoveryStartupCoordinator;
-import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.spon.edolcore.service.printer.runtime.PrinterStateRuntime;
 import org.spon.edolcore.service.timelapse.TimelapseService;
 import org.springframework.context.event.EventListener;
@@ -53,14 +53,15 @@ public class PrinterEventListener {
     private final SpoolFingerprintBuilder spoolFingerprintBuilder;
     private final RecoveryStartupCoordinator recoveryStartupCoordinator;
     private final MetadataAcquisitionService metadataAcquisitionService;
-    private final PrinterRuntimeContextProvider printerRuntimeContextProvider;
+    private final PrinterRuntimeQueryService runtimeQueryService;
     private final LogContextFactory logContextFactory;
     private final ExecutorService timelapseExecutor;
     private final ExecutorService virtualThreadExecutor;
 
     private PrinterStateRuntime runtime(UUID printerId) {
-        return printerRuntimeContextProvider
-                .getContext(printerId)
+        return runtimeQueryService
+                .getRuntime(printerId)
+                .getContext()
                 .getPrinterStateRuntime();
     }
 

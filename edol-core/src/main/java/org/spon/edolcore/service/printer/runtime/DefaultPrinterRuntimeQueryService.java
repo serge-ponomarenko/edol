@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -20,13 +19,15 @@ public class DefaultPrinterRuntimeQueryService
     }
 
     @Override
-    public PrinterRuntimeContext getRuntimeContext(UUID printerId) {
+    public PrinterRuntime getRuntime(UUID printerId) {
         return runtimeRegistry.get(printerId);
     }
 
     @Override
-    public Map<UUID, PrinterRuntimeContext> getRuntimeContexts() {
-        return runtimeRegistry.getAll();
+    public Collection<PrinterRuntime> getRuntimes() {
+        return runtimeRegistry
+                .getAll()
+                .values();
     }
 
     @Override

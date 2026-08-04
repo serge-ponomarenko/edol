@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.CameraSnapshot;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.printer.runtime.CameraRuntimeState;
-import org.spon.edolcore.service.printer.runtime.PrinterRuntimeContextProvider;
+import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -29,7 +29,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CameraSnapshotStore {
 
-    private final PrinterRuntimeContextProvider runtimeContextProvider;
+    private final PrinterRuntimeQueryService runtimeQueryService;
 
     private static final int MAX_HISTORY = 50;
     private final LogContextFactory logContextFactory;
@@ -214,8 +214,9 @@ public class CameraSnapshotStore {
     }
 
     private CameraRuntimeState runtime(UUID printerId) {
-        return runtimeContextProvider
-                .getContext(printerId)
+        return runtimeQueryService
+                .getRuntime(printerId)
+                .getContext()
                 .getCameraRuntimeState();
     }
 
