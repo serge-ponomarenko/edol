@@ -14,4 +14,6 @@ public interface PrinterRuntimeLifecycleService {
 
     void restartRuntime(UUID printerId);
 
+    void reconcileRuntime(UUID printerId);
+
 }

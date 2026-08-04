@@ -21,11 +21,7 @@ public class PrinterRuntimeBootstrap {
     public void bootstrap() {
         printerRepository.findByEnabledTrue()
                 .forEach(printer -> {
-                    runtimeLifecycleService.createRuntime(
-                            printer.getId()
-                    );
-
-                    runtimeLifecycleService.startRuntime(
+                    runtimeLifecycleService.reconcileRuntime(
                             printer.getId()
                     );
 

@@ -36,11 +36,7 @@ public class DefaultPrinterProvisioningService implements PrinterProvisioningSer
 
         configurationRepository.save(connection);
 
-        runtimeLifecycleService.createRuntime(
-                printer.getId()
-        );
-
-        runtimeLifecycleService.startRuntime(
+        runtimeLifecycleService.reconcileRuntime(
                 printer.getId()
         );
 
