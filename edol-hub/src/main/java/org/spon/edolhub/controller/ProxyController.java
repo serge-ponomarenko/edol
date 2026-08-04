@@ -8,6 +8,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/proxy")
@@ -21,7 +22,7 @@ public class ProxyController {
 
     @PostMapping("/request/skip-objects")
     public ResponseEntity<?> skipObjects(@RequestBody Map<String, Object> body) {
-        String url = edolCoreUrl + "/printer/request/skip-objects";
+        String url = edolCoreUrl + "/api/request/skip-objects";
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -45,7 +46,7 @@ public class ProxyController {
     public ResponseEntity<?> pausePrint() {
         try {
             return restTemplate.exchange(
-                    edolCoreUrl + "/printer/request/pause",
+                    edolCoreUrl + "/api/request/pause",
                     HttpMethod.POST,
                     null,
                     String.class
@@ -61,7 +62,7 @@ public class ProxyController {
     public ResponseEntity<?> resumePrint() {
         try {
             return restTemplate.exchange(
-                    edolCoreUrl + "/printer/request/resume",
+                    edolCoreUrl + "/api/request/resume",
                     HttpMethod.POST,
                     null,
                     String.class
@@ -77,7 +78,7 @@ public class ProxyController {
     public ResponseEntity<?> stopPrint() {
         try {
             return restTemplate.exchange(
-                    edolCoreUrl + "/printer/request/stop",
+                    edolCoreUrl + "/api/request/stop",
                     HttpMethod.POST,
                     null,
                     String.class
@@ -91,7 +92,7 @@ public class ProxyController {
 
     @GetMapping("/modeltopimage")
     public ResponseEntity<byte[]> proxyTopImage() {
-        String url = edolCoreUrl + "/printer/modeltopimage";
+        String url = edolCoreUrl + "/api/modeltopimage";
 
         ResponseEntity<byte[]> response = restTemplate.exchange(
                 url,
@@ -108,7 +109,7 @@ public class ProxyController {
 
     @GetMapping("/modelimage")
     public ResponseEntity<byte[]> proxyModelImage() {
-        String url = edolCoreUrl + "/printer/modelimage";
+        String url = edolCoreUrl + "/api/modelimage";
 
         try {
             ResponseEntity<byte[]> response = restTemplate.exchange(
@@ -127,9 +128,38 @@ public class ProxyController {
         }
     }
 
+    @GetMapping("/printers/{printerId}/modelimage")
+    public ResponseEntity<byte[]> proxyPrinterModelImage(
+            @PathVariable UUID printerId
+    ) {
+        String url =
+                edolCoreUrl +
+                        "/printer/api/printers/" +
+                        printerId +
+                        "/modelimage";
+
+        try {
+            ResponseEntity<byte[]> response =
+                    restTemplate.exchange(
+                            url,
+                            HttpMethod.GET,
+                            null,
+                            byte[].class
+                    );
+
+            return ResponseEntity
+                    .status(response.getStatusCode())
+                    .headers(response.getHeaders())
+                    .body(response.getBody());
+
+        } catch (RestClientException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @GetMapping("/camera")
     public ResponseEntity<byte[]> proxyCameraImage() {
-        String url = edolCoreUrl + "/camera/latest";
+        String url = edolCoreUrl + "/api/camera/latest";
 
         ResponseEntity<byte[]> response = restTemplate.exchange(
                 url,

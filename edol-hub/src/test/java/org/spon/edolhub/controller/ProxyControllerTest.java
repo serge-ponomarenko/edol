@@ -235,7 +235,7 @@ class ProxyControllerTest {
         void proxiesCameraImage() {
             byte[] imageData = "camera".getBytes();
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/camera/latest"),
+                    eq("http://edolcore:8080/api/camera/latest"),
                     eq(HttpMethod.GET),
                     isNull(),
                     eq(byte[].class)
