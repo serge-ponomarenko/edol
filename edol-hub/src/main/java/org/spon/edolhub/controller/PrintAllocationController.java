@@ -108,7 +108,7 @@ public class PrintAllocationController {
                                         query.toLowerCase()
                                 )
                 )
-                .limit(20)
+                //.limit(20)
                 .toList();
     }
 

@@ -21,8 +21,6 @@ public class MqttEventListener {
     private final PrintJobService printJobService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private PrinterState printerState;
-
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public void handle(Message<?> message) {
         try {
@@ -33,24 +31,16 @@ public class MqttEventListener {
 
             log.info("EdolCore MQTT EVENT: {}", event);
 
-            printerState = printerService.getState();
+            PrinterState printerState = printerService.getState();
 
             switch (event) {
-
-                case "print.started" -> handlePrintStarted(json);
-
-                case "print.finished" -> handlePrintFinished(json);
-
-                case "print.failed" -> handlePrintFailed(json);
-
-                case "print.progress.changed" -> handlePrintProgress(json);
-
-                case "print.metadata.loaded" -> handlePrintMetadata(json);
-
+                case "print.started" -> handlePrintStarted(printerState);
+                case "print.finished" -> handlePrintFinished(printerState);
+                case "print.failed" -> handlePrintFailed(printerState);
+                case "print.progress.changed" -> handlePrintProgress(printerState);
+                case "print.metadata.loaded" -> handlePrintMetadata(printerState);
                 case "ams.status.changed" -> handleAmsStatus(json);
-
                 case "ams.slot.changed" -> handleAmsSlot(json);
-
                 default -> log.debug("Unhandled event: {}", event);
             }
 
@@ -59,19 +49,19 @@ public class MqttEventListener {
         }
     }
 
-    private void handlePrintStarted(JsonNode json) {
+    private void handlePrintStarted(PrinterState printerState) {
         printJobService.start(printerState);
     }
 
-    private void handlePrintFinished(JsonNode json) {
+    private void handlePrintFinished(PrinterState printerState) {
         printJobService.finish(printerState);
     }
 
-    private void handlePrintFailed(JsonNode json) {
+    private void handlePrintFailed(PrinterState printerState) {
         printJobService.cancel(printerState);
     }
 
-    private void handlePrintProgress(JsonNode json) {
+    private void handlePrintProgress(PrinterState printerState) {
         try {
             printJobService.updateProgress(printerState);
         } catch (Exception e) {
@@ -79,7 +69,7 @@ public class MqttEventListener {
         }
     }
 
-    private void handlePrintMetadata(JsonNode json) {
+    private void handlePrintMetadata(PrinterState printerState) {
         printJobService.metadataLoaded(printerState);
     }
 

@@ -13,6 +13,6 @@ public class PrintRuntimeStateService {
 
     private volatile boolean allocationPreviewReady;
 
-    private PrintJob currentJob;
+    private volatile PrintJob currentJob;
 
 }
