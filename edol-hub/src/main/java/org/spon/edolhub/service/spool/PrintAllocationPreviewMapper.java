@@ -19,7 +19,7 @@ public class PrintAllocationPreviewMapper {
     ) {
         PrintAllocationPreviewDto dto = new PrintAllocationPreviewDto();
 
-        dto.setPrintJobId(preview.getPrintJob().getPublicId());
+        dto.setPrintJobId(preview.getPrintJob().getId());
         dto.setFinalized(preview.getFinalized());
 
         dto.setJobStatus(
