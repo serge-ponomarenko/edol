@@ -1,6 +1,7 @@
 package org.spon.edolhub.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.spon.edolhub.model.entity.PrintJob;
 import org.spon.edolhub.repository.PrintJobRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -22,7 +23,12 @@ public class PrintJobsController {
 
     @GetMapping("/delete/{id}")
     public String delete(@PathVariable Long id) {
-        printJobRepository.deleteById(id);
+        PrintJob job = printJobRepository
+                .findByPublicId(id)
+                .orElseThrow();
+
+        printJobRepository.delete(job);
+
         return "redirect:/print-jobs";
     }
 

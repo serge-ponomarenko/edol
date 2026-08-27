@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +41,7 @@ public class JobSpoolUsageService {
         return jobSpoolUsageRepository.save(usage);
     }
 
-    public List<JobSpoolUsage> findByPrintJob(Long printJobId) {
+    public List<JobSpoolUsage> findByPrintJob(UUID printJobId) {
         return jobSpoolUsageRepository.findByPrintJobId(printJobId);
     }
 

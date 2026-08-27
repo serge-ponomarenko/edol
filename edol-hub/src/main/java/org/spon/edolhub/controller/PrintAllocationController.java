@@ -9,6 +9,7 @@ import org.spon.edolhub.model.entity.PrintAllocationPreview;
 import org.spon.edolhub.repository.FilamentRepository;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
 import org.spon.edolhub.repository.PrintAllocationPreviewRepository;
+import org.spon.edolhub.repository.PrintJobRepository;
 import org.spon.edolhub.service.spool.AllocationMutationService;
 import org.spon.edolhub.service.spool.PrintAllocationPreviewMapper;
 import org.spon.edolhub.service.spool.PrintAllocationReconciliationService;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.UUID;
 
 import static org.spon.edolhub.config.GramUtils.GRAM_EPSILON;
 
@@ -32,6 +34,7 @@ public class PrintAllocationController {
     private final PrintAllocationReconciliationService printAllocationReconciliationService;
     private final FilamentRepository filamentRepository;
     private final FilamentSpoolRepository filamentSpoolRepository;
+    private final PrintJobRepository printJobRepository;
 
     @GetMapping("/print-jobs/allocation/{jobId}")
     public String allocationPage(
@@ -57,14 +60,14 @@ public class PrintAllocationController {
     public PrintAllocationPreviewDto getAllocation(
             @PathVariable Long jobId
     ) {
+        UUID printJobId = resolveJobId(jobId);
+
         PrintAllocationPreview preview =
                 previewRepository
-                        .findByPrintJobId(jobId)
+                        .findByPrintJobId(printJobId)
                         .orElseThrow();
 
-        return previewMapper.toDto(
-                preview
-        );
+        return previewMapper.toDto(preview);
     }
 
     @PostMapping("/api/allocations/rerun")
@@ -73,11 +76,10 @@ public class PrintAllocationController {
             @RequestParam Long jobId,
             @RequestParam Long filamentId
     ) {
-        allocationMutationService
-                .rerunAllocation(
-                        jobId,
-                        filamentId
-                );
+        allocationMutationService.rerunAllocation(
+                resolveJobId(jobId),
+                filamentId
+        );
     }
 
     @PostMapping("/api/allocations/finalize")
@@ -85,10 +87,9 @@ public class PrintAllocationController {
     public Boolean finalizeReconciliation(
             @RequestParam Long jobId
     ) {
-
-        return printAllocationReconciliationService
-                .finalizeReconciliation(jobId);
-
+        return printAllocationReconciliationService.finalizeReconciliation(
+                resolveJobId(jobId)
+        );
     }
 
     @GetMapping("/api/allocations/filaments")
@@ -128,7 +129,7 @@ public class PrintAllocationController {
 
         allocationMutationService
                 .replaceFilament(
-                        jobId,
+                        resolveJobId(jobId),
                         sourceFilamentId,
                         filament
                 );
@@ -174,7 +175,7 @@ public class PrintAllocationController {
 
         allocationMutationService
                 .replaceAllocationWithSingleSpool(
-                        jobId,
+                        resolveJobId(jobId),
                         filamentId,
                         spool,
                         grams,
@@ -206,7 +207,7 @@ public class PrintAllocationController {
 
         allocationMutationService
                 .addAllocationItem(
-                        jobId,
+                        resolveJobId(jobId),
                         filamentId,
                         spool,
                         grams,
@@ -215,6 +216,13 @@ public class PrintAllocationController {
                                 grams
                         )
                 );
+    }
+
+    private UUID resolveJobId(Long publicId) {
+        return printJobRepository
+                .findByPublicId(publicId)
+                .orElseThrow()
+                .getId();
     }
 
     private AllocationSpoolOptionDto toSpoolOptionDto(

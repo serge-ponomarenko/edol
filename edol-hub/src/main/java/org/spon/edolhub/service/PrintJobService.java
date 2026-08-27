@@ -19,7 +19,6 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -79,7 +78,7 @@ public class PrintJobService {
     public void metadataLoaded(
             PrinterState printerState
     ) {
-        PrintJob job = getCurrentJob(printerState);
+        PrintJob job = getCurrentJob();
 
         if (previewRepository.existsByPrintJobId(
                 job.getId()
@@ -103,7 +102,7 @@ public class PrintJobService {
                 job.getId()
         );
 
-        saveModelImage(printerState);
+        saveModelImage(job);
     }
 
     @Transactional
@@ -230,11 +229,11 @@ public class PrintJobService {
         }
     }
 
-    public void saveModelImage(PrinterState printerState) {
-        CompletableFuture.runAsync(() -> fetchAndSave(printerState));
+    public void saveModelImage(PrintJob job) {
+        CompletableFuture.runAsync(() -> fetchAndSave(job));
     }
 
-    public void fetchAndSave(PrinterState printerState) {
+    private void fetchAndSave(PrintJob job) {
         String url = edolCoreUrl + "/api/modelimage";
 
         ResponseEntity<byte[]> response = restTemplate.exchange(
@@ -244,17 +243,22 @@ public class PrintJobService {
                 byte[].class
         );
 
-        PrintJob job = getCurrentJob(printerState);
-
         job.setPlateImage(response.getBody());
         job.setPlateImageType("image/png");
 
-        log.info(
-                "Model image saved. Job ID: {}",
-                job.getId()
-        );
+        log.info("Model image saved. Job ID: {}", job.getId());
 
         printJobRepository.save(job);
+    }
+
+    private PrintJob getCurrentJob() {
+        PrintJob job = runtimeStateService.getCurrentJob();
+
+        if (job == null) {
+            throw new IllegalStateException("No active print job");
+        }
+
+        return job;
     }
 
     private PrintJob getCurrentJob(PrinterState printerState) {

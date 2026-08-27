@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.repository.PrintAllocationPreviewRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class AllocationPreviewRuntimeSyncService {
@@ -14,7 +16,7 @@ public class AllocationPreviewRuntimeSyncService {
             runtimeCacheService;
 
     public void refresh(
-            Long printJobId
+            UUID printJobId
     ) {
         previewRepository
                 .findByPrintJobId(printJobId)

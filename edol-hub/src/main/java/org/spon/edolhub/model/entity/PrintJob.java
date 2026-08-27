@@ -2,6 +2,7 @@ package org.spon.edolhub.model.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.spon.edolhub.common.domain.PersistableEntity;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -15,11 +16,16 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PrintJob {
+public class PrintJob extends PersistableEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(
+            name = "public_id",
+            nullable = false,
+            unique = true,
+            updatable = false,
+            insertable = false
+    )
+    private Long publicId;
 
     /**
      * Printer job identifier

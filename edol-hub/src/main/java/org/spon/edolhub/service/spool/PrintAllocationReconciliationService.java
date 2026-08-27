@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,7 +28,7 @@ public class PrintAllocationReconciliationService {
 
     @Transactional
     public boolean finalizeReconciliation(
-            Long printJobId
+            UUID printJobId
     ) {
         PrintJob job =
                 printJobRepository
@@ -51,7 +52,7 @@ public class PrintAllocationReconciliationService {
 
     @Transactional
     public void rollbackFinalizedAllocation(
-            Long printJobId
+            UUID printJobId
     ) {
         PrintAllocationPreview preview =
                 previewRepository

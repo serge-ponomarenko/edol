@@ -50,7 +50,7 @@ public class PrinterDashboardStateService {
             }
 
             response.setJobId(
-                    currentJob.getId()
+                    currentJob.getPublicId()
             );
 
             boolean previewReady =

@@ -31,7 +31,7 @@ public class PrintJobMapper {
     ) {
         PrintJobDto dto = new PrintJobDto();
 
-        dto.setId(job.getId());
+        dto.setId(job.getPublicId());
         dto.setTaskName(job.getTaskName());
         dto.setStatus(job.getStatus().name());
         dto.setProgress(job.getProgress());

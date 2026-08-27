@@ -33,6 +33,16 @@ public class MqttEventListener {
 
             PrinterState printerState = printerService.getState();
 
+            log.info(
+                    "State for event {}: sessionId={}, printing={}, filaments={}",
+                    event,
+                    printerState != null ? printerState.getSessionId() : null,
+                    printerState != null && printerState.isPrinting(),
+                    printerState != null && printerState.getFilaments() != null
+                            ? printerState.getFilaments().size()
+                            : null
+            );
+
             switch (event) {
                 case "print.started" -> handlePrintStarted(printerState);
                 case "print.finished" -> handlePrintFinished(printerState);

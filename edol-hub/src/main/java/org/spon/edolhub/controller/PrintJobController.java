@@ -27,7 +27,9 @@ public class PrintJobController {
     @GetMapping("/image/{jobId}")
     public ResponseEntity<byte[]> image(@PathVariable Long jobId) {
 
-        PrintJob job = printJobRepository.findById(jobId).orElseThrow();
+        PrintJob job = printJobRepository
+                .findByPublicId(jobId)
+                .orElseThrow();
 
         if (job.getPlateImage() != null) {
             return ResponseEntity.ok()

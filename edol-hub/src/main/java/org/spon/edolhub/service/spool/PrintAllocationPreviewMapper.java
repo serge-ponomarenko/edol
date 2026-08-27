@@ -19,7 +19,7 @@ public class PrintAllocationPreviewMapper {
     ) {
         PrintAllocationPreviewDto dto = new PrintAllocationPreviewDto();
 
-        dto.setPrintJobId(preview.getPrintJob().getId());
+        dto.setPrintJobId(preview.getPrintJob().getPublicId());
         dto.setFinalized(preview.getFinalized());
 
         dto.setJobStatus(
@@ -115,8 +115,8 @@ public class PrintAllocationPreviewMapper {
         dto.setColorHex(
                 item.getSpool() != null
                         ? item.getSpool()
-                          .getFilament()
-                          .getColorHex()
+                        .getFilament()
+                        .getColorHex()
                         : null
         );
 
@@ -125,14 +125,14 @@ public class PrintAllocationPreviewMapper {
         dto.setSpoolRemainingGrams(
                 item.getSpool() != null
                         ? item.getSpool()
-                          .getWeightRemaining()
+                        .getWeightRemaining()
                         : null
         );
 
         dto.setEstimatedCost(
                 item.getEstimatedCost() != null
                         ? item.getEstimatedCost()
-                          .doubleValue()
+                        .doubleValue()
                         : null
         );
 

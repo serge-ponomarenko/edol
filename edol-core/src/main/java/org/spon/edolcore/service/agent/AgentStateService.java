@@ -43,6 +43,10 @@ public class AgentStateService {
             return false;
         }
 
+        if (isOfflineSuppressed(printerId)) {
+            return true;
+        }
+
         return state.getLastHeartbeat() != null
                 && Duration.between(
                 state.getLastHeartbeat(),

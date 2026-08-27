@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 import static org.spon.edolhub.config.GramUtils.GRAM_EPSILON;
 import static org.spon.edolhub.config.GramUtils.round;
@@ -30,7 +31,7 @@ public class AllocationMutationService {
 
     @Transactional
     public void replaceAllocationWithSingleSpool(
-            Long printJobId,
+            UUID printJobId,
             Long filamentId,
             FilamentSpool spool,
             Double allocatedGrams,
@@ -73,7 +74,7 @@ public class AllocationMutationService {
 
     @Transactional
     public void addAllocationItem(
-            Long printJobId,
+            UUID printJobId,
             Long filamentId,
             FilamentSpool spool,
             Double allocatedGrams,
@@ -123,7 +124,7 @@ public class AllocationMutationService {
 
     @Transactional
     public void rerunAllocation(
-            Long printJobId,
+            UUID printJobId,
             Long filamentId
     ) {
         PrintAllocationPreview preview =
@@ -160,7 +161,7 @@ public class AllocationMutationService {
 
     @Transactional
     public void replaceFilament(
-            Long printJobId,
+            UUID printJobId,
             Long sourceFilamentId,
             Filament targetFilament
     ) {
@@ -200,7 +201,7 @@ public class AllocationMutationService {
     }
 
     private PrintAllocationPreview loadMutablePreview(
-            Long printJobId
+            UUID printJobId
     ) {
         PrintAllocationPreview preview =
                 previewRepository

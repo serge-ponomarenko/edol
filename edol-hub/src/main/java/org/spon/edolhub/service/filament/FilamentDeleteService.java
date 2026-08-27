@@ -56,7 +56,7 @@ public class FilamentDeleteService {
                                             .sum();
 
                             return new FilamentDeletePreviewDto.JobInfo(
-                                    entry.getKey().getId(),
+                                    entry.getKey().getPublicId(),
                                     entry.getKey().getTaskName(),
                                     usedGrams
                             );
