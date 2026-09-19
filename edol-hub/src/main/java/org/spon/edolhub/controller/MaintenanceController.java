@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.UUID;
+
 @Controller
 @RequiredArgsConstructor
 public class MaintenanceController {
@@ -18,37 +20,39 @@ public class MaintenanceController {
     private final MaintenanceService maintenanceService;
     private final PrinterStatsService printerStatsService;
 
-    @GetMapping("/maintenance")
-    public String maintenancePage(Model model) {
+    @GetMapping("/printers/{printerId}/maintenance")
+    public String maintenancePage(@PathVariable UUID printerId, Model model) {
 
         model.addAttribute(
                 "maintenances",
-                maintenanceService.getMaintenanceStatus()
+                maintenanceService.getMaintenanceStatus(printerId)
         );
 
         model.addAttribute(
                 "stats",
-                printerStatsService.getStats()
+                printerStatsService.getStats(printerId)
         );
 
         long dueCount = maintenanceService
-                .getMaintenanceStatus()
+                .getMaintenanceStatus(printerId)
                 .stream()
                 .filter(MaintenanceStatusDto::isDue)
                 .count();
 
         model.addAttribute("dueCount", dueCount);
+        model.addAttribute("printerId", printerId);
 
         return "dashboard/maintenance/list";
     }
 
-    @PostMapping("/maintenance/{id}/complete")
+    @PostMapping("/printers/{printerId}/maintenance/{id}/complete")
     public String completeMaintenance(
+            @PathVariable UUID printerId,
             @PathVariable Long id,
             @RequestParam(required = false) String notes) {
 
-        maintenanceService.completeMaintenance(id, notes);
+        maintenanceService.completeMaintenance(printerId, id, notes);
 
-        return "redirect:/maintenance";
+        return "redirect:/printers/" + printerId + "/maintenance";
     }
 }

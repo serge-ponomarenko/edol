@@ -10,6 +10,8 @@ import org.spon.edolhub.repository.FilamentRepository;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
 import org.spon.edolhub.repository.PrintAllocationPreviewRepository;
 import org.spon.edolhub.repository.PrintJobRepository;
+import org.spon.edolhub.service.PrinterAccessService;
+import org.spon.edolhub.service.TenantContext;
 import org.spon.edolhub.service.spool.AllocationMutationService;
 import org.spon.edolhub.service.spool.PrintAllocationPreviewMapper;
 import org.spon.edolhub.service.spool.PrintAllocationReconciliationService;
@@ -35,32 +37,38 @@ public class PrintAllocationController {
     private final FilamentRepository filamentRepository;
     private final FilamentSpoolRepository filamentSpoolRepository;
     private final PrintJobRepository printJobRepository;
+    private final PrinterAccessService printerAccessService;
+    private final TenantContext tenantContext;
 
-    @GetMapping("/print-jobs/allocation/{jobId}")
+    @GetMapping("/printers/{printerId}/print-jobs/allocation/{jobId}")
     public String allocationPage(
+            @PathVariable UUID printerId,
             @PathVariable Long jobId,
             Model model
     ) {
+        resolveJobId(printerId, jobId);
         model.addAttribute(
                 "currentPath",
-                "/print-jobs"
+                "/printers/" + printerId + "/print-jobs"
         );
 
         model.addAttribute(
                 "jobId",
                 jobId
         );
+        model.addAttribute("printerId", printerId);
 
         return "dashboard/print-jobs/allocation";
 
     }
 
-    @GetMapping("/api/allocations/job/{jobId}")
+    @GetMapping("/api/printers/{printerId}/allocations/job/{jobId}")
     @ResponseBody
     public PrintAllocationPreviewDto getAllocation(
+            @PathVariable UUID printerId,
             @PathVariable Long jobId
     ) {
-        UUID printJobId = resolveJobId(jobId);
+        UUID printJobId = resolveJobId(printerId, jobId);
 
         PrintAllocationPreview preview =
                 previewRepository
@@ -70,36 +78,40 @@ public class PrintAllocationController {
         return previewMapper.toDto(preview);
     }
 
-    @PostMapping("/api/allocations/rerun")
+    @PostMapping("/api/printers/{printerId}/allocations/rerun")
     @ResponseBody
     public void rerunAllocation(
+            @PathVariable UUID printerId,
             @RequestParam Long jobId,
             @RequestParam Long filamentId
     ) {
         allocationMutationService.rerunAllocation(
-                resolveJobId(jobId),
+                resolveJobId(printerId, jobId),
                 filamentId
         );
     }
 
-    @PostMapping("/api/allocations/finalize")
+    @PostMapping("/api/printers/{printerId}/allocations/finalize")
     @ResponseBody
     public Boolean finalizeReconciliation(
+            @PathVariable UUID printerId,
             @RequestParam Long jobId
     ) {
         return printAllocationReconciliationService.finalizeReconciliation(
-                resolveJobId(jobId)
+                resolveJobId(printerId, jobId)
         );
     }
 
-    @GetMapping("/api/allocations/filaments")
+    @GetMapping("/api/printers/{printerId}/allocations/filaments")
     @ResponseBody
     public List<Filament> filaments(
+            @PathVariable UUID printerId,
             @RequestParam("query")
             String query
     ) {
+        printerAccessService.getPrinter(printerId);
         return filamentRepository
-                .findAll()
+                .findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId())
                 .stream()
                 .filter(f ->
                         f.getFullId() != null
@@ -113,37 +125,39 @@ public class PrintAllocationController {
                 .toList();
     }
 
-    @PostMapping("/api/allocations/replace-filament")
+    @PostMapping("/api/printers/{printerId}/allocations/replace-filament")
     @ResponseBody
     public void replaceFilament(
+            @PathVariable UUID printerId,
             @RequestParam Long jobId,
             @RequestParam Long sourceFilamentId,
             @RequestParam Long targetFilamentId
     ) {
         Filament filament =
                 filamentRepository
-                        .findById(
-                                targetFilamentId
-                        )
+                        .findByIdAndTenantId(targetFilamentId, tenantContext.getCurrentTenantId())
                         .orElseThrow();
 
         allocationMutationService
                 .replaceFilament(
-                        resolveJobId(jobId),
+                        resolveJobId(printerId, jobId),
                         sourceFilamentId,
                         filament
                 );
 
     }
 
-    @GetMapping("/api/allocations/spools")
+    @GetMapping("/api/printers/{printerId}/allocations/spools")
     @ResponseBody
     public List<AllocationSpoolOptionDto> spools(
+            @PathVariable UUID printerId,
             @RequestParam Long filamentId
     ) {
+        printerAccessService.getPrinter(printerId);
         return filamentSpoolRepository
-                .findAllByFilamentIdAndStatusIn(
+                .findAllByFilamentIdAndFilamentTenantIdAndStatusIn(
                         filamentId,
+                        tenantContext.getCurrentTenantId(),
                         List.of(
                                 FilamentSpool.FilamentSpoolStatus.ACTIVE,
                                 FilamentSpool.FilamentSpoolStatus.SEALED
@@ -154,9 +168,10 @@ public class PrintAllocationController {
                 .toList();
     }
 
-    @PostMapping("/api/allocations/replace-spool")
+    @PostMapping("/api/printers/{printerId}/allocations/replace-spool")
     @ResponseBody
     public void replaceSpool(
+            @PathVariable UUID printerId,
             @RequestParam Long jobId,
             @RequestParam Long filamentId,
             @RequestParam Long spoolId,
@@ -164,7 +179,7 @@ public class PrintAllocationController {
     ) {
         FilamentSpool spool =
                 filamentSpoolRepository
-                        .findById(spoolId)
+                        .findByIdAndFilamentTenantId(spoolId, tenantContext.getCurrentTenantId())
                         .orElseThrow();
 
         validateSpoolMutation(
@@ -175,7 +190,7 @@ public class PrintAllocationController {
 
         allocationMutationService
                 .replaceAllocationWithSingleSpool(
-                        resolveJobId(jobId),
+                        resolveJobId(printerId, jobId),
                         filamentId,
                         spool,
                         grams,
@@ -186,9 +201,10 @@ public class PrintAllocationController {
                 );
     }
 
-    @PostMapping("/api/allocations/add-spool")
+    @PostMapping("/api/printers/{printerId}/allocations/add-spool")
     @ResponseBody
     public void addSpool(
+            @PathVariable UUID printerId,
             @RequestParam Long jobId,
             @RequestParam Long filamentId,
             @RequestParam Long spoolId,
@@ -196,7 +212,7 @@ public class PrintAllocationController {
     ) {
         FilamentSpool spool =
                 filamentSpoolRepository
-                        .findById(spoolId)
+                        .findByIdAndFilamentTenantId(spoolId, tenantContext.getCurrentTenantId())
                         .orElseThrow();
 
         validateSpoolMutation(
@@ -207,7 +223,7 @@ public class PrintAllocationController {
 
         allocationMutationService
                 .addAllocationItem(
-                        resolveJobId(jobId),
+                        resolveJobId(printerId, jobId),
                         filamentId,
                         spool,
                         grams,
@@ -218,11 +234,15 @@ public class PrintAllocationController {
                 );
     }
 
-    private UUID resolveJobId(Long publicId) {
-        return printJobRepository
-                .findByPublicId(publicId)
-                .orElseThrow()
-                .getId();
+    private UUID resolveJobId(UUID printerId, Long publicId) {
+        printerAccessService.getPrinter(printerId);
+        var job = printJobRepository
+                .findByPublicIdAndPrinterTenantId(publicId, tenantContext.getCurrentTenantId())
+                .orElseThrow();
+        if (job.getPrinter() == null || !printerId.equals(job.getPrinter().getId())) {
+            throw new IllegalArgumentException("Print job does not belong to the selected printer");
+        }
+        return job.getId();
     }
 
     private AllocationSpoolOptionDto toSpoolOptionDto(

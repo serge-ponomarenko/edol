@@ -8,6 +8,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.spon.edolhub.model.entity.Printer;
+import org.spon.edolhub.service.PrinterAccessService;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -25,8 +28,13 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ProxyControllerTest {
 
+    private static final UUID PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
+
     @Mock
     private RestTemplate restTemplate;
+
+    @Mock
+    private PrinterAccessService printerAccessService;
 
     @InjectMocks
     private ProxyController controller;
@@ -34,6 +42,9 @@ class ProxyControllerTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(controller, "edolCoreUrl", "http://edolcore:8080");
+        Printer printer = new Printer();
+        printer.setId(PRINTER_ID);
+        org.mockito.Mockito.lenient().when(printerAccessService.getDefaultPrinter()).thenReturn(printer);
     }
 
     @Nested
@@ -46,7 +57,7 @@ class ProxyControllerTest {
             Map<String, Object> body = Map.of("obj", "test");
             ResponseEntity<String> coreResponse = ResponseEntity.ok("done");
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/request/skip-objects"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/skip-objects"),
                     eq(HttpMethod.POST),
                     any(HttpEntity.class),
                     eq(String.class)
@@ -67,7 +78,7 @@ class ProxyControllerTest {
         @DisplayName("proxies pause request")
         void proxiesPause() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/request/pause"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/pause"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -82,7 +93,7 @@ class ProxyControllerTest {
         @DisplayName("returns 502 when core unavailable")
         void returnsBadGateway() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/request/pause"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/pause"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -103,7 +114,7 @@ class ProxyControllerTest {
         @DisplayName("proxies resume request")
         void proxiesResume() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/request/resume"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/resume"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -118,7 +129,7 @@ class ProxyControllerTest {
         @DisplayName("returns 502 when core unavailable")
         void returnsBadGateway() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/request/resume"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/resume"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -139,7 +150,7 @@ class ProxyControllerTest {
         @DisplayName("proxies stop request")
         void proxiesStop() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/request/stop"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/stop"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -154,7 +165,7 @@ class ProxyControllerTest {
         @DisplayName("returns 502 when core unavailable")
         void returnsBadGateway() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/request/stop"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/stop"),
                     eq(HttpMethod.POST),
                     isNull(),
                     eq(String.class)
@@ -176,7 +187,7 @@ class ProxyControllerTest {
         void proxiesTopImage() {
             byte[] imageData = "image".getBytes();
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/modeltopimage"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/media/model/top"),
                     eq(HttpMethod.GET),
                     isNull(),
                     eq(byte[].class)
@@ -198,7 +209,7 @@ class ProxyControllerTest {
         void proxiesModelImage() {
             byte[] imageData = "model".getBytes();
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/modelimage"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/media/model/plate"),
                     eq(HttpMethod.GET),
                     isNull(),
                     eq(byte[].class)
@@ -214,7 +225,7 @@ class ProxyControllerTest {
         @DisplayName("returns 404 when core unavailable")
         void returnsNotFound() {
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/modelimage"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/media/model/plate"),
                     eq(HttpMethod.GET),
                     isNull(),
                     eq(byte[].class)
@@ -226,25 +237,4 @@ class ProxyControllerTest {
         }
     }
 
-    @Nested
-    @DisplayName("proxyCameraImage")
-    class ProxyCameraImage {
-
-        @Test
-        @DisplayName("proxies camera image")
-        void proxiesCameraImage() {
-            byte[] imageData = "camera".getBytes();
-            when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/camera/latest"),
-                    eq(HttpMethod.GET),
-                    isNull(),
-                    eq(byte[].class)
-            )).thenReturn(ResponseEntity.ok(imageData));
-
-            ResponseEntity<byte[]> response = controller.proxyCameraImage();
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).isEqualTo(imageData);
-        }
-    }
 }

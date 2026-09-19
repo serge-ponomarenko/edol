@@ -61,7 +61,7 @@ public class CameraController {
         );
     }
 
-    @GetMapping("/api/printers/{printerId}/camera/status-image")
+    @GetMapping("/printers/{printerId}/camera/status-image")
     public Path getLatestStatusImagePath(
             @PathVariable UUID printerId
     ) {

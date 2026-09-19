@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -21,12 +22,12 @@ public class MaintenanceService {
     private final MaintenanceExecutionRepository executionRepo;
     private final PrinterStatsService printerStatsService;
 
-    public List<MaintenanceStatusDto> getMaintenanceStatus() {
+    public List<MaintenanceStatusDto> getMaintenanceStatus(UUID printerId) {
 
-        int currentHours = printerStatsService.getTotalPrinterHours();
-        LocalDateTime startPrintingDate = printerStatsService.getStats().getPrinterStartedPrintingDate();
+        int currentHours = printerStatsService.getTotalPrinterHours(printerId);
+        LocalDateTime startPrintingDate = printerStatsService.getStats(printerId).getPrinterStartedPrintingDate();
 
-        return definitionRepo.findByActiveTrue()
+        return definitionRepo.findByPrinterIdAndActiveTrue(printerId)
                 .stream()
                 .map(m -> calculateStatus(m, currentHours, startPrintingDate))
                 .sorted(Comparator.comparing(MaintenanceStatusDto::isDue).reversed())
@@ -97,12 +98,12 @@ public class MaintenanceService {
     }
 
     @Transactional
-    public void completeMaintenance(Long id, String notes) {
+    public void completeMaintenance(UUID printerId, Long id, String notes) {
 
         MaintenanceDefinition definition =
-                definitionRepo.findById(id).orElseThrow();
+                definitionRepo.findByIdAndPrinterId(id, printerId).orElseThrow();
 
-        int currentHours = printerStatsService.getTotalPrinterHours();
+        int currentHours = printerStatsService.getTotalPrinterHours(printerId);
 
         MaintenanceExecution exec = new MaintenanceExecution();
 

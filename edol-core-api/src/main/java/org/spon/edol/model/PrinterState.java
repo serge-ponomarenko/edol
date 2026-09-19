@@ -3,11 +3,12 @@ package org.spon.edol.model;
 import lombok.Data;
 
 import java.util.List;
+import java.util.UUID;
 
 @Data
 public class PrinterState {
 
-    private int printerId = 1;
+    private UUID printerId;
     private boolean isOnline;
 
     private String gcodeState;

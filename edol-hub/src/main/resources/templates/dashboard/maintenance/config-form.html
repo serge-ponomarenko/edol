@@ -34,7 +34,7 @@
                     </div>
 
                     <div class="card-body">
-                        <form method="post" th:action="@{/maintenance/config/add}" th:object="${definition}">
+                        <form method="post" th:action="@{/printers/{id}/maintenance/config/add(id=${printerId})}" th:object="${definition}">
 
                             <input th:field="*{id}" type="hidden"/>
 
@@ -62,7 +62,7 @@
                                 Save
                             </button>
 
-                            <a class="btn btn-secondary" href="/maintenance/config">
+                            <a class="btn btn-secondary" th:href="@{/printers/{id}/maintenance/config(id=${printerId})}">
                                 Cancel
                             </a>
 

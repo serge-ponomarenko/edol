@@ -1,13 +1,14 @@
 package org.spon.edolhub.service;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.spon.edolhub.model.entity.Printer;
 import org.spon.edolhub.model.entity.PrinterStats;
 import org.spon.edolhub.repository.PrinterStatsRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -15,40 +16,37 @@ import java.time.LocalDateTime;
 public class PrinterStatsService {
 
     private final PrinterStatsRepository repository;
+    private final PrinterAccessService printerAccessService;
 
-    @PostConstruct
-    public void init() {
-        getStats();
-    }
+    public PrinterStats getStats(UUID printerId) {
+        Printer printer = printerAccessService.getPrinter(printerId);
+        PrinterStats stats = repository.findByPrinterId(printerId)
+                .orElseGet(() -> createStats(printer));
 
-    public PrinterStats getStats() {
-        PrinterStats stats = repository.findAll()
-                .stream()
-                .findFirst()
-                .orElseGet(this::createStats);
-
-        stats.setTotalPrintHours(
-                stats.getTotalPrintSeconds() / 3600
-        );
-
+        stats.setTotalPrintHours(stats.getTotalPrintSeconds() / 3600);
         return stats;
     }
 
-    private PrinterStats createStats() {
+    public PrinterStats getStats() {
+        return getStats(printerAccessService.getDefaultPrinter().getId());
+    }
+
+    private PrinterStats createStats(Printer printer) {
         PrinterStats stats = new PrinterStats();
+        stats.setPrinter(printer);
         stats.setUpdatedAt(LocalDateTime.now());
 
         return repository.save(stats);
     }
 
-    public int getTotalPrinterHours() {
-        PrinterStats stats = getStats();
+    public int getTotalPrinterHours(UUID printerId) {
+        PrinterStats stats = getStats(printerId);
 
         return (int) (stats.getTotalPrintSeconds() / 3600);
     }
 
-    public void addPrintJob(long jobSeconds, long filamentGrams) {
-        PrinterStats stats = getStats();
+    public void addPrintJob(Printer printer, long jobSeconds, long filamentGrams) {
+        PrinterStats stats = getStats(printer.getId());
 
         stats.setTotalPrintSeconds(
                 stats.getTotalPrintSeconds() + jobSeconds
@@ -68,8 +66,8 @@ public class PrinterStatsService {
     }
 
     @Transactional
-    public void updateStats(PrinterStats updated) {
-        PrinterStats stats = getStats();
+    public void updateStats(UUID printerId, PrinterStats updated) {
+        PrinterStats stats = getStats(printerId);
 
         if (updated.getTotalPrintHours() != null) {
 
@@ -88,13 +86,13 @@ public class PrinterStatsService {
         repository.save(stats);
     }
 
-    public double getTotalPrinterHoursDouble() {
-        return getStats().getTotalPrintSeconds() / 3600.0;
+    public double getTotalPrinterHoursDouble(UUID printerId) {
+        return getStats(printerId).getTotalPrintSeconds() / 3600.0;
     }
 
-    public String getFormattedPrinterTime() {
+    public String getFormattedPrinterTime(UUID printerId) {
 
-        long seconds = getStats().getTotalPrintSeconds();
+        long seconds = getStats(printerId).getTotalPrintSeconds();
 
         long hours = seconds / 3600;
         long minutes = (seconds % 3600) / 60;

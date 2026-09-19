@@ -9,7 +9,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.service.PrinterService;
+import org.spon.edolhub.service.PrinterAccessService;
 import org.springframework.ui.Model;
+
+import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -17,8 +21,13 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DashboardControllerTest {
 
+    private static final UUID PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
+
     @Mock
     private PrinterService printerService;
+
+    @Mock
+    private PrinterAccessService printerAccessService;
 
     @Mock
     private Model model;
@@ -35,9 +44,10 @@ class DashboardControllerTest {
         void returnsViewWithState() {
             PrinterState state = new PrinterState();
             state.setCurrentTask("Test Print");
-            when(printerService.getState()).thenReturn(state);
+            when(printerService.getState(PRINTER_ID)).thenReturn(state);
+            when(printerAccessService.getPrinters()).thenReturn(List.of());
 
-            String view = controller.dashboard(model);
+            String view = controller.dashboard(PRINTER_ID, model);
 
             assertThat(view).isEqualTo("dashboard/index");
             verify(model).addAttribute("printer", state);
@@ -47,9 +57,10 @@ class DashboardControllerTest {
         @Test
         @DisplayName("returns dashboard view when printer offline")
         void returnsViewWhenOffline() {
-            when(printerService.getState()).thenReturn(null);
+            when(printerService.getState(PRINTER_ID)).thenReturn(null);
+            when(printerAccessService.getPrinters()).thenReturn(List.of());
 
-            String view = controller.dashboard(model);
+            String view = controller.dashboard(PRINTER_ID, model);
 
             assertThat(view).isEqualTo("dashboard/index");
             verify(model).addAttribute(eq("printer"), any(PrinterState.class));

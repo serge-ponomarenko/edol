@@ -116,7 +116,8 @@
 
 </body>
 
-<script>
+<script th:inline="javascript">
+    const printerId = /*[[${printerId}]]*/ "";
 
     let page = 0;
     let size = 10;
@@ -162,7 +163,7 @@
         loadMoreBtn.disabled = true;
         loader.classList.remove("d-none");
 
-        fetch(`/api/print/print-jobs?page=${page}&size=${size}`)
+        fetch(`/api/printers/${printerId}/print-jobs?page=${page}&size=${size}`)
             .then(res => res.json())
             .then(data => {
 
@@ -214,12 +215,12 @@
             <td>
                 <div class="btn-list">
                     <a class="btn btn-sm btn-warning"
-                       href="/print-jobs/allocation/${job.id}">
+                       href="/printers/${printerId}/print-jobs/allocation/${job.id}">
                         <i class="ti ti-edit"></i>
                     </a>
                     <a class="btn btn-sm btn-danger"
                        onclick="return confirm('Delete JOB: ${job.taskName}?')"
-                       href="/print-jobs/delete/${job.id}">
+                       href="/printers/${printerId}/print-jobs/delete/${job.id}">
                         <i class="ti ti-trash"></i>
                     </a>
                 </div>
@@ -352,7 +353,7 @@
         const manageButton = `
         <div class="mt-2">
             <a class="btn btn-sm btn-outline-primary"
-               href="/print-jobs/allocation/${job.id}">
+               href="/printers/${printerId}/print-jobs/allocation/${job.id}">
                 <i class="ti ti-adjustments"></i>
                 Manage Allocation
             </a>

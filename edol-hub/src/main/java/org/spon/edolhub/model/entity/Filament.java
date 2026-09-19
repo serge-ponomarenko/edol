@@ -16,6 +16,10 @@ public class Filament {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
+
     // Example: JAMG HE PETG Basic - comes from Printer
     private String fullId;
 

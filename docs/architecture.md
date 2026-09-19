@@ -19,11 +19,13 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with Po
 3. Hub, Notify, and AMS subscribe to `edolcore/#`. Hub persists print and inventory effects; Notify sends Telegram messages; AMS changes spool state.
 4. Hub, Notify, and AMS also call Core over HTTP for current printer state or commands. Hub owns its persistence; Core owns printer connectivity and runtime state.
 
-Core runtime is per printer. Its HTTP API exposes all states and an explicit `{printerId}` state endpoint. The legacy default-state endpoint remains a deprecated compatibility boundary. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer; incomplete working-tree migrations are not established architecture.
+Core runtime is per printer. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints. Legacy default-printer endpoints remain deprecated compatibility boundaries. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
+
+Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, and dashboard routes are printer-scoped. During the tenant bootstrap phase, `TenantContext` resolves one database-marked default tenant; authentication and user membership remain future work. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md`.
 
 ## Lifecycle and Persistence
 
-- On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub attempts to recover an active print job and allocation preview from Core state.
+- On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog, performs validated legacy backfill, and then attempts recovery independently for every enabled projected printer.
 - Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract.
 - Core stores models and camera snapshots on mounted volumes. Docker Compose also mounts service logs.
 
@@ -36,7 +38,7 @@ Core runtime is per printer. Its HTTP API exposes all states and an explicit `{p
 ## Testing and Checks
 
 - The reactor check used by CI is `mvn -B clean verify`, followed by SonarQube analysis.
-- Existing automated tests are Mockito-based unit tests in `edol-hub`; there is no discovered automated integration coverage for Core, MQTT, Flyway, or physical printers.
+- Hub has Mockito-based unit tests and optional Testcontainers coverage for the Flyway PostgreSQL chain. There is no automated integration coverage for Core/Hub HTTP, MQTT, or physical printers.
 - Validate changes at the narrowest affected module first, then broaden checks when a shared contract, migration, or runtime boundary changes.
 
 ## Decision Records

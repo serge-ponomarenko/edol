@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public interface FilamentSpoolRepository extends
@@ -24,6 +25,12 @@ public interface FilamentSpoolRepository extends
 
     List<FilamentSpool> findAllByFilamentIdAndStatusIn(
             Long filamentId,
+            List<FilamentSpool.FilamentSpoolStatus> statuses
+    );
+
+    List<FilamentSpool> findAllByFilamentIdAndFilamentTenantIdAndStatusIn(
+            Long filamentId,
+            UUID tenantId,
             List<FilamentSpool.FilamentSpoolStatus> statuses
     );
 
@@ -44,5 +51,9 @@ public interface FilamentSpoolRepository extends
                 join fetch f.materialType
             """)
     List<FilamentSpool> findAllWithFilament();
+
+    List<FilamentSpool> findAllByFilamentTenantId(UUID tenantId);
+
+    Optional<FilamentSpool> findByIdAndFilamentTenantId(Long id, UUID tenantId);
 
 }

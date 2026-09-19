@@ -12,14 +12,18 @@ import org.spon.edolhub.model.entity.PrinterStats;
 import org.spon.edolhub.service.MaintenanceService;
 import org.spon.edolhub.service.PrinterDashboardStateService;
 import org.spon.edolhub.service.PrinterStatsService;
+import org.spon.edolhub.service.PrinterAccessService;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PrinterStateControllerTest {
+
+    private static final UUID PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
 
     @Mock
     private PrinterStatsService printerStatsService;
@@ -29,6 +33,9 @@ class PrinterStateControllerTest {
 
     @Mock
     private PrinterDashboardStateService printerDashboardStateService;
+
+    @Mock
+    private PrinterAccessService printerAccessService;
 
     @InjectMocks
     private PrinterStateController controller;
@@ -41,9 +48,9 @@ class PrinterStateControllerTest {
         @DisplayName("returns enriched printer state")
         void returnsEnrichedState() {
             PrinterStateController.PrinterStateEnriched expected = new PrinterStateController.PrinterStateEnriched();
-            when(printerDashboardStateService.getState()).thenReturn(expected);
+            when(printerDashboardStateService.getState(PRINTER_ID)).thenReturn(expected);
 
-            PrinterStateController.PrinterStateEnriched result = controller.getState();
+            PrinterStateController.PrinterStateEnriched result = controller.getState(PRINTER_ID);
 
             assertThat(result).isSameAs(expected);
         }
@@ -57,9 +64,9 @@ class PrinterStateControllerTest {
         @DisplayName("returns printer stats")
         void returnsStats() {
             PrinterStats stats = new PrinterStats();
-            when(printerStatsService.getStats()).thenReturn(stats);
+            when(printerStatsService.getStats(PRINTER_ID)).thenReturn(stats);
 
-            PrinterStats result = controller.getStats();
+            PrinterStats result = controller.getStats(PRINTER_ID);
 
             assertThat(result).isSameAs(stats);
         }
@@ -79,9 +86,9 @@ class PrinterStateControllerTest {
             MaintenanceStatusDto notDue = new MaintenanceStatusDto();
             notDue.setDue(false);
 
-            when(maintenanceService.getMaintenanceStatus()).thenReturn(List.of(due1, notDue, due2));
+            when(maintenanceService.getMaintenanceStatus(PRINTER_ID)).thenReturn(List.of(due1, notDue, due2));
 
-            List<MaintenanceStatusDto> alerts = controller.getMaintenanceAlerts();
+            List<MaintenanceStatusDto> alerts = controller.getMaintenanceAlerts(PRINTER_ID);
 
             assertThat(alerts)
                     .hasSize(2)
@@ -94,9 +101,9 @@ class PrinterStateControllerTest {
             MaintenanceStatusDto notDue = new MaintenanceStatusDto();
             notDue.setDue(false);
 
-            when(maintenanceService.getMaintenanceStatus()).thenReturn(List.of(notDue));
+            when(maintenanceService.getMaintenanceStatus(PRINTER_ID)).thenReturn(List.of(notDue));
 
-            List<MaintenanceStatusDto> alerts = controller.getMaintenanceAlerts();
+            List<MaintenanceStatusDto> alerts = controller.getMaintenanceAlerts(PRINTER_ID);
 
             assertThat(alerts).isEmpty();
         }

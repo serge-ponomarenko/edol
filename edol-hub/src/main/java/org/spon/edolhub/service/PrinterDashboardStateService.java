@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -23,11 +25,11 @@ public class PrinterDashboardStateService {
     private final AllocationPreviewRuntimeCacheService
             runtimeCacheService;
 
-    public PrinterStateEnriched getState() {
+    public PrinterStateEnriched getState(UUID printerId) {
         try {
             PrinterState printerState =
                     edolCoreClient.get()
-                            .uri("/api/printers/state-default")
+                            .uri("/api/printers/{printerId}/state", printerId)
                             .retrieve()
                             .body(PrinterState.class);
 
@@ -39,7 +41,7 @@ public class PrinterDashboardStateService {
 
             response.setPrinterState(printerState);
 
-            PrintJob currentJob = runtimeStateService.getCurrentJob();
+            PrintJob currentJob = runtimeStateService.getCurrentJob(printerId);
 
             if (currentJob == null) {
                 response.setAllocationPreview(null);
@@ -53,9 +55,7 @@ public class PrinterDashboardStateService {
                     currentJob.getPublicId()
             );
 
-            boolean previewReady =
-                    runtimeStateService
-                            .isAllocationPreviewReady();
+            boolean previewReady = runtimeStateService.isAllocationPreviewReady(printerId);
 
             response.setAllocationPreviewPending(
                     !previewReady
@@ -66,7 +66,7 @@ public class PrinterDashboardStateService {
             }
 
             PrintAllocationPreviewDto preview =
-                    runtimeCacheService.getCurrentAllocationPreview();
+                    runtimeCacheService.getCurrentAllocationPreview(printerId);
             if (preview != null
                     && !preview.getPrintJobId().equals(currentJob.getId())) {
                 preview = null;

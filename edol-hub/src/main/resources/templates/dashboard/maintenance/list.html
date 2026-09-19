@@ -128,7 +128,7 @@
                     <div th:if="${#lists.isEmpty(maintenances)}">
                         <div class="empty">
                             <p>No maintenance tasks configured.</p>
-                            <a class="btn btn-primary" href="/maintenance/config">
+                            <a class="btn btn-primary" th:href="@{/printers/{id}/maintenance/config(id=${printerId})}">
                                 Add Maintenance
                             </a>
                         </div>
@@ -203,7 +203,7 @@
 
                                     <td class="text-end">
                                         <form method="post"
-                                              th:action="@{/maintenance/{id}/complete(id=${m.id})}">
+                                              th:action="@{/printers/{printerId}/maintenance/{id}/complete(printerId=${printerId}, id=${m.id})}">
                                             <button class="btn btn-sm btn-primary">
                                                 Mark done
                                             </button>

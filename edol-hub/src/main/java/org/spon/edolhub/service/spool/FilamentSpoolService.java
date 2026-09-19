@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,7 @@ import java.util.Optional;
 public class FilamentSpoolService {
 
     private final FilamentSpoolRepository filamentSpoolRepository;
+    private final TenantContext tenantContext;
 
     public List<FilamentSpool> findFiltered(
             String vendor,
@@ -29,6 +31,11 @@ public class FilamentSpoolService {
     ) {
         return filamentSpoolRepository.findAll((root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            predicates.add(cb.equal(
+                    root.get("filament").get("tenant").get("id"),
+                    tenantContext.getCurrentTenantId()
+            ));
 
             if (vendor != null && !vendor.isEmpty()) {
                 predicates.add(cb.equal(

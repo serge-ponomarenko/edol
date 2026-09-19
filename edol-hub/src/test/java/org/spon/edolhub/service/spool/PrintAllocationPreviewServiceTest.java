@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,9 +57,10 @@ class PrintAllocationPreviewServiceTest {
                 .materialType(materialType).brand("Matte").colorHex("#F95D73")
                 .build();
         job = PrintJob.builder()
-                .id(100L).sessionId("SESS-001").fileName("test.gcode")
+                .sessionId("SESS-001").fileName("test.gcode")
                 .taskName("Test Print").status(PrintJobStatus.RUNNING)
                 .build();
+        job.setId(UUID.fromString("00000000-0000-0000-0000-000000000201"));
     }
 
     @Nested

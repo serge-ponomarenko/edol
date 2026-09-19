@@ -25,6 +25,7 @@ public class AllocationPreviewRuntimeSyncService {
                 .ifPresent(preview ->
                         runtimeCacheService
                                 .setCurrentAllocationPreview(
+                                        preview.getPrintJob().getPrinter().getId(),
                                         previewMapper
                                                 .toDto(preview)
                                 )

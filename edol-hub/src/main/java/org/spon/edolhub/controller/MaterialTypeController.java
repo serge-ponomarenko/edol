@@ -3,6 +3,7 @@ package org.spon.edolhub.controller;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.entity.MaterialType;
 import org.spon.edolhub.repository.MaterialTypeRepository;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -13,10 +14,11 @@ import org.springframework.web.bind.annotation.*;
 public class MaterialTypeController {
 
     private final MaterialTypeRepository materialRepository;
+    private final TenantContext tenantContext;
 
     @GetMapping
     public String list(Model model) {
-        model.addAttribute("materials", materialRepository.findAll());
+        model.addAttribute("materials", materialRepository.findAllByTenantIdOrderByName(tenantContext.getCurrentTenantId()));
 
         return "dashboard/materials/list";
     }
@@ -30,6 +32,7 @@ public class MaterialTypeController {
 
     @PostMapping
     public String save(@ModelAttribute MaterialType material) {
+        material.setTenant(tenantContext.getCurrentTenant());
         materialRepository.save(material);
 
         return "redirect:/materials";
@@ -37,7 +40,7 @@ public class MaterialTypeController {
 
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable Long id, Model model) {
-        MaterialType material = materialRepository.findById(id).orElseThrow();
+        MaterialType material = materialRepository.findByIdAndTenantId(id, tenantContext.getCurrentTenantId()).orElseThrow();
 
         model.addAttribute("material", material);
 
@@ -46,7 +49,9 @@ public class MaterialTypeController {
 
     @GetMapping("/delete/{id}")
     public String delete(@PathVariable Long id) {
-        materialRepository.deleteById(id);
+        materialRepository.delete(
+                materialRepository.findByIdAndTenantId(id, tenantContext.getCurrentTenantId()).orElseThrow()
+        );
 
         return "redirect:/materials";
     }

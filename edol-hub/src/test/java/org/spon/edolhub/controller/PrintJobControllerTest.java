@@ -13,6 +13,7 @@ import org.spon.edolhub.model.entity.PrintJob;
 import org.spon.edolhub.repository.PrintJobRepository;
 import org.spon.edolhub.service.PrintJobMapper;
 import org.spon.edolhub.service.PrintJobService;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpHeaders;
@@ -22,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,6 +31,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PrintJobControllerTest {
+
+    private static final UUID PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Mock
     private PrintJobService printJobService;
@@ -38,6 +43,9 @@ class PrintJobControllerTest {
 
     @Mock
     private PrintJobMapper printJobMapper;
+
+    @Mock
+    private TenantContext tenantContext;
 
     @InjectMocks
     private PrintJobController controller;
@@ -50,11 +58,12 @@ class PrintJobControllerTest {
         @DisplayName("returns plate image when present")
         void returnsPlateImage() {
             byte[] imageData = "fake-image-data".getBytes();
-            PrintJob job = PrintJob.builder().id(1L).build();
+            PrintJob job = PrintJob.builder().build();
             job.setPlateImage(imageData);
             job.setPlateImageType("image/png");
 
-            when(printJobRepository.findById(1L)).thenReturn(Optional.of(job));
+            when(tenantContext.getCurrentTenantId()).thenReturn(TENANT_ID);
+            when(printJobRepository.findByPublicIdAndPrinterTenantId(1L, TENANT_ID)).thenReturn(Optional.of(job));
 
             ResponseEntity<byte[]> response = controller.image(1L);
 
@@ -66,9 +75,10 @@ class PrintJobControllerTest {
         @Test
         @DisplayName("returns SVG placeholder when no plate image")
         void returnsSvgPlaceholder() {
-            PrintJob job = PrintJob.builder().id(1L).build();
+            PrintJob job = PrintJob.builder().build();
 
-            when(printJobRepository.findById(1L)).thenReturn(Optional.of(job));
+            when(tenantContext.getCurrentTenantId()).thenReturn(TENANT_ID);
+            when(printJobRepository.findByPublicIdAndPrinterTenantId(1L, TENANT_ID)).thenReturn(Optional.of(job));
 
             ResponseEntity<byte[]> response = controller.image(1L);
 
@@ -82,7 +92,8 @@ class PrintJobControllerTest {
         @Test
         @DisplayName("throws when job not found")
         void throwsWhenNotFound() {
-            when(printJobRepository.findById(99L)).thenReturn(Optional.empty());
+            when(tenantContext.getCurrentTenantId()).thenReturn(TENANT_ID);
+            when(printJobRepository.findByPublicIdAndPrinterTenantId(99L, TENANT_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> controller.image(99L))
                     .isInstanceOf(java.util.NoSuchElementException.class);
@@ -96,15 +107,15 @@ class PrintJobControllerTest {
         @Test
         @DisplayName("returns paged job DTOs")
         void returnsPagedJobs() {
-            PrintJob job = PrintJob.builder().id(1L).build();
+            PrintJob job = PrintJob.builder().build();
             PrintJobDto dto = new PrintJobDto();
             dto.setId(1L);
 
             Page<PrintJob> jobPage = new PageImpl<>(List.of(job));
-            when(printJobService.getJobs(0, 10)).thenReturn(jobPage);
+            when(printJobService.getJobs(PRINTER_ID, 0, 10)).thenReturn(jobPage);
             when(printJobMapper.toDto(job)).thenReturn(dto);
 
-            PageResponse<PrintJobDto> result = controller.getJobs(0, 10);
+            PageResponse<PrintJobDto> result = controller.getJobs(PRINTER_ID, 0, 10);
 
             assertThat(result.getContent()).hasSize(1);
             assertThat(result.getContent().getFirst().getId()).isEqualTo(1L);

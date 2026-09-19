@@ -14,21 +14,23 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/print")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class PrintJobController {
 
     private final PrintJobService printJobService;
     private final PrintJobRepository printJobRepository;
     private final PrintJobMapper printJobMapper;
+    private final org.spon.edolhub.service.TenantContext tenantContext;
 
-    @GetMapping("/image/{jobId}")
+    @GetMapping("/print/image/{jobId}")
     public ResponseEntity<byte[]> image(@PathVariable Long jobId) {
 
         PrintJob job = printJobRepository
-                .findByPublicId(jobId)
+                .findByPublicIdAndPrinterTenantId(jobId, tenantContext.getCurrentTenantId())
                 .orElseThrow();
 
         if (job.getPlateImage() != null) {
@@ -55,13 +57,14 @@ public class PrintJobController {
                 .body(svg.getBytes(StandardCharsets.UTF_8));
     }
 
-    @GetMapping("/print-jobs")
+    @GetMapping("/printers/{printerId}/print-jobs")
     @ResponseBody
     public PageResponse<PrintJobDto> getJobs(
+            @PathVariable UUID printerId,
             @RequestParam int page,
             @RequestParam int size
     ) {
-        Page<PrintJobDto> result = printJobService.getJobs(page, size)
+        Page<PrintJobDto> result = printJobService.getJobs(printerId, page, size)
                 .map(printJobMapper::toDto);
 
         return new PageResponse<>(

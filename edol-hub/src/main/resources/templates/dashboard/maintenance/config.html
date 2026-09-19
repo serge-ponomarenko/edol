@@ -35,13 +35,13 @@
                         <h3 class="card-title">Maintenance Definitions Types</h3>
 
                         <div class="card-actions">
-                            <a class="btn btn-primary" href="/maintenance/config/printer-stats-form">
+                            <a class="btn btn-primary" th:href="@{/printers/{id}/maintenance/config/printer-stats-form(id=${printerId})}">
                                 Edit Printer Statistics
                             </a>
                         </div>
 
                         <div class="card-actions">
-                            <a class="btn btn-primary" href="/maintenance/config/new">
+                            <a class="btn btn-primary" th:href="@{/printers/{id}/maintenance/config/new(id=${printerId})}">
                                 Add Maintenance Definition
                             </a>
                         </div>
@@ -82,20 +82,20 @@
                                 <td class="text-end">
                                     <form method="post"
                                           style="display:inline"
-                                          th:action="@{/maintenance/config/{id}/toggle(id=${m.id})}">
+                                          th:action="@{/printers/{printerId}/maintenance/config/{id}/toggle(printerId=${printerId}, id=${m.id})}">
                                         <button class="btn btn-sm btn-warning">
                                             Toggle active
                                         </button>
                                     </form>
 
                                     <a class="btn btn-sm btn-info"
-                                       th:href="@{/maintenance/config/edit/{id}(id=${m.id})}">
+                                       th:href="@{/printers/{printerId}/maintenance/config/edit/{id}(printerId=${printerId}, id=${m.id})}">
                                         Edit
                                     </a>
 
                                     <form method="post"
                                           style="display:inline"
-                                          th:action="@{/maintenance/config/{id}/delete(id=${m.id})}">
+                                          th:action="@{/printers/{printerId}/maintenance/config/{id}/delete(printerId=${printerId}, id=${m.id})}">
                                         <button class="btn btn-sm btn-danger"
                                                 onclick="return confirmDelete(this)"
                                                 th:attr="data-name=${m.name}">

@@ -103,38 +103,30 @@
 
         <hr class="my-4"/>
 
-        <h3>Select AMS tray</h3>
+        <div class="mt-4" th:each="printer : ${printers}">
+            <h3 th:text="${printer.name}">Printer</h3>
 
-        <div class="row g-3 mt-2">
-
-            <div class="col-3" th:each="i : ${#numbers.sequence(0,3)}">
-                <form method="post" th:action="@{/s/{spoolId}/{trayId}(spoolId=${spool.id}, trayId=${i})}">
-                    <button class="btn btn-primary w-100 tray-btn" type="submit">
-                        A[[${i}+1]]
-                    </button>
-                </form>
+            <div class="row g-3 mt-2">
+                <div class="col-3" th:each="i : ${#numbers.sequence(0,3)}">
+                    <form method="post"
+                          th:action="@{/s/{printerId}/{spoolId}/{trayId}(printerId=${printer.id}, spoolId=${spool.id}, trayId=${i})}">
+                        <button class="btn btn-primary w-100 tray-btn" type="submit">
+                            A[[${i}+1]]
+                        </button>
+                    </form>
+                </div>
             </div>
 
-        </div>
-
-        <div class="row g-3 mt-2">
-
-            <div class="col-6">
-                <form method="post" th:action="@{/s/{spoolId}/254(spoolId=${spool.id})}">
-                    <button class="btn btn-outline-primary w-100 tray-btn" type="submit">
-                        External spool (Main)
-                    </button>
-                </form>
+            <div class="row g-3 mt-2">
+                <div class="col-12">
+                    <form method="post"
+                          th:action="@{/s/{printerId}/{spoolId}/254(printerId=${printer.id}, spoolId=${spool.id})}">
+                        <button class="btn btn-outline-primary w-100 tray-btn" type="submit">
+                            External spool
+                        </button>
+                    </form>
+                </div>
             </div>
-
-            <div class="col-6">
-                <form method="post" th:action="@{/s/{spoolId}/255(spoolId=${spool.id})}">
-                    <button class="btn btn-outline-primary w-100 tray-btn" type="submit">
-                        External spool (Second)
-                    </button>
-                </form>
-            </div>
-
         </div>
 
     </div>

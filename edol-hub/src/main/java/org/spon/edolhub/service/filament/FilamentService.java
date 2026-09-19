@@ -8,6 +8,7 @@ import org.spon.edolhub.model.entity.Vendor;
 import org.spon.edolhub.repository.FilamentRepository;
 import org.spon.edolhub.repository.MaterialTypeRepository;
 import org.spon.edolhub.repository.VendorRepository;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +24,16 @@ public class FilamentService {
     private final FilamentRepository filamentRepository;
     private final MaterialTypeRepository materialTypeRepository;
     private final VendorRepository vendorRepository;
+    private final TenantContext tenantContext;
 
     @Transactional
     public Filament findByBrandIndexOrCreate(String filamentBrandIndex, String color, String fullId) {
         return filamentRepository
-                .findFirstByPrinterFilamentProfileIdAndColorHexIgnoreCase(filamentBrandIndex, color)
+                .findFirstByTenantIdAndPrinterFilamentProfileIdAndColorHexIgnoreCase(
+                        tenantContext.getCurrentTenantId(),
+                        filamentBrandIndex,
+                        color
+                )
                 .orElseGet(
                         () -> findOrCreateFilament(fullId, color, filamentBrandIndex)
                 );
@@ -37,7 +43,11 @@ public class FilamentService {
     @CacheEvict(value = "spools", allEntries = true)
     public Filament findOrCreateFilament(String fullId, String color, String filamentBrandIndex) {
         Optional<Filament> existing =
-                filamentRepository.findFirstByFullIdAndColorHexIgnoreCase(fullId, color);
+                filamentRepository.findFirstByTenantIdAndFullIdAndColorHexIgnoreCase(
+                        tenantContext.getCurrentTenantId(),
+                        fullId,
+                        color
+                );
 
         if (existing.isPresent()) {
             Filament filament = existing.get();
@@ -54,7 +64,10 @@ public class FilamentService {
         for (int i = 0; i < parts.length; i++) {
 
             Optional<MaterialType> found =
-                    materialTypeRepository.findByNameIgnoreCase(parts[i]);
+                    materialTypeRepository.findByTenantIdAndNameIgnoreCase(
+                            tenantContext.getCurrentTenantId(),
+                            parts[i]
+                    );
 
             if (found.isPresent()) {
                 material = found.get();
@@ -78,10 +91,11 @@ public class FilamentService {
                         : material.getName();
 
         Vendor vendor = vendorRepository
-                .findByNameIgnoreCase(vendorName)
+                .findByTenantIdAndNameIgnoreCase(tenantContext.getCurrentTenantId(), vendorName)
                 .orElseGet(() ->
                         vendorRepository.save(
                                 Vendor.builder()
+                                        .tenant(tenantContext.getCurrentTenant())
                                         .name(vendorName)
                                         .build()
                         )
@@ -89,6 +103,7 @@ public class FilamentService {
 
         Filament filament = new Filament();
 
+        filament.setTenant(tenantContext.getCurrentTenant());
         filament.setFullId(fullId);
         filament.setBrand(brand);
         filament.setColorHex(color.toUpperCase());

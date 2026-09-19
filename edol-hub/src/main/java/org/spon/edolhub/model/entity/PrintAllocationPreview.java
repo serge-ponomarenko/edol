@@ -22,7 +22,7 @@ public class PrintAllocationPreview {
      * Print job reference
      */
     @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "print_job_id")
+    @JoinColumn(name = "print_job_id", nullable = false)
     private PrintJob printJob;
 
     /**

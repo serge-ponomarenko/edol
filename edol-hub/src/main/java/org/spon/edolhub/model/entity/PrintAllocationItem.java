@@ -22,7 +22,7 @@ public class PrintAllocationItem {
      * Allocation group reference
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "group_id")
+    @JoinColumn(name = "group_id", nullable = false)
     private PrintAllocationGroup group;
 
     /**

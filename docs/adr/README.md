@@ -13,3 +13,7 @@ Each ADR contains:
 5. **Consequences** — important benefits, costs, and follow-up obligations.
 
 Keep the record concise and update its status only when a later explicit decision supersedes it.
+
+## Index
+
+- `0001-hub-printer-projection-and-tenant-bootstrap.md` — Core-owned printer UUIDs, Hub tenant projections, default-tenant bootstrap, and expand/backfill/contract rollout.

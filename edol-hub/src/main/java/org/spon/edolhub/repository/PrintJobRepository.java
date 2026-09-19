@@ -15,7 +15,13 @@ public interface PrintJobRepository extends JpaRepository<PrintJob, UUID> {
 
     Page<PrintJob> findAllByOrderByStartedAtDesc(Pageable pageable);
 
+    Page<PrintJob> findAllByPrinterIdOrderByStartedAtDesc(UUID printerId, Pageable pageable);
+
     Optional<PrintJob> findBySessionId(String sessionId);
 
+    Optional<PrintJob> findByPrinterIdAndSessionId(UUID printerId, String sessionId);
+
     Optional<PrintJob> findByPublicId(Long publicId);
+
+    Optional<PrintJob> findByPublicIdAndPrinterTenantId(Long publicId, UUID tenantId);
 }

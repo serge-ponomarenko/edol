@@ -73,7 +73,7 @@
                             </button>
 
                             <a class="btn btn-secondary"
-                               href="/print-jobs">
+                               th:href="@{/printers/{id}/print-jobs(id=${printerId})}">
                                 Back
                             </a>
 
@@ -263,8 +263,9 @@
 
 </body>
 
-<script>
+<script th:inline="javascript">
     const jobId = window.location.pathname.split('/').pop();
+    const printerId = /*[[${printerId}]]*/ '';
     let currentPreview = null;
 
     loadAllocation();
@@ -354,7 +355,7 @@
     async function loadAllocation() {
         const response =
             await fetch(
-                `/api/allocations/job/${jobId}`
+                `/api/printers/${printerId}/allocations/job/${jobId}`
             );
 
         const preview =
@@ -571,7 +572,7 @@
             }
 
             await fetch(
-                `/api/allocations/rerun?jobId=${jobId}&filamentId=${filamentId}`,
+                `/api/printers/${printerId}/allocations/rerun?jobId=${jobId}&filamentId=${filamentId}`,
                 {
                     method: 'POST'
                 }
@@ -694,7 +695,7 @@
     ) {
         const response =
             await fetch(
-                `/api/allocations/spools?filamentId=${filamentId}`
+                `/api/printers/${printerId}/allocations/spools?filamentId=${filamentId}`
             );
 
         const spools =
@@ -884,8 +885,8 @@
 
         const endpoint =
             mode === 'replace'
-                ? '/api/allocations/replace-spool'
-                : '/api/allocations/add-spool';
+                ? `/api/printers/${printerId}/allocations/replace-spool`
+                : `/api/printers/${printerId}/allocations/add-spool`;
 
         try {
             const response =
@@ -937,7 +938,7 @@
 
         const response =
             await fetch(
-                '/api/allocations/filaments?query='
+                `/api/printers/${printerId}/allocations/filaments?query=`
             );
 
         const filaments =
@@ -1120,7 +1121,7 @@
             }
 
             await fetch(
-                `/api/allocations/replace-filament`
+                `/api/printers/${printerId}/allocations/replace-filament`
                 + `?jobId=${jobId}`
                 + `&sourceFilamentId=${sourceFilamentId}`
                 + `&targetFilamentId=${targetFilamentId}`,
@@ -1214,7 +1215,7 @@
 
             const response =
                 await fetch(
-                    `/api/allocations/finalize?jobId=${jobId}`,
+                    `/api/printers/${printerId}/allocations/finalize?jobId=${jobId}`,
                     {
                         method: 'POST'
                     }
@@ -1234,7 +1235,7 @@
             );
 
             window.location.href =
-                '/print-jobs';
+                `/printers/${printerId}/print-jobs`;
 
             await loadAllocation();
 

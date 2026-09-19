@@ -1,6 +1,7 @@
 package org.spon.edolhub.controller;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import org.spon.edolhub.repository.FilamentSpoolRepository;
 import org.spon.edolhub.repository.MaterialTypeRepository;
 import org.spon.edolhub.repository.VendorRepository;
 import org.spon.edolhub.service.LabelService;
+import org.spon.edolhub.service.TenantContext;
 import org.spon.edolhub.service.spool.FilamentSpoolService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,6 +37,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class FilamentSpoolControllerTest {
+
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Mock
     private FilamentSpoolRepository filamentSpoolRepository;
@@ -54,10 +59,18 @@ class FilamentSpoolControllerTest {
     private LabelService labelService;
 
     @Mock
+    private TenantContext tenantContext;
+
+    @Mock
     private Model model;
 
     @InjectMocks
     private FilamentSpoolController controller;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(tenantContext.getCurrentTenantId()).thenReturn(TENANT_ID);
+    }
 
     @Nested
     @DisplayName("listSpools")
@@ -74,8 +87,8 @@ class FilamentSpoolControllerTest {
             when(filamentSpoolService.findFiltered(null, null,
                     List.of(FilamentSpool.FilamentSpoolStatus.SEALED, FilamentSpool.FilamentSpoolStatus.ACTIVE)))
                     .thenReturn(List.of(spool));
-            when(vendorRepository.findAll()).thenReturn(List.of());
-            when(materialRepository.findAll()).thenReturn(List.of());
+            when(vendorRepository.findAllByTenantIdOrderByName(TENANT_ID)).thenReturn(List.of());
+            when(materialRepository.findAllByTenantIdOrderByName(TENANT_ID)).thenReturn(List.of());
 
             String view = controller.listSpools(null, null, null, model);
 
@@ -91,8 +104,8 @@ class FilamentSpoolControllerTest {
             when(filamentSpoolService.findFiltered(null, null,
                     List.of(FilamentSpool.FilamentSpoolStatus.ACTIVE)))
                     .thenReturn(List.of());
-            when(vendorRepository.findAll()).thenReturn(List.of());
-            when(materialRepository.findAll()).thenReturn(List.of());
+            when(vendorRepository.findAllByTenantIdOrderByName(TENANT_ID)).thenReturn(List.of());
+            when(materialRepository.findAllByTenantIdOrderByName(TENANT_ID)).thenReturn(List.of());
 
             controller.listSpools(null, null, List.of(FilamentSpool.FilamentSpoolStatus.ACTIVE), model);
 
@@ -109,7 +122,7 @@ class FilamentSpoolControllerTest {
         @DisplayName("returns form view with new spool")
         void returnsFormView() {
             List<Filament> filaments = List.of(new Filament());
-            when(filamentRepository.findAll()).thenReturn(filaments);
+            when(filamentRepository.findAllByTenantIdOrderByFullId(TENANT_ID)).thenReturn(filaments);
 
             String view = controller.createForm(model);
 
@@ -145,8 +158,8 @@ class FilamentSpoolControllerTest {
             source.setStatus(FilamentSpool.FilamentSpoolStatus.ACTIVE);
             source.setPurchasedAt(LocalDateTime.now());
 
-            when(filamentSpoolRepository.findById(5L)).thenReturn(Optional.of(source));
-            when(filamentRepository.findAll()).thenReturn(List.of());
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(5L, TENANT_ID)).thenReturn(Optional.of(source));
+            when(filamentRepository.findAllByTenantIdOrderByFullId(TENANT_ID)).thenReturn(List.of());
 
             String view = controller.duplicate(5L, model);
 
@@ -164,7 +177,11 @@ class FilamentSpoolControllerTest {
         @DisplayName("saves single new spool")
         void savesSingle() {
             FilamentSpool spool = new FilamentSpool();
+            Filament filament = new Filament();
+            filament.setId(1L);
+            spool.setFilament(filament);
             spool.setWeightTotal(1000.0);
+            when(filamentRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(filament));
 
             String view = controller.save(spool, 1);
 
@@ -176,7 +193,11 @@ class FilamentSpoolControllerTest {
         @DisplayName("saves multiple copies when quantity > 1")
         void savesMultiple() {
             FilamentSpool spool = new FilamentSpool();
+            Filament filament = new Filament();
+            filament.setId(1L);
+            spool.setFilament(filament);
             spool.setWeightTotal(1000.0);
+            when(filamentRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(filament));
 
             String view = controller.save(spool, 3);
 
@@ -188,8 +209,12 @@ class FilamentSpoolControllerTest {
         @DisplayName("sets weightRemaining from weightTotal when null")
         void setsWeightRemaining() {
             FilamentSpool spool = new FilamentSpool();
+            Filament filament = new Filament();
+            filament.setId(1L);
+            spool.setFilament(filament);
             spool.setWeightTotal(1000.0);
             spool.setWeightRemaining(null);
+            when(filamentRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(filament));
 
             controller.save(spool, 1);
 
@@ -200,8 +225,12 @@ class FilamentSpoolControllerTest {
         @DisplayName("updates existing spool without duplication")
         void updatesExisting() {
             FilamentSpool spool = new FilamentSpool();
+            Filament filament = new Filament();
+            filament.setId(1L);
+            spool.setFilament(filament);
             spool.setId(1L);
             spool.setWeightTotal(1000.0);
+            when(filamentRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(filament));
 
             String view = controller.save(spool, 1);
 
@@ -219,8 +248,8 @@ class FilamentSpoolControllerTest {
         void returnsForm() {
             FilamentSpool spool = new FilamentSpool();
             spool.setId(1L);
-            when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
-            when(filamentRepository.findAll()).thenReturn(List.of());
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
+            when(filamentRepository.findAllByTenantIdOrderByFullId(TENANT_ID)).thenReturn(List.of());
 
             String view = controller.edit(1L, model);
 
@@ -237,10 +266,12 @@ class FilamentSpoolControllerTest {
         @Test
         @DisplayName("deletes spool and redirects")
         void deletesAndRedirects() {
+            FilamentSpool spool = new FilamentSpool();
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
             String view = controller.delete(1L);
 
             assertThat(view).isEqualTo("redirect:/filament-spools");
-            verify(filamentSpoolRepository).deleteById(1L);
+            verify(filamentSpoolRepository).delete(spool);
         }
     }
 
@@ -253,7 +284,7 @@ class FilamentSpoolControllerTest {
         void marksDried() {
             FilamentSpool spool = new FilamentSpool();
             spool.setId(1L);
-            when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
 
             ResponseEntity<?> response = controller.dry(1L);
 
@@ -265,7 +296,7 @@ class FilamentSpoolControllerTest {
         @Test
         @DisplayName("throws 404 when spool not found")
         void throwsWhenNotFound() {
-            when(filamentSpoolRepository.findById(99L)).thenReturn(Optional.empty());
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(99L, TENANT_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> controller.dry(99L))
                     .isInstanceOf(java.util.NoSuchElementException.class);
@@ -283,7 +314,7 @@ class FilamentSpoolControllerTest {
             spool.setId(1L);
             byte[] labelData = "label".getBytes();
 
-            when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
             when(labelService.generateLabel(spool)).thenReturn(labelData);
 
             ResponseEntity<byte[]> response = controller.generateLabel(1L);
@@ -296,7 +327,7 @@ class FilamentSpoolControllerTest {
         @Test
         @DisplayName("throws 404 when spool not found")
         void throwsWhenNotFound() {
-            when(filamentSpoolRepository.findById(99L)).thenReturn(Optional.empty());
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(99L, TENANT_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> controller.generateLabel(99L))
                     .isInstanceOf(ResponseStatusException.class);

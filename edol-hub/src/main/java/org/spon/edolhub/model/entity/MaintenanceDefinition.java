@@ -12,6 +12,10 @@ public class MaintenanceDefinition {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "printer_id")
+    private Printer printer;
+
     private String name;
 
     @Column(length = 2000)

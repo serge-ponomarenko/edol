@@ -35,7 +35,7 @@
 
                     <div class="card-body">
 
-                        <form method="post" th:action="@{/maintenance/config/printer-stats-form}"
+                        <form method="post" th:action="@{/printers/{id}/maintenance/config/printer-stats-form(id=${printerId})}"
                               th:object="${stats}">
 
                             <input th:field="*{id}" type="hidden">

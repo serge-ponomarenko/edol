@@ -21,3 +21,12 @@
 - Verify every change with the most relevant available checks; report any verification limitation.
 - Run `mvn -B clean verify` for a full reactor check when appropriate. For Hub-only changes, start with `mvn -pl edol-hub -am test`.
 - Before finishing, decide whether a documented architectural fact changed. Update `docs/architecture.md` or an ADR only when it did, then check the documentation against code.
+
+## Workflow Improvement
+
+- Notice recurring friction during development. When the same non-trivial procedure, lookup, or external-access workaround appears repeatedly, recommend a reusable project-level improvement instead of continuing to solve it ad hoc.
+- Recommend a Skill when a repeatable multi-step workflow, project-specific procedure, or decision process would benefit from explicit reusable instructions.
+- Recommend documentation when project knowledge, commands, conventions, troubleshooting steps, or architectural facts are repeatedly rediscovered or inferred from code.
+- Recommend an MCP server or MCP integration when work repeatedly requires structured access to an external system such as a database, API, service, runtime, or infrastructure environment.
+- Prefer the smallest appropriate mechanism. Do not propose automation for trivial, rare, or already well-documented tasks.
+- Do not create Skills, documentation, MCP integrations, or other workflow infrastructure unless requested. Briefly explain the recurring friction observed and the expected benefit.

@@ -15,6 +15,8 @@ import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.model.entity.MaterialType;
 import org.spon.edolhub.model.entity.Vendor;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
+import org.spon.edolhub.service.PrinterAccessService;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,11 +39,20 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SpoolChangeControllerTest {
 
+    private static final UUID PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
     @Mock
     private RestTemplate restTemplate;
 
     @Mock
     private FilamentSpoolRepository filamentSpoolRepository;
+
+    @Mock
+    private TenantContext tenantContext;
+
+    @Mock
+    private PrinterAccessService printerAccessService;
 
     @Mock
     private RedirectAttributes redirectAttributes;
@@ -57,6 +69,7 @@ class SpoolChangeControllerTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(controller, "edolCoreUrl", "http://edolcore:8080");
+        org.mockito.Mockito.lenient().when(tenantContext.getCurrentTenantId()).thenReturn(TENANT_ID);
 
         Vendor vendor = new Vendor();
         vendor.setId(1L);
@@ -87,19 +100,19 @@ class SpoolChangeControllerTest {
         @Test
         @DisplayName("sends spool change request and redirects")
         void sendsRequestAndRedirects() {
-            when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
             when(restTemplate.exchange(
-                    eq("http://edolcore:8080/api/request/spool-change"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/spool-change"),
                     eq(HttpMethod.POST),
                     any(HttpEntity.class),
                     eq(String.class)
             )).thenReturn(ResponseEntity.ok("done"));
 
-            String view = controller.spoolChange(1L, 0, redirectAttributes);
+            String view = controller.spoolChange(PRINTER_ID, 1L, 0, redirectAttributes);
 
             assertThat(view).isEqualTo("redirect:/s/1");
             verify(restTemplate).exchange(
-                    eq("http://edolcore:8080/api/request/spool-change"),
+                    eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/spool-change"),
                     eq(HttpMethod.POST),
                     requestCaptor.capture(),
                     eq(String.class)
@@ -121,12 +134,12 @@ class SpoolChangeControllerTest {
         @Test
         @DisplayName("uses amsId 254 for trayId 254")
         void usesAmsId254() {
-            when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
             when(restTemplate.exchange(
                     anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)
             )).thenReturn(ResponseEntity.ok("done"));
 
-            controller.spoolChange(1L, 254, redirectAttributes);
+            controller.spoolChange(PRINTER_ID, 1L, 254, redirectAttributes);
 
             verify(restTemplate).exchange(
                     anyString(), eq(HttpMethod.POST), requestCaptor.capture(), eq(String.class)
@@ -139,12 +152,12 @@ class SpoolChangeControllerTest {
         @Test
         @DisplayName("uses amsId 255 for trayId 255")
         void usesAmsId255() {
-            when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
             when(restTemplate.exchange(
                     anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)
             )).thenReturn(ResponseEntity.ok("done"));
 
-            controller.spoolChange(1L, 255, redirectAttributes);
+            controller.spoolChange(PRINTER_ID, 1L, 255, redirectAttributes);
 
             verify(restTemplate).exchange(
                     anyString(), eq(HttpMethod.POST), requestCaptor.capture(), eq(String.class)
@@ -157,7 +170,7 @@ class SpoolChangeControllerTest {
         @Test
         @DisplayName("throws 400 for trayId -1")
         void throwsForNegativeTrayId() {
-            assertThatThrownBy(() -> controller.spoolChange(1L, -1, redirectAttributes))
+            assertThatThrownBy(() -> controller.spoolChange(PRINTER_ID, 1L, -1, redirectAttributes))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasFieldOrPropertyWithValue("statusCode", HttpStatus.BAD_REQUEST);
         }
@@ -165,7 +178,7 @@ class SpoolChangeControllerTest {
         @Test
         @DisplayName("throws 400 for trayId 4")
         void throwsForInvalidTrayId() {
-            assertThatThrownBy(() -> controller.spoolChange(1L, 4, redirectAttributes))
+            assertThatThrownBy(() -> controller.spoolChange(PRINTER_ID, 1L, 4, redirectAttributes))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasFieldOrPropertyWithValue("statusCode", HttpStatus.BAD_REQUEST);
         }
@@ -173,9 +186,9 @@ class SpoolChangeControllerTest {
         @Test
         @DisplayName("throws 404 when spool not found")
         void throwsWhenSpoolNotFound() {
-            when(filamentSpoolRepository.findById(99L)).thenReturn(Optional.empty());
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(99L, TENANT_ID)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> controller.spoolChange(99L, 0, redirectAttributes))
+            assertThatThrownBy(() -> controller.spoolChange(PRINTER_ID, 99L, 0, redirectAttributes))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasFieldOrPropertyWithValue("statusCode", HttpStatus.NOT_FOUND);
         }
@@ -184,9 +197,9 @@ class SpoolChangeControllerTest {
         @DisplayName("throws 400 for invalid color hex")
         void throwsForInvalidColor() {
             filament.setColorHex("invalid");
-            when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
 
-            assertThatThrownBy(() -> controller.spoolChange(1L, 0, redirectAttributes))
+            assertThatThrownBy(() -> controller.spoolChange(PRINTER_ID, 1L, 0, redirectAttributes))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasFieldOrPropertyWithValue("statusCode", HttpStatus.BAD_REQUEST);
         }
@@ -195,9 +208,9 @@ class SpoolChangeControllerTest {
         @DisplayName("throws 400 for null color")
         void throwsForNullColor() {
             filament.setColorHex(null);
-            when(filamentSpoolRepository.findById(1L)).thenReturn(Optional.of(spool));
+            when(filamentSpoolRepository.findByIdAndFilamentTenantId(1L, TENANT_ID)).thenReturn(Optional.of(spool));
 
-            assertThatThrownBy(() -> controller.spoolChange(1L, 0, redirectAttributes))
+            assertThatThrownBy(() -> controller.spoolChange(PRINTER_ID, 1L, 0, redirectAttributes))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasFieldOrPropertyWithValue("statusCode", HttpStatus.BAD_REQUEST);
         }

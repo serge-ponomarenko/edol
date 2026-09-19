@@ -9,6 +9,7 @@ import org.spon.edolhub.repository.FilamentSpoolRepository;
 import org.spon.edolhub.repository.MaterialTypeRepository;
 import org.spon.edolhub.repository.VendorRepository;
 import org.spon.edolhub.service.LabelService;
+import org.spon.edolhub.service.TenantContext;
 import org.spon.edolhub.service.spool.FilamentSpoolService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -37,6 +38,7 @@ public class FilamentSpoolController {
     private final VendorRepository vendorRepository;
     private final MaterialTypeRepository materialRepository;
     private final LabelService labelService;
+    private final TenantContext tenantContext;
 
 
     @GetMapping
@@ -71,8 +73,8 @@ public class FilamentSpoolController {
         model.addAttribute("selectedMaterial", material);
         model.addAttribute("selectedStatus", status);
 
-        model.addAttribute("vendors", vendorRepository.findAll());
-        model.addAttribute("materials", materialRepository.findAll());
+        model.addAttribute("vendors", vendorRepository.findAllByTenantIdOrderByName(tenantContext.getCurrentTenantId()));
+        model.addAttribute("materials", materialRepository.findAllByTenantIdOrderByName(tenantContext.getCurrentTenantId()));
 
         return "dashboard/filament-spools/list";
     }
@@ -83,7 +85,7 @@ public class FilamentSpoolController {
         spool.setPurchasedAt(LocalDateTime.now());
 
         model.addAttribute("spool", spool);
-        model.addAttribute("filaments", filamentRepository.findAll());
+        model.addAttribute("filaments", filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
         return "dashboard/filament-spools/form";
     }
 
@@ -92,7 +94,9 @@ public class FilamentSpoolController {
             @PathVariable Long id,
             Model model
     ) {
-        FilamentSpool source = filamentSpoolRepository.findById(id).orElseThrow();
+        FilamentSpool source = filamentSpoolRepository
+                .findByIdAndFilamentTenantId(id, tenantContext.getCurrentTenantId())
+                .orElseThrow();
 
         FilamentSpool spool = copyFilamentSpool(source);
 
@@ -108,7 +112,7 @@ public class FilamentSpoolController {
         spool.setLastDriedAt(null);
 
         model.addAttribute("spool", spool);
-        model.addAttribute("filaments", filamentRepository.findAll());
+        model.addAttribute("filaments", filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
 
         return "dashboard/filament-spools/form";
     }
@@ -118,6 +122,10 @@ public class FilamentSpoolController {
             @ModelAttribute FilamentSpool spool,
             @RequestParam(defaultValue = "1") Integer quantity
     ) {
+        Filament filament = filamentRepository
+                .findByIdAndTenantId(spool.getFilament().getId(), tenantContext.getCurrentTenantId())
+                .orElseThrow();
+        spool.setFilament(filament);
         if (spool.getWeightRemaining() == null) {
             spool.setWeightRemaining(spool.getWeightTotal());
         }
@@ -167,24 +175,30 @@ public class FilamentSpoolController {
 
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable Long id, Model model) {
-        FilamentSpool spool = filamentSpoolRepository.findById(id).orElseThrow();
+        FilamentSpool spool = filamentSpoolRepository
+                .findByIdAndFilamentTenantId(id, tenantContext.getCurrentTenantId())
+                .orElseThrow();
 
         model.addAttribute("spool", spool);
-        model.addAttribute("filaments", filamentRepository.findAll());
+        model.addAttribute("filaments", filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
 
         return "dashboard/filament-spools/form";
     }
 
     @GetMapping("/delete/{id}")
     public String delete(@PathVariable Long id) {
-        filamentSpoolRepository.deleteById(id);
+        filamentSpoolRepository.delete(
+                filamentSpoolRepository.findByIdAndFilamentTenantId(id, tenantContext.getCurrentTenantId()).orElseThrow()
+        );
 
         return "redirect:/filament-spools";
     }
 
     @PostMapping("/dry/{id}")
     public ResponseEntity<?> dry(@PathVariable Long id) {
-        FilamentSpool spool = filamentSpoolRepository.findById(id).orElseThrow();
+        FilamentSpool spool = filamentSpoolRepository
+                .findByIdAndFilamentTenantId(id, tenantContext.getCurrentTenantId())
+                .orElseThrow();
         spool.setLastDriedAt(LocalDateTime.now());
         filamentSpoolRepository.save(spool);
         return ResponseEntity.ok().build();
@@ -192,7 +206,10 @@ public class FilamentSpoolController {
 
     @GetMapping(value = "/label/{spoolId}", produces = MediaType.IMAGE_PNG_VALUE)
     public ResponseEntity<byte[]> generateLabel(@PathVariable Long spoolId) throws Exception {
-        FilamentSpool spool = filamentSpoolRepository.findById(spoolId)
+        FilamentSpool spool = filamentSpoolRepository.findByIdAndFilamentTenantId(
+                        spoolId,
+                        tenantContext.getCurrentTenantId()
+                )
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
         byte[] image = labelService.generateLabel(spool);

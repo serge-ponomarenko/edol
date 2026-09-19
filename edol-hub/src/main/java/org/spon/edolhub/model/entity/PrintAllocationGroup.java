@@ -22,7 +22,7 @@ public class PrintAllocationGroup {
      * Preview reference
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "preview_id")
+    @JoinColumn(name = "preview_id", nullable = false)
     private PrintAllocationPreview preview;
 
     /**

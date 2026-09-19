@@ -16,14 +16,17 @@ import org.spon.edolhub.model.dto.AllocationResult;
 import org.spon.edolhub.model.entity.*;
 import org.spon.edolhub.repository.PrintAllocationPreviewRepository;
 import org.spon.edolhub.repository.PrintJobRepository;
+import org.spon.edolhub.repository.PrinterRepository;
 import org.spon.edolhub.service.spool.*;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,8 +36,17 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PrintJobServiceTest {
 
+    private static final UUID PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
+    private static final UUID JOB_ID = UUID.fromString("00000000-0000-0000-0000-000000000201");
+
     @Mock
     private PrintJobRepository printJobRepository;
+
+    @Mock
+    private PrinterRepository printerRepository;
+
+    @Mock
+    private RestTemplate restTemplate;
 
     @Mock
     private PrinterStatsService printerStatsService;
@@ -76,6 +88,7 @@ class PrintJobServiceTest {
     private FilamentSpool spool;
     private Vendor vendor;
     private MaterialType materialType;
+    private Printer printer;
 
     private static final double PLANNED_GRAMS = 200.0;
 
@@ -96,18 +109,22 @@ class PrintJobServiceTest {
                 .build();
 
         printerState = new PrinterState();
-        printerState.setPrinterId(1);
+        printerState.setPrinterId(PRINTER_ID);
         printerState.setSessionId("SESS-001");
         printerState.setCurrentFile("test.gcode");
         printerState.setCurrentTask("Test Print");
 
+        printer = new Printer();
+        printer.setId(PRINTER_ID);
+
         job = PrintJob.builder()
-                .id(100L).sessionId("SESS-001").printerId(1)
+                .sessionId("SESS-001").printer(printer)
                 .fileName("test.gcode").taskName("Test Print")
                 .status(PrintJobStatus.RUNNING)
                 .startedAt(LocalDateTime.now())
                 .jobSpoolUsages(new ArrayList<>())
                 .build();
+        job.setId(JOB_ID);
 
         filamentDto = new org.spon.edol.model.Filament(5, "Pbec608f", "PLA", "#F95D73",
                 "JAMG HE", "JAMG HE PLA Matte", 10.87, PLANNED_GRAMS, true, false, 0);
@@ -121,21 +138,21 @@ class PrintJobServiceTest {
         @DisplayName("creates print job and sets runtime state")
         void createsJobAndSetsRuntime() {
             when(printJobRepository.save(any())).thenReturn(job);
-            when(runtimeStateService.getCurrentJob()).thenReturn(job);
+            when(printerRepository.findById(PRINTER_ID)).thenReturn(Optional.of(printer));
 
-            printJobService.start(printerState);
+            printJobService.start(PRINTER_ID, printerState);
 
             verify(printJobRepository).save(jobCaptor.capture());
             PrintJob saved = jobCaptor.getValue();
-            assertThat(saved.getPrinterId()).isEqualTo(1);
+            assertThat(saved.getPrinter()).isSameAs(printer);
             assertThat(saved.getSessionId()).isEqualTo("SESS-001");
             assertThat(saved.getFileName()).isEqualTo("test.gcode");
             assertThat(saved.getTaskName()).isEqualTo("Test Print");
             assertThat(saved.getStatus()).isEqualTo(PrintJobStatus.RUNNING);
             assertThat(saved.getStartedAt()).isNotNull();
 
-            verify(runtimeStateService).setCurrentJob(job);
-            verify(runtimeStateService).setAllocationPreviewReady(false);
+            verify(runtimeStateService).setCurrentJob(PRINTER_ID, job);
+            verify(runtimeStateService).setAllocationPreviewReady(PRINTER_ID, false);
         }
 
     }
@@ -147,23 +164,23 @@ class PrintJobServiceTest {
         @Test
         @DisplayName("creates allocation snapshot and sets runtime ready")
         void createsSnapshot() {
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.existsByPrintJobId(job.getId())).thenReturn(false);
 
-            printJobService.metadataLoaded(printerState);
+            printJobService.metadataLoaded(PRINTER_ID, printerState);
 
             verify(printAllocationSnapshotService).createSnapshot(job, printerState);
-            verify(runtimeStateService).setAllocationPreviewReady(true);
+            verify(runtimeStateService).setAllocationPreviewReady(PRINTER_ID, true);
             verify(allocationPreviewRuntimeSyncService).refresh(job.getId());
         }
 
         @Test
         @DisplayName("skips snapshot when preview already exists")
         void skipsWhenPreviewExists() {
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.existsByPrintJobId(job.getId())).thenReturn(true);
 
-            printJobService.metadataLoaded(printerState);
+            printJobService.metadataLoaded(PRINTER_ID, printerState);
 
             verifyNoInteractions(printAllocationSnapshotService);
         }
@@ -171,10 +188,10 @@ class PrintJobServiceTest {
         @Test
         @DisplayName("throws when job not found by session")
         void throwsWhenJobNotFound() {
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.empty());
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(null);
 
-            assertThatThrownBy(() -> printJobService.metadataLoaded(printerState))
-                    .isInstanceOf(RuntimeException.class);
+            assertThatThrownBy(() -> printJobService.metadataLoaded(PRINTER_ID, printerState))
+                    .isInstanceOf(IllegalStateException.class);
 
             verifyNoInteractions(printAllocationSnapshotService);
         }
@@ -191,12 +208,12 @@ class PrintJobServiceTest {
             job.getJobSpoolUsages().add(JobSpoolUsage.builder().usedGrams(200.0).build());
             job.setStartedAt(LocalDateTime.now().minusMinutes(30));
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             printerState.setTotalLayers(160);
             printerState.setProgress(100);
-            printJobService.finish(printerState);
+            printJobService.finish(PRINTER_ID, printerState);
 
             verify(printAllocationFinalizeService).finalizeAllocation(job);
 
@@ -207,10 +224,10 @@ class PrintJobServiceTest {
             assertThat(saved.getProgress()).isEqualTo(100);
             assertThat(saved.getFinishedAt()).isNotNull();
 
-            verify(runtimeStateService).setAllocationPreviewReady(false);
-            verify(runtimeCacheService).setCurrentAllocationPreview(null);
-            verify(runtimeStateService).setCurrentJob(null);
-            verify(printerStatsService).addPrintJob(any(Long.class), eq(200L));
+            verify(runtimeStateService).setAllocationPreviewReady(PRINTER_ID, false);
+            verify(runtimeCacheService).setCurrentAllocationPreview(PRINTER_ID, null);
+            verify(runtimeStateService).setCurrentJob(PRINTER_ID, null);
+            verify(printerStatsService).addPrintJob(eq(printer), anyLong(), eq(200L));
         }
 
     }
@@ -242,13 +259,13 @@ class PrintJobServiceTest {
             printerState.setFilaments(List.of(filamentDto));
             printerState.setError(new PrinterError(50348044, "User cancelled"));
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.findByPrintJobId(job.getId())).thenReturn(Optional.of(preview));
             when(spoolAllocationService.previewAllocation(hubFilament, 100.0))
                     .thenReturn(List.of(new AllocationResult(spool, 100.0, BigDecimal.valueOf(2.50))));
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verify(printAllocationPreviewService).updateActualUsage(
                     eq(job), eq(hubFilament), eq(100.0), anyList());
@@ -269,13 +286,13 @@ class PrintJobServiceTest {
             printerState.setFilaments(List.of(filamentDto));
             printerState.setError(new PrinterError(123456, "Filament jam"));
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.findByPrintJobId(job.getId())).thenReturn(Optional.of(preview));
             when(spoolAllocationService.previewAllocation(hubFilament, 100.0))
                     .thenReturn(List.of(new AllocationResult(spool, 100.0, BigDecimal.valueOf(2.50))));
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verify(printJobRepository).save(jobCaptor.capture());
             assertThat(jobCaptor.getValue().getStatus()).isEqualTo(PrintJobStatus.FAILED);
@@ -285,9 +302,9 @@ class PrintJobServiceTest {
         @DisplayName("skips cancel when job already in terminal state")
         void skipsWhenTerminal() {
             job.setStatus(PrintJobStatus.FINISHED);
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verifyNoInteractions(spoolAllocationService, printAllocationPreviewService, printAllocationFinalizeService);
         }
@@ -301,11 +318,11 @@ class PrintJobServiceTest {
             printerState.setTotalLayers(160);
             printerState.setProgress(50);
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.findByPrintJobId(job.getId())).thenReturn(Optional.empty());
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verifyNoInteractions(spoolAllocationService, printAllocationPreviewService);
             verify(printAllocationFinalizeService).finalizeAllocation(job);
@@ -342,11 +359,11 @@ class PrintJobServiceTest {
             printerState.setFilaments(List.of(filamentDto));
             printerState.setError(new PrinterError(50348044, ""));
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.findByPrintJobId(job.getId())).thenReturn(Optional.of(preview));
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verify(spoolAllocationService).previewAllocation(hubFilament, 100.0);
         }
@@ -360,11 +377,11 @@ class PrintJobServiceTest {
             printerState.setFilaments(List.of(filamentDto));
             printerState.setError(new PrinterError(50348044, ""));
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.findByPrintJobId(job.getId())).thenReturn(Optional.of(preview));
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verify(spoolAllocationService).previewAllocation(hubFilament, PLANNED_GRAMS);
         }
@@ -378,11 +395,11 @@ class PrintJobServiceTest {
             printerState.setFilaments(List.of(filamentDto));
             printerState.setError(new PrinterError(50348044, ""));
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.findByPrintJobId(job.getId())).thenReturn(Optional.of(preview));
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verify(spoolAllocationService).previewAllocation(hubFilament, PLANNED_GRAMS);
         }
@@ -396,11 +413,11 @@ class PrintJobServiceTest {
             printerState.setFilaments(List.of(filamentDto));
             printerState.setError(new PrinterError(50348044, ""));
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.findByPrintJobId(job.getId())).thenReturn(Optional.of(preview));
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verify(spoolAllocationService).previewAllocation(hubFilament, 60.0);
         }
@@ -418,11 +435,11 @@ class PrintJobServiceTest {
             printerState.setFilaments(List.of(dto));
             printerState.setError(new PrinterError(50348044, ""));
 
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(previewRepository.findByPrintJobId(job.getId())).thenReturn(Optional.of(preview));
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            printJobService.cancel(printerState);
+            printJobService.cancel(PRINTER_ID, printerState);
 
             verify(spoolAllocationService).previewAllocation(hubFilament, 50.0);
         }
@@ -436,7 +453,7 @@ class PrintJobServiceTest {
         @Test
         @DisplayName("updates progress for running job")
         void updatesRunningJob() {
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             printerState.setProgress(50);
@@ -444,7 +461,7 @@ class PrintJobServiceTest {
             printerState.setTotalLayers(160);
             printerState.setRemainingTime(45);
 
-            printJobService.updateProgress(printerState);
+            printJobService.updateProgress(PRINTER_ID, printerState);
 
             verify(printJobRepository).save(jobCaptor.capture());
             PrintJob saved = jobCaptor.getValue();
@@ -458,23 +475,21 @@ class PrintJobServiceTest {
         @DisplayName("skips update for finished jobs")
         void skipsFinishedJob() {
             job.setStatus(PrintJobStatus.FINISHED);
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
 
-            printJobService.updateProgress(printerState);
+            printJobService.updateProgress(PRINTER_ID, printerState);
 
-            verifyNoInteractions(runtimeStateService);
+            verify(runtimeStateService).getCurrentJob(PRINTER_ID);
+            verifyNoMoreInteractions(runtimeStateService);
         }
 
         @Test
-        @DisplayName("sets current job when null")
-        void setsCurrentJobWhenNull() {
-            when(printJobRepository.findBySessionId("SESS-001")).thenReturn(Optional.of(job));
-            when(runtimeStateService.getCurrentJob()).thenReturn(null);
-            when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        @DisplayName("throws when current printer has no active job")
+        void throwsWhenCurrentJobIsNull() {
+            when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(null);
 
-            printJobService.updateProgress(printerState);
-
-            verify(runtimeStateService).setCurrentJob(job);
+            assertThatThrownBy(() -> printJobService.updateProgress(PRINTER_ID, printerState))
+                    .isInstanceOf(IllegalStateException.class);
         }
 
     }
@@ -486,9 +501,9 @@ class PrintJobServiceTest {
         @Test
         @DisplayName("returns paged jobs ordered by startedAt desc")
         void returnsPagedJobs() {
-            printJobService.getJobs(0, 10);
+            printJobService.getJobs(PRINTER_ID, 0, 10);
 
-            verify(printJobRepository).findAllByOrderByStartedAtDesc(any());
+            verify(printJobRepository).findAllByPrinterIdOrderByStartedAtDesc(eq(PRINTER_ID), any());
         }
 
     }

@@ -23,5 +23,6 @@ public class PrinterRuntimeContext {
 
     public PrinterRuntimeContext(UUID printerId) {
         this.printerId = printerId;
+        printerStateRuntime.getState().setPrinterId(printerId);
     }
 }

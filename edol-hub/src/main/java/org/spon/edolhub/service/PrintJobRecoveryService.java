@@ -20,10 +20,19 @@ public class PrintJobRecoveryService {
     private final PrintRuntimeStateService runtimeStateService;
     private final PrintAllocationPreviewRepository previewRepository;
     private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
+    private final PrinterAccessService printerAccessService;
+    private final PrinterCatalogSyncService printerCatalogSyncService;
 
     @EventListener(ApplicationReadyEvent.class)
     public void recover() {
-        PrinterState state = printerService.getState();
+        printerCatalogSyncService.synchronize();
+        printerAccessService.getPrinters().stream()
+                .filter(printer -> printer.isEnabled() && printer.isAvailableInCore())
+                .forEach(printer -> recover(printer.getId()));
+    }
+
+    private void recover(java.util.UUID printerId) {
+        PrinterState state = printerService.getState(printerId);
 
         if (state == null) {
             log.info("Print job recovery skipped: EDOL Core unavailable");
@@ -35,13 +44,13 @@ public class PrintJobRecoveryService {
             return;
         }
 
-        printJobRepository.findBySessionId(state.getSessionId())
+        printJobRepository.findByPrinterIdAndSessionId(printerId, state.getSessionId())
                 .ifPresentOrElse(
                         job -> {
-                            runtimeStateService.setCurrentJob(job);
+                            runtimeStateService.setCurrentJob(printerId, job);
 
                             if (previewRepository.existsByPrintJobId(job.getId())) {
-                                runtimeStateService.setAllocationPreviewReady(true);
+                                runtimeStateService.setAllocationPreviewReady(printerId, true);
                                 allocationPreviewRuntimeSyncService.refresh(job.getId());
 
                                 log.info(

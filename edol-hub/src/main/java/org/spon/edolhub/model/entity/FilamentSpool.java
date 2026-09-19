@@ -25,7 +25,7 @@ public class FilamentSpool {
      * Logical filament (PLA, PETG, etc.)
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "filament_id")
+    @JoinColumn(name = "filament_id", nullable = false)
     private Filament filament;
 
     /**

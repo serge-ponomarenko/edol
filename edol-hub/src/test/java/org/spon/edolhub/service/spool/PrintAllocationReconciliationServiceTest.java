@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,9 +72,10 @@ class PrintAllocationReconciliationServiceTest {
                 .status(FilamentSpool.FilamentSpoolStatus.ACTIVE)
                 .build();
         job = PrintJob.builder()
-                .id(100L).sessionId("SESS-001").fileName("test.gcode")
+                .sessionId("SESS-001").fileName("test.gcode")
                 .taskName("Test Print").status(PrintJobStatus.RUNNING)
                 .build();
+        job.setId(UUID.fromString("00000000-0000-0000-0000-000000000201"));
     }
 
     @Nested
@@ -114,9 +116,10 @@ class PrintAllocationReconciliationServiceTest {
         @Test
         @DisplayName("throws when print job not found")
         void throwsWhenJobNotFound() {
-            when(printJobRepository.findById(999L)).thenReturn(Optional.empty());
+            UUID missingJobId = UUID.fromString("00000000-0000-0000-0000-000000000999");
+            when(printJobRepository.findById(missingJobId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> reconciliationService.finalizeReconciliation(999L))
+            assertThatThrownBy(() -> reconciliationService.finalizeReconciliation(missingJobId))
                     .isInstanceOf(RuntimeException.class);
             verifyNoInteractions(previewRepository, finalizeService);
         }
@@ -124,7 +127,7 @@ class PrintAllocationReconciliationServiceTest {
         @Test
         @DisplayName("throws when preview not found")
         void throwsWhenPreviewNotFound() {
-            Long jobId = job.getId();
+            UUID jobId = job.getId();
 
             when(printJobRepository.findById(jobId)).thenReturn(Optional.of(job));
             when(previewRepository.findByPrintJobId(jobId)).thenReturn(Optional.empty());
@@ -200,9 +203,10 @@ class PrintAllocationReconciliationServiceTest {
         @Test
         @DisplayName("throws when preview not found")
         void throwsWhenPreviewNotFound() {
-            when(previewRepository.findByPrintJobId(999L)).thenReturn(Optional.empty());
+            UUID missingJobId = UUID.fromString("00000000-0000-0000-0000-000000000999");
+            when(previewRepository.findByPrintJobId(missingJobId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> reconciliationService.rollbackFinalizedAllocation(999L))
+            assertThatThrownBy(() -> reconciliationService.rollbackFinalizedAllocation(missingJobId))
                     .isInstanceOf(RuntimeException.class);
             verifyNoInteractions(
                     jobSpoolUsageService, spoolConsumptionService,

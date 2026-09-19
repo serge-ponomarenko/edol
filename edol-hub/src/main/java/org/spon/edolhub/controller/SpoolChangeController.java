@@ -3,6 +3,8 @@ package org.spon.edolhub.controller;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
+import org.spon.edolhub.service.PrinterAccessService;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Controller;
@@ -15,6 +17,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Controller
 @RequiredArgsConstructor
@@ -23,12 +26,15 @@ public class SpoolChangeController {
 
     private final RestTemplate restTemplate;
     private final FilamentSpoolRepository filamentSpoolRepository;
+    private final TenantContext tenantContext;
+    private final PrinterAccessService printerAccessService;
 
     @Value("${edol-core.url}")
     private String edolCoreUrl;
 
-    @PostMapping("/{spoolId}/{trayId}")
-    public String spoolChange(@PathVariable Long spoolId,
+    @PostMapping("/{printerId}/{spoolId}/{trayId}")
+    public String spoolChange(@PathVariable UUID printerId,
+                              @PathVariable Long spoolId,
                               @PathVariable Integer trayId,
                               RedirectAttributes redirectAttributes) {
         if (trayId < 0 || (trayId > 3 && trayId != 254 && trayId != 255)) {
@@ -40,7 +46,9 @@ public class SpoolChangeController {
             amsId = trayId;
         }
 
-        FilamentSpool filamentSpool = filamentSpoolRepository.findById(spoolId)
+        printerAccessService.getPrinter(printerId);
+        FilamentSpool filamentSpool = filamentSpoolRepository
+                .findByIdAndFilamentTenantId(spoolId, tenantContext.getCurrentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Spool not found"));
 
         var filament = filamentSpool.getFilament();
@@ -50,7 +58,7 @@ public class SpoolChangeController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid color");
         }
 
-        String url = edolCoreUrl + "/api/request/spool-change";
+        String url = edolCoreUrl + "/api/printers/" + printerId + "/commands/spool-change";
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

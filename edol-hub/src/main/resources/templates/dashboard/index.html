@@ -114,7 +114,7 @@
                                 <div class="card-body p-1">
 
                                     <img id="camera"
-                                         src="api/proxy/camera"
+                                         th:src="@{/api/printers/{id}/camera/snapshot(id=${printerId})}"
                                          style="width:100%;border-radius:8px"/>
 
                                 </div>
@@ -330,7 +330,7 @@
                                             <!-- RIGHT: SECONDARY ACTION -->
                                             <div>
                                                 <a class="btn btn-danger btn-sm"
-                                                   href="/controls/skip-objects">
+                                                   th:href="@{/printers/{id}/controls/skip-objects(id=${printerId})}">
                                                     <i class="ti ti-player-skip-forward me-1"></i>
                                                     Skip Objects
                                                 </a>
@@ -349,7 +349,7 @@
 
                                 <div class="card-body text-center">
                                     <img id="modelImage"
-                                         src="/api/proxy/modelimage"
+                                         th:src="@{/api/printers/{id}/media/model/plate(id=${printerId})}"
                                          style="max-width:100%;border-radius:10px"/>
                                 </div>
 
@@ -465,7 +465,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/gaugeJS/dist/gauge.min.js"></script>
 
-<script>
+<script th:inline="javascript">
+    const printerId = /*[[${printerId}]]*/ "";
     const nozzleGauge = new Gauge(document.getElementById("nozzleGauge")).setOptions({
         angle: 0,
         lineWidth: 0.2,
@@ -486,7 +487,7 @@
 <script>
     async function refreshPrinterState() {
         try {
-            const res = await fetch("/api/printer/state");
+            const res = await fetch(`/api/printers/${printerId}/state`);
 
             if (!res.ok) {
                 throw new Error(
@@ -522,14 +523,14 @@
     }
 
     async function refreshPrinterStats() {
-        const res = await fetch("/api/printer/stats");
+        const res = await fetch(`/api/printers/${printerId}/stats`);
         const data = await res.json();
 
         updatePrinterStats(data);
     }
 
     async function refreshMaintenanceAlerts() {
-        const res = await fetch("/api/printer/alerts");
+        const res = await fetch(`/api/printers/${printerId}/alerts`);
         const data = await res.json();
 
         updateMaintenanceAlerts(data);
@@ -828,7 +829,7 @@
     function updateCamera() {
         const img = document.getElementById("camera");
         if (img.src.includes("camera-offline")) return;
-        img.src = "api/proxy/camera?t=" + Date.now();
+        img.src = `/api/printers/${printerId}/camera/snapshot?t=${Date.now()}`;
     }
 
     function updateFilamentUsage(data) {
@@ -877,7 +878,7 @@
                 ? `
                     <div class="mt-2">
                         <a class="btn btn-sm btn-outline-primary"
-                           href="/print-jobs/allocation/${data.jobId}">
+                           href="/printers/${printerId}/print-jobs/allocation/${data.jobId}">
                             <i class="ti ti-adjustments"></i>
                             Manage Allocation
                         </a>
@@ -973,7 +974,7 @@
 
     function restoreImages() {
         document.getElementById("camera").src =
-            "api/proxy/camera?t=" + Date.now();
+            `/api/printers/${printerId}/camera/snapshot?t=${Date.now()}`;
 
         const modelImage = document.getElementById("modelImage");
 
@@ -982,7 +983,7 @@
             this.src = "/img/model-placeholder.png";
         };
 
-        modelImage.src = "/api/proxy/modelimage?t=" + Date.now();
+        modelImage.src = `/api/printers/${printerId}/media/model/plate?t=${Date.now()}`;
     }
 
     function renderOfflineDashboardState() {

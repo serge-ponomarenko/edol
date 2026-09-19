@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.repository.FilamentRepository;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,10 +20,11 @@ public class SpoolApiController {
 
     private final FilamentSpoolRepository spoolRepository;
     private final FilamentRepository filamentRepository;
+    private final TenantContext tenantContext;
 
     @GetMapping
     public List<FilamentSpool> spools() {
-        return spoolRepository.findAll();
+        return spoolRepository.findAllByFilamentTenantId(tenantContext.getCurrentTenantId());
     }
 
     @GetMapping("/find")
@@ -30,7 +32,8 @@ public class SpoolApiController {
             @RequestParam("printerFilamentProfileId") String printerFilamentProfileId,
             @RequestParam("colorHex") String colorHex
     ) {
-        return filamentRepository.findFirstByPrinterFilamentProfileIdAndColorHexIgnoreCase(
+        return filamentRepository.findFirstByTenantIdAndPrinterFilamentProfileIdAndColorHexIgnoreCase(
+                        tenantContext.getCurrentTenantId(),
                         printerFilamentProfileId,
                         colorHex
                 )
@@ -46,7 +49,7 @@ public class SpoolApiController {
     public ResponseEntity<FilamentSpool> findSpoolById(
             @RequestParam("id") Long id
     ) {
-        return spoolRepository.findById(id)
+        return spoolRepository.findByIdAndFilamentTenantId(id, tenantContext.getCurrentTenantId())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
     }

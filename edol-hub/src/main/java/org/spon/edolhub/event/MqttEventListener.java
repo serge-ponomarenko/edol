@@ -6,10 +6,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.service.PrintJobService;
+import org.spon.edolhub.service.PrinterCatalogSyncService;
 import org.spon.edolhub.service.PrinterService;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 
 @Component
@@ -18,6 +21,7 @@ import org.springframework.stereotype.Component;
 public class MqttEventListener {
 
     private final PrinterService printerService;
+    private final PrinterCatalogSyncService printerCatalogSyncService;
     private final PrintJobService printJobService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -28,10 +32,17 @@ public class MqttEventListener {
 
             JsonNode json = objectMapper.readTree(payload);
             String event = json.get("event").asText();
+            UUID printerId = UUID.fromString(json.get("printerId").asText());
 
             log.info("EdolCore MQTT EVENT: {}", event);
 
-            PrinterState printerState = printerService.getState();
+            printerCatalogSyncService.synchronize(printerId);
+            PrinterState printerState = printerService.getState(printerId);
+
+            if (printerState == null) {
+                log.warn("Skipping event {} because printer state is unavailable for {}", event, printerId);
+                return;
+            }
 
             log.info(
                     "State for event {}: sessionId={}, printing={}, filaments={}",
@@ -44,11 +55,11 @@ public class MqttEventListener {
             );
 
             switch (event) {
-                case "print.started" -> handlePrintStarted(printerState);
-                case "print.finished" -> handlePrintFinished(printerState);
-                case "print.failed" -> handlePrintFailed(printerState);
-                case "print.progress.changed" -> handlePrintProgress(printerState);
-                case "print.metadata.loaded" -> handlePrintMetadata(printerState);
+                case "print.started" -> handlePrintStarted(printerId, printerState);
+                case "print.finished" -> handlePrintFinished(printerId, printerState);
+                case "print.failed" -> handlePrintFailed(printerId, printerState);
+                case "print.progress.changed" -> handlePrintProgress(printerId, printerState);
+                case "print.metadata.loaded" -> handlePrintMetadata(printerId, printerState);
                 case "ams.status.changed" -> handleAmsStatus(json);
                 case "ams.slot.changed" -> handleAmsSlot(json);
                 default -> log.debug("Unhandled event: {}", event);
@@ -59,28 +70,28 @@ public class MqttEventListener {
         }
     }
 
-    private void handlePrintStarted(PrinterState printerState) {
-        printJobService.start(printerState);
+    private void handlePrintStarted(UUID printerId, PrinterState printerState) {
+        printJobService.start(printerId, printerState);
     }
 
-    private void handlePrintFinished(PrinterState printerState) {
-        printJobService.finish(printerState);
+    private void handlePrintFinished(UUID printerId, PrinterState printerState) {
+        printJobService.finish(printerId, printerState);
     }
 
-    private void handlePrintFailed(PrinterState printerState) {
-        printJobService.cancel(printerState);
+    private void handlePrintFailed(UUID printerId, PrinterState printerState) {
+        printJobService.cancel(printerId, printerState);
     }
 
-    private void handlePrintProgress(PrinterState printerState) {
+    private void handlePrintProgress(UUID printerId, PrinterState printerState) {
         try {
-            printJobService.updateProgress(printerState);
+            printJobService.updateProgress(printerId, printerState);
         } catch (Exception e) {
             log.error("Session ID {} hasn't been registered.", printerState.getSessionId());
         }
     }
 
-    private void handlePrintMetadata(PrinterState printerState) {
-        printJobService.metadataLoaded(printerState);
+    private void handlePrintMetadata(UUID printerId, PrinterState printerState) {
+        printJobService.metadataLoaded(printerId, printerState);
     }
 
     private void handleAmsStatus(JsonNode json) {

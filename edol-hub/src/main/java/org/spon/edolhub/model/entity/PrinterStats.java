@@ -15,6 +15,10 @@ public class PrinterStats {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "printer_id")
+    private Printer printer;
+
     // total printer usage
     private Long totalPrintSeconds = 0L;
 

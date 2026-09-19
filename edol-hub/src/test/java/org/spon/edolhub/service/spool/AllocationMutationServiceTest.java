@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -69,9 +70,10 @@ class AllocationMutationServiceTest {
                 .status(FilamentSpool.FilamentSpoolStatus.ACTIVE)
                 .build();
         job = PrintJob.builder()
-                .id(100L).sessionId("SESS-001").fileName("test.gcode")
+                .sessionId("SESS-001").fileName("test.gcode")
                 .taskName("Test Print").status(PrintJobStatus.RUNNING)
                 .build();
+        job.setId(UUID.fromString("00000000-0000-0000-0000-000000000201"));
     }
 
     private PrintAllocationGroup groupWithFilament(Filament f, double requested, AllocationStatus status, List<PrintAllocationItem> items) {
@@ -157,7 +159,7 @@ class AllocationMutationServiceTest {
         void throwsWhenExceedsRequested() {
             PrintAllocationGroup group = groupWithFilament(filament, 200.0, AllocationStatus.RESOLVED, null);
             PrintAllocationPreview preview = previewWithGroup(group, false);
-            Long jobId = job.getId();
+            UUID jobId = job.getId();
             Long filamentId = filament.getId();
 
             when(previewRepository.findByPrintJobId(jobId)).thenReturn(Optional.of(preview));
@@ -173,7 +175,7 @@ class AllocationMutationServiceTest {
         void throwsWhenGramsNull() {
             PrintAllocationGroup group = groupWithFilament(filament, 200.0, AllocationStatus.RESOLVED, null);
             PrintAllocationPreview preview = previewWithGroup(group, false);
-            Long jobId = job.getId();
+            UUID jobId = job.getId();
             Long filamentId = filament.getId();
 
             when(previewRepository.findByPrintJobId(jobId)).thenReturn(Optional.of(preview));
@@ -189,7 +191,7 @@ class AllocationMutationServiceTest {
         void throwsWhenGramsZero() {
             PrintAllocationGroup group = groupWithFilament(filament, 200.0, AllocationStatus.RESOLVED, null);
             PrintAllocationPreview preview = previewWithGroup(group, false);
-            Long jobId = job.getId();
+            UUID jobId = job.getId();
             Long filamentId = filament.getId();
 
             when(previewRepository.findByPrintJobId(jobId)).thenReturn(Optional.of(preview));
@@ -295,7 +297,7 @@ class AllocationMutationServiceTest {
             group.setMissingGrams(100.0);
             existing.setGroup(group);
             PrintAllocationPreview preview = previewWithGroup(group, false);
-            Long jobId = job.getId();
+            UUID jobId = job.getId();
             Long filamentId = filament.getId();
 
             when(previewRepository.findByPrintJobId(jobId)).thenReturn(Optional.of(preview));
@@ -313,7 +315,7 @@ class AllocationMutationServiceTest {
             group.setAllocatedGrams(0.0);
             group.setMissingGrams(200.0);
             PrintAllocationPreview preview = previewWithGroup(group, false);
-            Long jobId = job.getId();
+            UUID jobId = job.getId();
             Long filamentId = filament.getId();
 
             when(previewRepository.findByPrintJobId(jobId)).thenReturn(Optional.of(preview));
@@ -428,7 +430,7 @@ class AllocationMutationServiceTest {
         void throwsWhenGroupNotFound() {
             PrintAllocationGroup group = groupWithFilament(filament, 200.0, AllocationStatus.RESOLVED, null);
             PrintAllocationPreview preview = previewWithGroup(group, false);
-            Long jobId = job.getId();
+            UUID jobId = job.getId();
             when(previewRepository.findByPrintJobId(jobId)).thenReturn(Optional.of(preview));
 
             assertThatThrownBy(() ->
@@ -439,7 +441,7 @@ class AllocationMutationServiceTest {
         @Test
         @DisplayName("throws when preview not found")
         void throwsWhenPreviewNotFound() {
-            Long jobId = job.getId();
+            UUID jobId = job.getId();
             when(previewRepository.findByPrintJobId(jobId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() ->

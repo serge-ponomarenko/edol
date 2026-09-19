@@ -1,6 +1,7 @@
 package org.spon.edolhub.controller;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,15 +12,18 @@ import org.spon.edolhub.model.dto.FilamentDeletePreviewDto;
 import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.MaterialType;
 import org.spon.edolhub.model.entity.Vendor;
+import org.spon.edolhub.model.entity.Tenant;
 import org.spon.edolhub.repository.FilamentRepository;
 import org.spon.edolhub.repository.MaterialTypeRepository;
 import org.spon.edolhub.repository.VendorRepository;
 import org.spon.edolhub.service.filament.FilamentDeleteService;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,6 +32,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class FilamentControllerTest {
+
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private final Tenant tenant = new Tenant();
 
     @Mock
     private FilamentRepository filamentRepository;
@@ -42,6 +49,9 @@ class FilamentControllerTest {
     private FilamentDeleteService filamentDeleteService;
 
     @Mock
+    private TenantContext tenantContext;
+
+    @Mock
     private Model model;
 
     @Mock
@@ -49,6 +59,13 @@ class FilamentControllerTest {
 
     @InjectMocks
     private FilamentController controller;
+
+    @BeforeEach
+    void setUp() {
+        tenant.setId(TENANT_ID);
+        lenient().when(tenantContext.getCurrentTenantId()).thenReturn(TENANT_ID);
+        lenient().when(tenantContext.getCurrentTenant()).thenReturn(tenant);
+    }
 
     @Nested
     @DisplayName("list")
@@ -58,7 +75,7 @@ class FilamentControllerTest {
         @DisplayName("returns list view with all filaments")
         void returnsListView() {
             List<Filament> filaments = List.of(new Filament());
-            when(filamentRepository.findAll()).thenReturn(filaments);
+            when(filamentRepository.findAllByTenantIdOrderByFullId(TENANT_ID)).thenReturn(filaments);
 
             String view = controller.list(model);
 
@@ -76,8 +93,8 @@ class FilamentControllerTest {
         void returnsFormView() {
             List<Vendor> vendors = List.of(new Vendor());
             List<MaterialType> materials = List.of(new MaterialType());
-            when(vendorRepository.findAll()).thenReturn(vendors);
-            when(materialTypeRepository.findAll()).thenReturn(materials);
+            when(vendorRepository.findAllByTenantIdOrderByName(TENANT_ID)).thenReturn(vendors);
+            when(materialTypeRepository.findAllByTenantIdOrderByName(TENANT_ID)).thenReturn(materials);
 
             String view = controller.createForm(model);
 
@@ -115,9 +132,9 @@ class FilamentControllerTest {
         void returnsFormWithFilament() {
             Filament filament = new Filament();
             filament.setId(1L);
-            when(filamentRepository.findById(1L)).thenReturn(Optional.of(filament));
-            when(vendorRepository.findAll()).thenReturn(List.of());
-            when(materialTypeRepository.findAll()).thenReturn(List.of());
+            when(filamentRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(filament));
+            when(vendorRepository.findAllByTenantIdOrderByName(TENANT_ID)).thenReturn(List.of());
+            when(materialTypeRepository.findAllByTenantIdOrderByName(TENANT_ID)).thenReturn(List.of());
 
             String view = controller.edit(1L, model);
 
@@ -130,7 +147,7 @@ class FilamentControllerTest {
         @Test
         @DisplayName("throws when filament not found")
         void throwsWhenNotFound() {
-            when(filamentRepository.findById(99L)).thenReturn(Optional.empty());
+            when(filamentRepository.findByIdAndTenantId(99L, TENANT_ID)).thenReturn(Optional.empty());
 
             org.junit.jupiter.api.Assertions.assertThrows(
                     java.util.NoSuchElementException.class,
@@ -147,6 +164,7 @@ class FilamentControllerTest {
         @DisplayName("returns delete preview")
         void returnsPreview() {
             FilamentDeletePreviewDto preview = new FilamentDeletePreviewDto(List.of(), List.of());
+            when(filamentRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(new Filament()));
             when(filamentDeleteService.preview(1L)).thenReturn(preview);
 
             FilamentDeletePreviewDto result = controller.previewDelete(1L);
@@ -163,12 +181,14 @@ class FilamentControllerTest {
         @DisplayName("deletes filament when no dependencies")
         void deletesWhenNoDeps() {
             FilamentDeletePreviewDto preview = new FilamentDeletePreviewDto(List.of(), List.of());
+            Filament filament = new Filament();
+            when(filamentRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(filament));
             when(filamentDeleteService.preview(1L)).thenReturn(preview);
 
             String view = controller.delete(1L, redirectAttributes);
 
             assertThat(view).isEqualTo("redirect:/filaments");
-            verify(filamentRepository).deleteById(1L);
+            verify(filamentRepository).delete(filament);
             verifyNoInteractions(redirectAttributes);
         }
 
@@ -179,12 +199,13 @@ class FilamentControllerTest {
                     List.of(new FilamentDeletePreviewDto.SpoolInfo(1L, 500.0, "ACTIVE")),
                     List.of()
             );
+            when(filamentRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(new Filament()));
             when(filamentDeleteService.preview(1L)).thenReturn(preview);
 
             String view = controller.delete(1L, redirectAttributes);
 
             assertThat(view).isEqualTo("redirect:/filaments");
-            verify(filamentRepository, never()).deleteById(any());
+            verify(filamentRepository, never()).delete(any(Filament.class));
             verify(redirectAttributes).addFlashAttribute("deleteError", "Filament is used by other entities");
         }
     }

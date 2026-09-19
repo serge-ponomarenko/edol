@@ -35,7 +35,9 @@ public class PrintJob extends PersistableEntity {
     /**
      * Printer identifier
      */
-    private int printerId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "printer_id_uuid")
+    private Printer printer;
 
     /**
      * File name

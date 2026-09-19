@@ -23,14 +23,14 @@ public class JobSpoolUsage {
      * Print job reference
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "print_job_id")
+    @JoinColumn(name = "print_job_id", nullable = false)
     private PrintJob printJob;
 
     /**
      * Physical spool used for printing
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "filament_spool_id")
+    @JoinColumn(name = "filament_spool_id", nullable = false)
     private FilamentSpool filamentSpool;
 
     /**

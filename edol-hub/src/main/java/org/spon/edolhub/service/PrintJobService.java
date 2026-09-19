@@ -7,6 +7,7 @@ import org.spon.edolhub.model.dto.AllocationResult;
 import org.spon.edolhub.model.entity.*;
 import org.spon.edolhub.repository.PrintAllocationPreviewRepository;
 import org.spon.edolhub.repository.PrintJobRepository;
+import org.spon.edolhub.repository.PrinterRepository;
 import org.spon.edolhub.service.spool.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -38,6 +40,7 @@ public class PrintJobService {
     private final PrintAllocationPreviewService printAllocationPreviewService;
     private final SpoolAllocationService spoolAllocationService;
     private final PrintAllocationPreviewRepository previewRepository;
+    private final PrinterRepository printerRepository;
     private final AllocationPreviewRuntimeCacheService runtimeCacheService;
     private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
 
@@ -46,14 +49,19 @@ public class PrintJobService {
     private String edolCoreUrl;
 
 
-    public Page<PrintJob> getJobs(int page, int size) {
-        return printJobRepository.findAllByOrderByStartedAtDesc(PageRequest.of(page, size));
+    public Page<PrintJob> getJobs(UUID printerId, int page, int size) {
+        return printJobRepository.findAllByPrinterIdOrderByStartedAtDesc(
+                printerId,
+                PageRequest.of(page, size)
+        );
     }
 
     @Transactional
-    public void start(PrinterState printerState) {
+    public void start(UUID printerId, PrinterState printerState) {
+        Printer printer = printerRepository.findById(printerId)
+                .orElseThrow(() -> new IllegalStateException("Unknown printer: " + printerId));
         PrintJob job = PrintJob.builder()
-                .printerId(printerState.getPrinterId())
+                .printer(printer)
                 .sessionId(printerState.getSessionId())
                 .fileName(printerState.getCurrentFile())
                 .taskName(printerState.getCurrentTask())
@@ -63,11 +71,12 @@ public class PrintJobService {
 
         PrintJob savedJob = printJobRepository.save(job);
 
-        runtimeStateService.setCurrentJob(savedJob);
-        runtimeStateService.setAllocationPreviewReady(false);
+        runtimeStateService.setCurrentJob(printerId, savedJob);
+        runtimeStateService.setAllocationPreviewReady(printerId, false);
 
         log.info(
-                "Print started. Session ID: {}, Job ID: {}",
+                "Print started. Printer ID: {}, Session ID: {}, Job ID: {}",
+                printerId,
                 savedJob.getSessionId(),
                 savedJob.getId()
         );
@@ -76,9 +85,10 @@ public class PrintJobService {
 
     @Transactional
     public void metadataLoaded(
+            UUID printerId,
             PrinterState printerState
     ) {
-        PrintJob job = getCurrentJob();
+        PrintJob job = getCurrentJob(printerId);
 
         if (previewRepository.existsByPrintJobId(
                 job.getId()
@@ -92,7 +102,7 @@ public class PrintJobService {
         );
 
         runtimeStateService
-                .setAllocationPreviewReady(true);
+                .setAllocationPreviewReady(printerId, true);
 
         allocationPreviewRuntimeSyncService.refresh(job.getId());
 
@@ -102,12 +112,12 @@ public class PrintJobService {
                 job.getId()
         );
 
-        saveModelImage(job);
+        saveModelImage(printerId, job);
     }
 
     @Transactional
-    public void finish(PrinterState printerState) {
-        PrintJob job = getCurrentJob(printerState);
+    public void finish(UUID printerId, PrinterState printerState) {
+        PrintJob job = getCurrentJob(printerId, printerState);
 
         job.setStatus(PrintJobStatus.FINISHED);
         printAllocationFinalizeService.finalizeAllocation(job);
@@ -118,11 +128,11 @@ public class PrintJobService {
 
         updatePrinterStats(job);
 
-        runtimeStateService.setAllocationPreviewReady(false);
+        runtimeStateService.setAllocationPreviewReady(printerId, false);
 
-        runtimeCacheService.setCurrentAllocationPreview(null);
+        runtimeCacheService.setCurrentAllocationPreview(printerId, null);
 
-        runtimeStateService.setCurrentJob(null);
+        runtimeStateService.setCurrentJob(printerId, null);
 
         log.info("Print finished. Session ID: {}, Job ID: {}",
                 printerState.getSessionId(),
@@ -132,8 +142,8 @@ public class PrintJobService {
     }
 
     @Transactional
-    public void cancel(PrinterState printerState) {
-        PrintJob job = getCurrentJob(printerState);
+    public void cancel(UUID printerId, PrinterState printerState) {
+        PrintJob job = getCurrentJob(printerId, printerState);
 
         if (isTerminalStatus(job))
             return; // may already be set by PRINT_ERROR or PRINT_FAILED events
@@ -190,11 +200,11 @@ public class PrintJobService {
         }
         job.setFinishedAt(LocalDateTime.now());
 
-        runtimeStateService.setAllocationPreviewReady(false);
+        runtimeStateService.setAllocationPreviewReady(printerId, false);
 
-        runtimeCacheService.setCurrentAllocationPreview(null);
+        runtimeCacheService.setCurrentAllocationPreview(printerId, null);
 
-        runtimeStateService.setCurrentJob(null);
+        runtimeStateService.setCurrentJob(printerId, null);
 
         updatePrinterStats(job);
 
@@ -206,8 +216,8 @@ public class PrintJobService {
     }
 
     @Transactional
-    public void updateProgress(PrinterState printerState) {
-        PrintJob job = getCurrentJob(printerState);
+    public void updateProgress(UUID printerId, PrinterState printerState) {
+        PrintJob job = getCurrentJob(printerId, printerState);
 
         if (job.getStatus() != PrintJobStatus.FINISHED
                 && job.getStatus() != PrintJobStatus.FAILED
@@ -229,12 +239,12 @@ public class PrintJobService {
         }
     }
 
-    public void saveModelImage(PrintJob job) {
-        CompletableFuture.runAsync(() -> fetchAndSave(job));
+    public void saveModelImage(UUID printerId, PrintJob job) {
+        CompletableFuture.runAsync(() -> fetchAndSave(printerId, job));
     }
 
-    private void fetchAndSave(PrintJob job) {
-        String url = edolCoreUrl + "/api/modelimage";
+    private void fetchAndSave(UUID printerId, PrintJob job) {
+        String url = edolCoreUrl + "/api/printers/" + printerId + "/media/model/plate";
 
         ResponseEntity<byte[]> response = restTemplate.exchange(
                 url,
@@ -251,22 +261,22 @@ public class PrintJobService {
         printJobRepository.save(job);
     }
 
-    private PrintJob getCurrentJob() {
-        PrintJob job = runtimeStateService.getCurrentJob();
+    private PrintJob getCurrentJob(UUID printerId) {
+        PrintJob job = runtimeStateService.getCurrentJob(printerId);
 
         if (job == null) {
-            throw new IllegalStateException("No active print job");
+            throw new IllegalStateException("No active print job for printer " + printerId);
         }
 
         return job;
     }
 
-    private PrintJob getCurrentJob(PrinterState printerState) {
-        PrintJob job = runtimeStateService.getCurrentJob();
+    private PrintJob getCurrentJob(UUID printerId, PrinterState printerState) {
+        PrintJob job = runtimeStateService.getCurrentJob(printerId);
 
         if (job == null) {
             throw new IllegalStateException(
-                    "No active print job for printer " + printerState.getPrinterId()
+                    "No active print job for printer " + printerId
             );
         }
 
@@ -328,6 +338,7 @@ public class PrintJobService {
                         .sum();
 
         printerStatsService.addPrintJob(
+                job.getPrinter(),
                 job.getPrintDuration()
                         .toSeconds(),
                 totalFilamentUsage
