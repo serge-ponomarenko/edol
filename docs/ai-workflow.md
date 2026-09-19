@@ -10,7 +10,15 @@
 
 ## MCP Status
 
-No MCP server is configured.
+The local PostgreSQL MCP server is configured in `.ai/mcp/mcp.json` as
+`edol-postgres`. It starts `@microsoft/postgres-mcp` through `npx` with
+telemetry disabled and uses connection profiles stored outside the repository
+in `%USERPROFILE%\.postgres-mcp\connections.yaml`.
+
+- Use only a local development profile. The MCP server does not expose a
+  read-only mode, so do not configure shared, staging, or production database
+  credentials.
+- Connection profiles and passwords are user-local and must never be committed.
 
 - Prefer Git CLI for local history and diffs. The repository remote is Gitea, so a GitHub integration is not a default fit.
 - Consider a read-only Gitea integration only when issue or pull-request context is regularly required.

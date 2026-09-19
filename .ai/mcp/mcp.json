@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "edol-postgres": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": [
+        "-y",
+        "@microsoft/postgres-mcp",
+        "run",
+        "--no-telemetry"
+      ]
+    }
+  }
+}
