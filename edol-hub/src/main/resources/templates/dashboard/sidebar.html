@@ -64,17 +64,22 @@
                 <li class="nav-item px-3 pt-3 text-muted small text-uppercase">Printer</li>
 
                 <li class="nav-item">
-                    <a class="nav-link"
-                       th:href="${printerId != null} ? @{/printers/{id}(id=${printerId})} : @{/printers}"
+                    <a class="nav-link" th:if="${printerId != null}"
+                       th:href="@{/printers/{id}(id=${printerId})}"
                        th:classappend="${printerId != null and currentPath.matches('/printers/[^/]+')} ? ' active'">
                         <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-activity"></i></span>
                         <span class="nav-link-title">Printer Status</span>
                     </a>
+                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true"
+                          title="Select a printer first">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-activity"></i></span>
+                        <span class="nav-link-title">Printer Status</span>
+                    </span>
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link"
-                       th:href="${printerId != null} ? @{/printers/{id}/print-jobs(id=${printerId})} : @{/}"
+                    <a class="nav-link" th:if="${printerId != null}"
+                       th:href="@{/printers/{id}/print-jobs(id=${printerId})}"
                        th:classappend="${currentPath.contains('/print-jobs')} ? ' active'">
 
                             <span class="nav-link-icon d-md-none d-lg-inline-block">
@@ -84,11 +89,18 @@
                                 Print Jobs
                             </span>
                     </a>
+                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true"
+                          title="Select a printer first">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="ti ti-printer"></i>
+                        </span>
+                        <span class="nav-link-title">Print Jobs</span>
+                    </span>
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link"
-                       th:href="${printerId != null} ? @{/printers/{id}/maintenance(id=${printerId})} : @{/}"
+                    <a class="nav-link" th:if="${printerId != null}"
+                       th:href="@{/printers/{id}/maintenance(id=${printerId})}"
                        th:classappend="${currentPath.endsWith('/maintenance')} ? ' active'">
                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                 <i class="ti ti-clock-cog"></i>
@@ -97,15 +109,27 @@
                                 Printer Maintenance
                             </span>
                     </a>
+                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true"
+                          title="Select a printer first">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="ti ti-clock-cog"></i>
+                        </span>
+                        <span class="nav-link-title">Printer Maintenance</span>
+                    </span>
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link"
-                       th:href="${printerId != null} ? @{/printers/{id}/maintenance/config(id=${printerId})} : @{/printers}"
+                    <a class="nav-link" th:if="${printerId != null}"
+                       th:href="@{/printers/{id}/maintenance/config(id=${printerId})}"
                        th:classappend="${currentPath.contains('/maintenance/config')} ? ' active'">
                         <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-device-ipad-cog"></i></span>
                         <span class="nav-link-title">Maintenance Definitions</span>
                     </a>
+                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true"
+                          title="Select a printer first">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-device-ipad-cog"></i></span>
+                        <span class="nav-link-title">Maintenance Definitions</span>
+                    </span>
                 </li>
 
                 <li class="nav-item"
