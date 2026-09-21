@@ -6,6 +6,39 @@
     <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+    <style>
+        .printer-model-preview {
+            align-items: center;
+            background: var(--tblr-bg-surface-secondary);
+            border-radius: 8px;
+            display: flex;
+            flex: 0 0 104px;
+            height: 104px;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .printer-model-preview img {
+            height: 100%;
+            object-fit: contain;
+            width: 100%;
+        }
+
+        .printer-metric {
+            background: var(--tblr-bg-surface-secondary);
+            border-radius: 6px;
+            font-size: .75rem;
+            padding: .4rem .5rem;
+        }
+
+        .printer-ams-slot {
+            border-radius: 3px;
+            display: inline-block;
+            height: 8px;
+            margin-right: 3px;
+            width: 20px;
+        }
+    </style>
 </head>
 <body class="layout-fluid">
 <div class="page">
@@ -23,51 +56,244 @@
                         </div>
                     </div>
                     <div class="alert alert-danger m-3" role="alert" th:if="${printerError}" th:text="${printerError}"></div>
-                    <div class="table-responsive" th:if="${!printers.isEmpty()}">
-                        <table class="table table-vcenter card-table">
-                            <thead>
-                            <tr>
-                                <th>Display ID</th>
-                                <th>Name</th>
-                                <th>Core</th>
-                                <th>Enabled</th>
-                                <th></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="printer : ${printers}">
-                                <td th:text="${printer.displayId}"></td>
-                                <td th:text="${printer.name}"></td>
-                                <td>
-                                    <span class="badge" th:classappend="${printer.availableInCore} ? ' bg-green text-green-fg' : ' bg-red text-red-fg'"
-                                          th:text="${printer.availableInCore} ? 'Available' : 'Unavailable'"></span>
-                                </td>
-                                <td th:text="${printer.enabled} ? 'Yes' : 'No'"></td>
-                                <td class="text-end">
-                                    <div class="btn-list justify-content-end">
-                                        <a class="btn btn-sm btn-outline-primary"
-                                           th:href="@{/printers/{printerId}(printerId=${printer.id})}">Status</a>
-                                        <a class="btn btn-sm btn-outline-secondary" th:if="${printer.availableInCore}"
-                                           th:href="@{/printers/{printerId}/edit(printerId=${printer.id})}">Edit</a>
-                                        <form th:if="${printer.availableInCore}"
-                                              th:action="@{/printers/{printerId}/delete(printerId=${printer.id})}" method="post"
-                                              onsubmit="return confirm('Decommission this printer in EDOL Core?');">
-                                            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
+                    <div class="card-body border-bottom py-3">
+                        <div class="btn-list" id="printerFilters">
+                            <button class="btn btn-sm btn-primary" data-filter="all" type="button">All</button>
+                            <button class="btn btn-sm btn-outline-secondary" data-filter="printing" type="button">Printing</button>
+                            <button class="btn btn-sm btn-outline-secondary" data-filter="idle" type="button">Idle</button>
+                            <button class="btn btn-sm btn-outline-secondary" data-filter="offline" type="button">Offline</button>
+                            <button class="btn btn-sm btn-outline-secondary" data-filter="attention" type="button">Attention</button>
+                        </div>
                     </div>
-                    <div class="empty py-5" th:if="${printers.isEmpty()}">
-                        <div class="empty-header">No printers</div>
-                        <p class="empty-subtitle text-muted">Add the first printer to start managing its status and jobs.</p>
+                    <div class="card-body">
+                        <div class="row row-cards" id="printerCards" aria-live="polite">
+                            <div class="col-12 text-muted text-center py-5">Loading printers&hellip;</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+<script>
+    const printerCards = document.getElementById("printerCards");
+    const printerFilters = document.getElementById("printerFilters");
+    let overview = [];
+    let activeFilter = "all";
+
+    async function refreshOverview() {
+        try {
+            const response = await fetch("/api/printers/overview");
+            if (!response.ok) {
+                throw new Error("Printer overview unavailable");
+            }
+            overview = await response.json();
+            renderOverview();
+        } catch (error) {
+            console.warn("Failed to refresh printer overview", error);
+            printerCards.innerHTML = "<div class='col-12 text-muted text-center py-5'>Printer overview is unavailable.</div>";
+        }
+    }
+
+    function renderOverview() {
+        const printers = overview
+            .filter(matchesFilter)
+            .sort(comparePrinters);
+
+        if (printers.length === 0) {
+            printerCards.innerHTML = "<div class='col-12 text-muted text-center py-5'>No printers match this filter.</div>";
+            return;
+        }
+
+        printerCards.innerHTML = printers.map(renderPrinterCard).join("");
+    }
+
+    function matchesFilter(printer) {
+        if (activeFilter === "all") return true;
+        if (activeFilter === "printing") return isPrinting(printer);
+        if (activeFilter === "idle") return isIdle(printer);
+        if (activeFilter === "offline") return isOffline(printer);
+        return needsAttention(printer);
+    }
+
+    function comparePrinters(first, second) {
+        return printerPriority(first) - printerPriority(second)
+            || String(first.displayId || '').localeCompare(String(second.displayId || ''));
+    }
+
+    function printerPriority(printer) {
+        if (needsAttention(printer)) return 0;
+        if (isPrinting(printer)) return 1;
+        if (isOffline(printer)) return 2;
+        return 3;
+    }
+
+    function isPrinting(printer) {
+        return Boolean(printer.state && printer.state.printing);
+    }
+
+    function isOffline(printer) {
+        return !printer.enabled || !printer.availableInCore || !printer.state || !printer.state.online;
+    }
+
+    function isIdle(printer) {
+        return !isPrinting(printer) && !isOffline(printer) && !needsAttention(printer);
+    }
+
+    function needsAttention(printer) {
+        return printer.maintenanceAlertCount > 0 || Boolean(printer.state && printer.state.error);
+    }
+
+    function renderPrinterCard(printer) {
+        const state = printer.state;
+        const printing = isPrinting(printer);
+        const alert = printer.maintenanceAlertCount > 0
+            ? `<span class="badge bg-yellow text-yellow-fg">Maintenance: ${printer.maintenanceAlertCount}</span>`
+            : state && state.error
+                ? '<span class="badge bg-red text-red-fg">Printer error</span>'
+                : '';
+        const task = printing
+            ? `<div class="text-truncate fw-semibold">${escapeHtml(state.currentTask || state.currentFile || "Current print")}</div>
+               <div class="small text-muted">${state.progress || 0}% &middot; Layer ${state.layer || 0}/${state.totalLayers || "&ndash;"} &middot; ${formatMinutes(state.remainingTime)}</div>
+               <div class="progress progress-sm mt-2"><div class="progress-bar" style="width:${Math.max(0, Math.min(100, state.progress || 0))}%"></div></div>`
+            : `<div class="fw-semibold">${statusLabel(printer)}</div><div class="small text-muted">${escapeHtml(statusDescription(printer))}</div>`;
+        const preview = printing
+            ? `<div class="printer-model-preview"><img src="/api/printers/${printer.id}/media/model/plate?t=${Date.now()}" alt="Model preview" onerror="this.onerror=null;this.src='/img/model-placeholder.png'"></div>`
+            : '';
+
+        return `<div class="col-sm-6 col-xl-4">
+            <article class="card h-100">
+                <div class="card-body d-flex flex-column gap-3">
+                    <div class="d-flex justify-content-between gap-2">
+                        <div class="min-width-0"><div class="h3 mb-0 text-truncate">${escapeHtml(printer.name)}</div><div class="text-muted small">${escapeHtml(printer.model || printer.displayId)}</div></div>
+                        <div class="text-end"><span class="badge ${statusClass(printer)}">${statusLabel(printer)}</span>${alert}</div>
+                    </div>
+                    <div class="d-flex gap-3 align-items-center">${preview}<div class="flex-fill min-width-0">${task}</div></div>
+                    ${renderMetrics(state)}
+                    ${renderFilament(state)}
+                    <div class="d-flex justify-content-between align-items-center mt-auto gap-2">
+                        <a class="btn btn-sm btn-outline-primary" href="/printers/${printer.id}">Open dashboard</a>
+                        <div class="btn-list">
+                            ${renderActions(printer)}
+                            ${renderManagementActions(printer)}
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>`;
+    }
+
+    function renderMetrics(state) {
+        if (!state) return '<div class="text-muted small">Live data unavailable</div>';
+        return `<div class="d-flex gap-2">
+            <div class="printer-metric flex-fill">Nozzle <b>${Math.round(state.nozzleTemp || 0)}&deg;</b><span class="text-muted"> / ${Math.round(state.nozzleTargetTemp || 0)}&deg;</span></div>
+            <div class="printer-metric flex-fill">Bed <b>${Math.round(state.bedTemp || 0)}&deg;</b><span class="text-muted"> / ${Math.round(state.bedTargetTemp || 0)}&deg;</span></div>
+        </div>`;
+    }
+
+    function renderFilament(state) {
+        if (!state) return '';
+        const slots = state.ams && state.ams.slots ? state.ams.slots : [];
+        const ams = slots.length === 0
+            ? '<span class="text-muted">AMS unavailable</span>'
+            : slots.map((slot, index) => `<span class="printer-ams-slot" title="AMS ${index + 1}: ${escapeHtml(slot.filamentType || "Empty")}" style="background:${safeColor(slot.color)}"></span>`).join('');
+        const external = state.extTray && state.extTray.filamentType
+            ? ` &middot; External: ${escapeHtml(state.extTray.filamentType)}`
+            : '';
+        return `<div class="small text-muted">AMS: ${ams}${external}</div>`;
+    }
+
+    function renderActions(printer) {
+        if (!isPrinting(printer)) return '';
+        const command = printer.state.gcodeState === 'PAUSE' ? 'resume' : 'pause';
+        const label = command === 'resume' ? 'Resume' : 'Pause';
+        return `<button class="btn btn-sm btn-outline-secondary" type="button" onclick="sendCommand('${printer.id}', '${command}')">${label}</button><button class="btn btn-sm btn-outline-danger" type="button" onclick="stopPrinter('${printer.id}')">Stop</button>`;
+    }
+
+    function renderManagementActions(printer) {
+        if (!printer.availableInCore) return '';
+        return `<div class="dropdown">
+            <button class="btn btn-sm btn-ghost-secondary" type="button" data-bs-toggle="dropdown" aria-label="Printer actions">
+                <i class="ti ti-dots-vertical"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end">
+                <a class="dropdown-item" href="/printers/${printer.id}/edit">
+                    <i class="ti ti-edit me-2"></i>Edit
+                </a>
+                <div class="dropdown-divider"></div>
+                <form action="/printers/${printer.id}/delete" method="post" onsubmit="return confirm('Decommission this printer in EDOL Core?');">
+                    <button class="dropdown-item text-danger" type="submit">
+                        <i class="ti ti-trash me-2"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>`;
+    }
+
+    function statusLabel(printer) {
+        if (!printer.enabled) return 'Disabled';
+        if (!printer.availableInCore || !printer.state) return 'Unavailable';
+        return printer.state.online ? (isPrinting(printer) ? 'Printing' : 'Ready') : 'Offline';
+    }
+
+    function statusDescription(printer) {
+        if (!printer.enabled) return 'Printer is disabled';
+        if (!printer.availableInCore) return 'Not available in EDOL Core';
+        if (!printer.state) return 'Live data unavailable';
+        return printer.state.gcodeState || 'Ready to print';
+    }
+
+    function statusClass(printer) {
+        if (needsAttention(printer)) return 'bg-red text-red-fg';
+        if (isOffline(printer)) return 'bg-secondary text-secondary-fg';
+        return isPrinting(printer) ? 'bg-blue text-blue-fg' : 'bg-green text-green-fg';
+    }
+
+    function formatMinutes(minutes) {
+        if (!minutes) return '&ndash;';
+        const hours = Math.floor(minutes / 60);
+        return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+    }
+
+    function safeColor(color) {
+        return /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#6c757d';
+    }
+
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>'"]/g, character => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        })[character]);
+    }
+
+    async function sendCommand(printerId, command) {
+        try {
+            const response = await fetch(`/api/printers/${printerId}/commands/${command}`, {method: 'POST'});
+            if (!response.ok) alert(`Unable to ${command} printer.`);
+        } catch (error) {
+            console.warn(`Failed to ${command} printer`, error);
+            alert(`Unable to ${command} printer.`);
+        } finally {
+            refreshOverview();
+        }
+    }
+
+    async function stopPrinter(printerId) {
+        if (!confirm('Stop the current print?')) return;
+        await sendCommand(printerId, 'stop');
+    }
+
+    printerFilters.addEventListener('click', event => {
+        const button = event.target.closest('[data-filter]');
+        if (!button) return;
+        activeFilter = button.dataset.filter;
+        printerFilters.querySelectorAll('[data-filter]').forEach(filter => {
+            filter.className = `btn btn-sm ${filter === button ? 'btn-primary' : 'btn-outline-secondary'}`;
+        });
+        renderOverview();
+    });
+
+    refreshOverview();
+    setInterval(refreshOverview, 5000);
+</script>
 </body>
 </html>
