@@ -32,6 +32,14 @@ public class PrinterService {
                 .body(PrinterState.class);
     }
 
+    public List<PrinterState> getStates() {
+        PrinterState[] states = edolCoreClient.get()
+                .uri("/api/printers/state")
+                .retrieve()
+                .body(PrinterState[].class);
+        return states == null ? List.of() : Arrays.asList(states);
+    }
+
     public Path getLatestStatusImagePath(UUID printerId) {
         return edolCoreClient.get()
                 .uri("/api/printers/{printerId}/camera/status-image", printerId)

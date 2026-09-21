@@ -15,7 +15,11 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -69,6 +73,7 @@ public class TelegramMessageController {
                 new InlineKeyboardButton("📃 Status", callback("status", printerId)),
                 new InlineKeyboardButton("⚙️ Controls", callback("controls", printerId))
         );
+        keyboard.addKeyboard(new InlineKeyboardButton("🖨 Printers", "printers"));
 
         Path latestStatusImagePath = printerService.getLatestStatusImagePath(printerId);
         String caption = formatter.buildStatusMessage(state, printer.name());
@@ -81,6 +86,18 @@ public class TelegramMessageController {
             return;
         }
         context.sendMessage(chatId, caption)
+                .parseMode(ParseMode.HTML)
+                .replyMarkup(keyboard)
+                .exec();
+    }
+
+    public void sendStatusPrinterSelection(BotContext context, long chatId) {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        statusSelections(printerService.getPrinters(), printerService.getStates())
+                .forEach(selection -> keyboard.addKeyboard(new InlineKeyboardButton(
+                        statusSelectionLabel(selection), callback("status", selection.printer().printerId())
+                )));
+        context.sendMessage(chatId, "Select a printer")
                 .parseMode(ParseMode.HTML)
                 .replyMarkup(keyboard)
                 .exec();
@@ -165,5 +182,29 @@ public class TelegramMessageController {
         }
         log.error("Telegram bot is unavailable or disabled");
         return null;
+    }
+
+    static List<PrinterSelection> statusSelections(List<PrinterSummary> printers, List<PrinterState> states) {
+        Map<UUID, PrinterState> statesByPrinterId = states.stream()
+                .filter(state -> state.getPrinterId() != null)
+                .collect(Collectors.toMap(PrinterState::getPrinterId, Function.identity()));
+        return printers.stream()
+                .filter(PrinterSummary::enabled)
+                .map(printer -> new PrinterSelection(printer, statesByPrinterId.get(printer.printerId())))
+                .toList();
+    }
+
+    static String statusSelectionLabel(PrinterSelection selection) {
+        PrinterState state = selection.state();
+        if (state == null || !state.isOnline()) {
+            return "🔴 " + selection.printer().name() + " — Offline";
+        }
+        if (state.isPrinting()) {
+            return "🟢 " + selection.printer().name() + " — Printing";
+        }
+        return "🟢 " + selection.printer().name() + " — Ready";
+    }
+
+    record PrinterSelection(PrinterSummary printer, PrinterState state) {
     }
 }
