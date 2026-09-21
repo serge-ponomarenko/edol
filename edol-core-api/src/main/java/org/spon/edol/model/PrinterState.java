@@ -23,6 +23,7 @@ public class PrinterState {
     private double nozzleTargetTemp;
 
     private int speed;
+    private int speedLevel;
 
     private double bedTemp;
     private double bedTargetTemp;

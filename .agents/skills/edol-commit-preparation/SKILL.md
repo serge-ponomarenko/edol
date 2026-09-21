@@ -18,7 +18,15 @@ Use this skill when the user asks to prepare an EDOL commit. Follow
    `Core`, `Hub`, `Project`, `Notify` or `AMS`; add a narrow second scope only
    when recent history establishes it.
 4. For a multi-area change, add concise `- ` bullets that state externally
-   meaningful changes and validation. Keep one-line changes as a subject only.
-5. Report the proposed message, affected paths, relevant test command and any
+   meaningful changes and validation. Use real lines and paragraphs in the
+   body, never literal `\\n` text. Keep one-line changes as a subject only.
+5. When handing a message to an independently authorized commit step in
+   PowerShell, pass body paragraphs as separate `-m` arguments or use a
+   literal multiline value. Never rely on `\\n` inside a double-quoted
+   PowerShell argument to create line breaks.
+6. After that separately authorized commit, verify the recorded message with
+   `git log -1 --format=%B` before reporting success. Amend it only with the
+   user's explicit approval.
+7. Report the proposed message, affected paths, relevant test command and any
    unverified runtime boundary. Commit only after the user explicitly asks for
    it and confirms the intended staged files and message.

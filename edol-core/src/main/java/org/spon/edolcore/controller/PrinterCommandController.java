@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -32,6 +33,7 @@ public class PrinterCommandController {
             ResponseEntity.ok().body(Map.of(
                     "status", "ok"
             ));
+    private static final Set<Integer> PRINT_SPEED_LEVELS = Set.of(1, 2, 3, 4);
 
     @Deprecated(forRemoval = true)
     @PostMapping("/request/skip-objects")
@@ -181,6 +183,33 @@ public class PrinterCommandController {
         return okResponseEntity;
     }
 
+    @PostMapping("/printers/{printerId}/commands/print-speed")
+    public ResponseEntity<Map<String, Object>> setPrintSpeed(
+            @PathVariable UUID printerId,
+            @RequestBody(required = false) PrintSpeedRequest request
+    ) {
+        if (request == null || !PRINT_SPEED_LEVELS.contains(request.getLevel())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "Print speed level must be between 1 and 4"
+            ));
+        }
+
+        printerCommandGateway.setPrintSpeed(printerId, request.getLevel());
+
+        logContextFactory
+                .printer(
+                        log.atInfo(),
+                        printerId
+                )
+                .log(
+                        "Print speed API request for level {}",
+                        request.getLevel()
+                );
+
+        return okResponseEntity;
+    }
+
     @Deprecated(forRemoval = true)
     @PostMapping("/request/pushall")
     public ResponseEntity<Map<String, Object>> pushAll() {
@@ -226,6 +255,11 @@ public class PrinterCommandController {
     @Data
     public static class SkipObjectsRequest {
         private List<Integer> objectIds;
+    }
+
+    @Data
+    public static class PrintSpeedRequest {
+        private Integer level;
     }
 
 }

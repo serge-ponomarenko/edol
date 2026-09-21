@@ -31,6 +31,15 @@ public final class PrinterCommandPayloadFactory {
               }
             }
             """;
+    private static final String PRINT_SPEED_PAYLOAD = """
+            {
+              "print": {
+                "command": "print_speed",
+                "sequence_id": "0",
+                "param": "%d"
+              }
+            }
+            """;
     private static final String PUSH_ALL_PAYLOAD = """
             {
                 "pushing": {
@@ -83,6 +92,10 @@ public final class PrinterCommandPayloadFactory {
 
     public static String stop() {
         return STOP_PAYLOAD;
+    }
+
+    public static String printSpeed(int level) {
+        return PRINT_SPEED_PAYLOAD.formatted(level);
     }
 
     public static String pushAll() {

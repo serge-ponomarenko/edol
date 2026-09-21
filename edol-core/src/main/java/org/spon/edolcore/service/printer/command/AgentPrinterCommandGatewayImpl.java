@@ -39,6 +39,14 @@ public class AgentPrinterCommandGatewayImpl implements AgentPrinterCommandGatewa
     }
 
     @Override
+    public void setPrintSpeed(UUID printerId, int level) {
+        publisher.publish(
+                printerId,
+                PrinterCommandPayloadFactory.printSpeed(level)
+        );
+    }
+
+    @Override
     public void pushAll(UUID printerId) {
         publisher.publish(
                 printerId,

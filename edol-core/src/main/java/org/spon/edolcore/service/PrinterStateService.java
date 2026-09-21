@@ -48,6 +48,7 @@ public class PrinterStateService {
     private static final String FIELD_FILE_NAME = "file";
     private static final String FIELD_WIFI_SIGNAL = "wifi_signal";
     private static final String FIELD_SPD_MAG = "spd_mag";
+    private static final String FIELD_SPD_LVL = "spd_lvl";
     private static final String FIELD_TRAY_NOW = "tray_now";
     private static final String FIELD_TRAY_TAR = "tray_tar";
     private static final String FIELD_TRAY_TYPE = "tray_type";
@@ -373,6 +374,9 @@ public class PrinterStateService {
 
         if (print.has(FIELD_SPD_MAG))
             getState(printerId).setSpeed(print.get(FIELD_SPD_MAG).asInt());
+
+        if (print.has(FIELD_SPD_LVL))
+            getState(printerId).setSpeedLevel(print.get(FIELD_SPD_LVL).asInt());
     }
 
     private boolean isPrintStartedTransition(String oldState, String newState) {

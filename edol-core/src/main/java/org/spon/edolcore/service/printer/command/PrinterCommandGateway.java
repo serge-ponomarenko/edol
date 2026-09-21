@@ -13,6 +13,8 @@ public interface PrinterCommandGateway {
 
     void stop(UUID printerId);
 
+    void setPrintSpeed(UUID printerId, int level);
+
     void pushAll(UUID printerId);
 
     void skipObjects(UUID printerId, List<Integer> objectIds);

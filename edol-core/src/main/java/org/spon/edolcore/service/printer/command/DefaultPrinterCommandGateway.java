@@ -50,6 +50,16 @@ public class DefaultPrinterCommandGateway
     }
 
     @Override
+    public void setPrintSpeed(UUID printerId, int level) {
+        if (isDirect(printerId)) {
+            directGateway.setPrintSpeed(printerId, level);
+            return;
+        }
+
+        agentGateway.setPrintSpeed(printerId, level);
+    }
+
+    @Override
     public void pushAll(UUID printerId) {
         if (isDirect(printerId)) {
             directGateway.pushAll(printerId);

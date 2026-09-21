@@ -279,7 +279,19 @@
                                         <span id="wifiSignalText"></span>
                                         •
                                         <i class="ti ti-brand-speedtest"></i>
-                                        Speed <span class="badge bg-azure-lt" id="speed"></span>%
+                                        Speed
+                                    <select class="form-select form-select-sm d-inline-block w-auto ms-1"
+                                            id="printSpeedSelect"
+                                            aria-label="Print speed"
+                                            onchange="setPrintSpeed(Number(this.value))">
+                                        <option value="" disabled>
+                                            Speed unknown
+                                        </option>
+                                        <option value="1">Silent</option>
+                                        <option value="2">Standard</option>
+                                        <option value="3">Sport</option>
+                                        <option value="4">Ludicrous</option>
+                                    </select>
                                     </div>
 
                                     <div class="row text-center">
@@ -485,6 +497,11 @@
     bedGauge.maxValue = 120;
 </script>
 <script>
+    let currentPrintSpeedLevel = 0;
+    let currentPrintSpeed = 0;
+    let isPrinterOnline = false;
+    let isPrintSpeedCommandPending = false;
+
     async function refreshPrinterState() {
         try {
             const res = await fetch(`/api/printers/${printerId}/state`);
@@ -537,6 +554,9 @@
     }
 
     function updatePrinterStatus(data) {
+        isPrinterOnline = data.online;
+        currentPrintSpeedLevel = data.speedLevel;
+        currentPrintSpeed = data.speed;
         const conn = document.getElementById("printerConnection");
 
         if (data.online) {
@@ -557,8 +577,28 @@
         document.getElementById("wifiSignalText").textContent =
             wifiQuality(data.wifiSignal);
 
-        document.getElementById("speed").textContent =
-            data.speed;
+        updatePrintSpeedSelect();
+    }
+
+    function updatePrintSpeedSelect() {
+        const select = document.getElementById("printSpeedSelect");
+        const labels = {
+            1: "Silent",
+            2: "Standard",
+            3: "Sport",
+            4: "Ludicrous"
+        };
+        const isKnownLevel = [1, 2, 3, 4].includes(currentPrintSpeedLevel);
+
+        Object.entries(labels).forEach(([level, label]) => {
+            select.querySelector(`option[value="${level}"]`).textContent = label;
+        });
+        select.value = isKnownLevel ? String(currentPrintSpeedLevel) : "";
+        if (isKnownLevel) {
+            select.options[select.selectedIndex].textContent =
+                `${labels[currentPrintSpeedLevel]} (${currentPrintSpeed}%)`;
+        }
+        select.disabled = !isPrinterOnline || isPrintSpeedCommandPending;
     }
 
     function updatePrinterStats(data) {
@@ -1054,6 +1094,35 @@
                 document.getElementById("stopPrintModal")
             );
         modal.hide();
+    }
+
+    async function setPrintSpeed(level) {
+        if (isPrintSpeedCommandPending || !isPrinterOnline) {
+            return;
+        }
+
+        isPrintSpeedCommandPending = true;
+        updatePrintSpeedSelect();
+
+        try {
+            const response = await fetch(
+                `/api/printers/${printerId}/commands/print-speed`,
+                {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({level})
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error("Unable to change print speed");
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            isPrintSpeedCommandPending = false;
+            updatePrintSpeedSelect();
+        }
     }
 </script>
 

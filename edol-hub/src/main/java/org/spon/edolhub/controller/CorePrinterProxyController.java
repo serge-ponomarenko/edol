@@ -28,6 +28,7 @@ public class CorePrinterProxyController {
             "pause",
             "resume",
             "stop",
+            "print-speed",
             "pushall",
             "fetchmetadata"
     );
