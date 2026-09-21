@@ -24,7 +24,7 @@ public class LogContextFactory {
         return log
                 .addKeyValue(PRINTER_ID_KEY, context.getPrinterId())
                 .addKeyValue("sessionId", context.getSessionId())
-                .addKeyValue("gcodeFile", context.getGcodeFile());
+                .addKeyValue("filename", context.getFileName());
     }
 
     public LoggingEventBuilder session(
