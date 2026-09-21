@@ -2,11 +2,10 @@ package org.spon.edolnotify.telegram.commands;
 
 import io.github.natanimn.telebof.BotContext;
 import io.github.natanimn.telebof.enums.ParseMode;
-import io.github.natanimn.telebof.types.keyboard.InlineKeyboardButton;
-import io.github.natanimn.telebof.types.keyboard.InlineKeyboardMarkup;
 import io.github.natanimn.telebof.types.updates.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import org.spon.edolnotify.telegram.TelegramMessageController;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +15,8 @@ public class StartCommand implements Command {
 
     @Value("${telegram.admin-id}")
     private Long adminId;
+
+    private final TelegramMessageController telegramMessageController;
 
     @Override
     @SneakyThrows
@@ -29,15 +30,10 @@ public class StartCommand implements Command {
                 "/metadata - download metadata\n" +
                 "/pushall - retrieve all info (Caution!!! As a rule of thumb, refrain from executing this command at intervals less than 5 minutes on the P1P, as it may cause lag due to its hardware limitations.)\n";
 
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        keyboard.addKeyboard(
-                new InlineKeyboardButton("\uD83D\uDCC3 Status", "status")
-        );
-
         ctx.sendMessage(chatId, userMessage)
                 .parseMode(ParseMode.HTML)
-                .replyMarkup(keyboard)
                 .exec();
+        telegramMessageController.sendPrinterSelection(ctx, chatId, "status", "Select a printer");
     }
 
 }

@@ -1,16 +1,17 @@
 package org.spon.edolnotify.service;
 
 import java.nio.file.Path;
+import java.util.UUID;
 
 public interface MessageService {
 
-    void sendStatusMessage();
+    void sendStatusMessage(UUID printerId);
 
-    void sendPrinterOnlineMessage();
+    void sendPrinterOnlineMessage(UUID printerId);
 
-    void sendPrinterOfflineMessage();
+    void sendPrinterOfflineMessage(UUID printerId);
 
-    void sendPrintStartedMessage();
+    void sendPrintStartedMessage(UUID printerId);
 
-    void sendTimelapseVideoMessage(Path videoPath);
+    void sendTimelapseVideoMessage(UUID printerId, Path videoPath);
 }

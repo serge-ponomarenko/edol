@@ -2,10 +2,14 @@ package org.spon.edolnotify.service;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edol.model.PrinterState;
+import org.spon.edolnotify.model.PrinterSummary;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -13,51 +17,59 @@ public class PrinterService {
 
     private final RestClient edolCoreClient;
 
-    public PrinterState getState() {
+    public List<PrinterSummary> getPrinters() {
+        PrinterSummary[] printers = edolCoreClient.get()
+                .uri("/api/printers")
+                .retrieve()
+                .body(PrinterSummary[].class);
+        return printers == null ? List.of() : Arrays.asList(printers);
+    }
+
+    public PrinterState getState(UUID printerId) {
         return edolCoreClient.get()
-                .uri("/api/printers/state-default")
+                .uri("/api/printers/{printerId}/state", printerId)
                 .retrieve()
                 .body(PrinterState.class);
     }
 
-    public Path getLatestStatusImagePath() {
+    public Path getLatestStatusImagePath(UUID printerId) {
         return edolCoreClient.get()
-                .uri("/camera/status-image")
+                .uri("/api/printers/{printerId}/camera/status-image", printerId)
                 .retrieve()
                 .body(Path.class);
     }
 
-    public void sendStopCommand() {
+    public void sendStopCommand(UUID printerId) {
         edolCoreClient.post()
-                .uri("/api/request/stop")
+                .uri("/api/printers/{printerId}/commands/stop", printerId)
                 .retrieve()
                 .toBodilessEntity();
     }
 
-    public void sendResumeCommand() {
+    public void sendResumeCommand(UUID printerId) {
         edolCoreClient.post()
-                .uri("/api/request/resume")
+                .uri("/api/printers/{printerId}/commands/resume", printerId)
                 .retrieve()
                 .toBodilessEntity();
     }
 
-    public void sendPauseCommand() {
+    public void sendPauseCommand(UUID printerId) {
         edolCoreClient.post()
-                .uri("/api/request/pause")
+                .uri("/api/printers/{printerId}/commands/pause", printerId)
                 .retrieve()
                 .toBodilessEntity();
     }
 
-    public void sendFetchMetadataCommand() {
+    public void sendFetchMetadataCommand(UUID printerId) {
         edolCoreClient.post()
-                .uri("/api/request/fetchmetadata")
+                .uri("/api/printers/{printerId}/commands/fetchmetadata", printerId)
                 .retrieve()
                 .toBodilessEntity();
     }
 
-    public void sendPushAllCommand() {
+    public void sendPushAllCommand(UUID printerId) {
         edolCoreClient.post()
-                .uri("/api/request/pushall")
+                .uri("/api/printers/{printerId}/commands/pushall", printerId)
                 .retrieve()
                 .toBodilessEntity();
     }

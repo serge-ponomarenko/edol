@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.util.UUID;
+
 
 @RestController
 @RequestMapping("/ams")
@@ -34,7 +36,8 @@ public class SpoolController {
     }
 
     @GetMapping("/find")
-    public ResponseEntity<Spool> findSpoolById(@RequestParam("id") Long id) {
+    public ResponseEntity<Spool> findSpoolById(@RequestParam("id") Long id,
+                                               @RequestParam UUID printerId) {
         try {
             FilamentSpool filamentSpool = edolHubClient.get()
                     .uri(uriBuilder -> uriBuilder
@@ -56,7 +59,7 @@ public class SpoolController {
             spool.setVendor(filamentSpool.getFilament().getVendor().getName());
             spool.setRemaining(filamentSpool.getWeightRemaining());
 
-            amsSpoolChangerService.setSpoolScannedState(filamentSpool.getId());
+            amsSpoolChangerService.setSpoolScannedState(printerId, filamentSpool.getId());
 
             return ResponseEntity.ok(spool);
 
@@ -70,19 +73,20 @@ public class SpoolController {
     @GetMapping("/set-spool")
     public ResponseEntity<String> setSpoolToAms(
             @RequestParam("id") Long id,
-            @RequestParam("slot") Integer slot
+            @RequestParam("slot") Integer slot,
+            @RequestParam UUID printerId
     ) {
         edolHubClient.post()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/s/{id}/{slot}")
-                        .build(id, slot))
+                        .path("/s/{printerId}/{spoolId}/{slot}")
+                        .build(printerId, id, slot))
                 .retrieve()
                 .toBodilessEntity();
 
-        amsSpoolChangerService.resetScannedSpool();
+        amsSpoolChangerService.resetScannedSpool(printerId);
 
         return ResponseEntity.ok(
-                "Spool " + id + " assigned to AMS slot " + slot
+                "Spool " + id + " assigned to AMS slot " + slot + " for printer " + printerId
         );
     }
 

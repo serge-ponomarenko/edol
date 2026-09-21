@@ -67,4 +67,9 @@ class DashboardControllerTest {
             verify(model).addAttribute("printerOffline", true);
         }
     }
+
+    @Test
+    void redirectsHomeToPrinterCatalog() {
+        assertThat(controller.defaultDashboard()).isEqualTo("redirect:/printers");
+    }
 }

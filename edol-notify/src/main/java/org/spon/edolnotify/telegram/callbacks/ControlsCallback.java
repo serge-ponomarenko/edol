@@ -15,13 +15,18 @@ public class ControlsCallback implements Callback {
     private final TelegramMessageController telegramMessageController;
 
     @Override
+    public String action() {
+        return "controls";
+    }
+
+    @Override
     public void handleCallback(BotContext context, CallbackQuery callback) {
         context.answerCallbackQuery(callback.getId()).exec();
         long chatId = callback.getMessage().getChat().getId();
         context.editMessageReplyMarkup(chatId, callback.getMessage().getMessageId())
                 .replyMarkup(null).exec();
 
-        telegramMessageController.sendControlsMessage(context, chatId);
+        telegramMessageController.sendControlsMessage(context, chatId, getPrinterId(callback));
 
     }
 }

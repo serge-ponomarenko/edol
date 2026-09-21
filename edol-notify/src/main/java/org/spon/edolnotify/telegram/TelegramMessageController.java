@@ -5,6 +5,8 @@ import io.github.natanimn.telebof.enums.ParseMode;
 import io.github.natanimn.telebof.types.keyboard.InlineKeyboardButton;
 import io.github.natanimn.telebof.types.keyboard.InlineKeyboardMarkup;
 import lombok.extern.slf4j.Slf4j;
+import org.spon.edol.model.PrinterState;
+import org.spon.edolnotify.model.PrinterSummary;
 import org.spon.edolnotify.service.PrinterService;
 import org.spon.edolnotify.service.TelegramMessageFormatterService;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,19 +15,20 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.UUID;
 
 @Component
 @Slf4j
 public class TelegramMessageController {
 
-    private final TelegramMessageFormatterService telegramMessageFormatterService;
+    private final TelegramMessageFormatterService formatter;
     private final PrinterService printerService;
     private final TelegramBotService telegramBotService;
 
-    public TelegramMessageController(TelegramMessageFormatterService telegramMessageFormatterService,
+    public TelegramMessageController(TelegramMessageFormatterService formatter,
                                      PrinterService printerService,
                                      @Lazy TelegramBotService telegramBotService) {
-        this.telegramMessageFormatterService = telegramMessageFormatterService;
+        this.formatter = formatter;
         this.printerService = printerService;
         this.telegramBotService = telegramBotService;
     }
@@ -33,127 +36,134 @@ public class TelegramMessageController {
     @Value("${telegram.admin-id}")
     private Long adminChatId;
 
+    public void sendPrinterSelection(BotContext context, long chatId, String action, String title) {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        printerService.getPrinters().stream()
+                .filter(PrinterSummary::enabled)
+                .forEach(printer -> keyboard.addKeyboard(new InlineKeyboardButton(
+                        printer.name(), action + "_" + printer.printerId()
+                )));
+        context.sendMessage(chatId, title)
+                .parseMode(ParseMode.HTML)
+                .replyMarkup(keyboard)
+                .exec();
+    }
+
+    public void sendStatusMessage(UUID printerId) {
+        PrinterState state = printerService.getState(printerId);
+        if (state == null || !state.isOnline()) {
+            sendPrinterOfflineMessage(printerId);
+            return;
+        }
+        BotContext context = getBotContext();
+        if (context != null) {
+            sendStatusMessage(context, adminChatId, printerId);
+        }
+    }
+
+    public void sendStatusMessage(BotContext context, long chatId, UUID printerId) {
+        PrinterState state = printerService.getState(printerId);
+        PrinterSummary printer = getPrinter(printerId);
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.addKeyboard(
+                new InlineKeyboardButton("📃 Status", callback("status", printerId)),
+                new InlineKeyboardButton("⚙️ Controls", callback("controls", printerId))
+        );
+
+        Path latestStatusImagePath = printerService.getLatestStatusImagePath(printerId);
+        String caption = formatter.buildStatusMessage(state, printer.name());
+        if (latestStatusImagePath != null) {
+            context.sendPhoto(chatId, latestStatusImagePath.toFile())
+                    .caption(caption)
+                    .parseMode(ParseMode.HTML)
+                    .replyMarkup(keyboard)
+                    .exec();
+            return;
+        }
+        context.sendMessage(chatId, caption)
+                .parseMode(ParseMode.HTML)
+                .replyMarkup(keyboard)
+                .exec();
+    }
+
+    public void sendPrinterStartedMessage(UUID printerId) {
+        sendStatusMessage(printerId);
+    }
+
+    public void sendVideo(UUID printerId, File video) {
+        BotContext context = getBotContext();
+        if (context != null) {
+            context.sendVideo(adminChatId, video)
+                    .caption("🖨 <b>" + getPrinter(printerId).name() + ": "
+                            + printerService.getState(printerId).getCurrentTask() + "</b>")
+                    .parseMode(ParseMode.HTML)
+                    .exec();
+        }
+    }
+
+    public void sendControlsMessage(BotContext context, long chatId, UUID printerId) {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.addKeyboard(
+                new InlineKeyboardButton("⏸️ Pause", callback("pause", printerId)),
+                new InlineKeyboardButton("▶️ Resume", callback("resume", printerId)),
+                new InlineKeyboardButton("🛑 Stop", callback("stpconfirm", printerId))
+        );
+        keyboard.addKeyboard(new InlineKeyboardButton("📃 Status", callback("status", printerId)));
+        context.sendMessage(chatId, "⚙️ <b>Controls. Be careful.</b>")
+                .parseMode(ParseMode.HTML)
+                .replyMarkup(keyboard)
+                .exec();
+    }
+
+    public void sendStopConfirmMessage(BotContext context, long chatId, UUID printerId) {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.addKeyboard(
+                new InlineKeyboardButton("📃 Status", callback("status", printerId)),
+                new InlineKeyboardButton("🛑 Stop", callback("stop", printerId))
+        );
+        context.sendMessage(chatId, "👋 <b>Are you sure you want to stop this printer?</b>")
+                .parseMode(ParseMode.HTML)
+                .replyMarkup(keyboard)
+                .exec();
+    }
+
+    public void sendPrinterOnlineMessage(UUID printerId) {
+        sendAvailabilityMessage(printerId, "🟢 Printer ONLINE!");
+    }
+
+    public void sendPrinterOfflineMessage(UUID printerId) {
+        sendAvailabilityMessage(printerId, "🔴 Printer OFFLINE!");
+    }
+
+    private void sendAvailabilityMessage(UUID printerId, String message) {
+        BotContext context = getBotContext();
+        if (context == null) {
+            return;
+        }
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        keyboard.addKeyboard(new InlineKeyboardButton("📃 Status", callback("status", printerId)));
+        context.sendMessage(adminChatId, "<b>" + getPrinter(printerId).name() + "</b>\n" + message)
+                .parseMode(ParseMode.HTML)
+                .replyMarkup(keyboard)
+                .exec();
+    }
+
+    private PrinterSummary getPrinter(UUID printerId) {
+        return printerService.getPrinters().stream()
+                .filter(printer -> printer.printerId().equals(printerId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Printer is unavailable: " + printerId));
+    }
+
+    private String callback(String action, UUID printerId) {
+        return action + "_" + printerId;
+    }
+
     private BotContext getBotContext() {
         if (telegramBotService != null && telegramBotService.getBot() != null) {
             return telegramBotService.getBot().context;
-        } else {
-            log.error("Telegram bot is unavailable or disabled!");
-            return null;
         }
+        log.error("Telegram bot is unavailable or disabled");
+        return null;
     }
-
-    public void sendStatusMessage() {
-        if (!printerService.getState().isOnline()) {
-            sendPrinterOfflineMessage();
-        } else {
-            if (getBotContext() != null) {
-                sendStatusMessage(getBotContext(), adminChatId);
-            }
-        }
-    }
-
-    public void sendStatusMessage(BotContext context, long chatId) {
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        keyboard.addKeyboard(
-                new InlineKeyboardButton("\uD83D\uDCC3 Status", "status"),
-                new InlineKeyboardButton("⚙️ Controls", "controls")
-        );
-
-        Path latestStatusImagePath = printerService.getLatestStatusImagePath();
-        if (latestStatusImagePath != null) {
-            File latestStatusImage = latestStatusImagePath.toFile();
-
-            context
-                    .sendPhoto(chatId, latestStatusImage)
-                    .caption(telegramMessageFormatterService.buildStatusMessage())
-                    .parseMode(ParseMode.HTML)
-                    .replyMarkup(keyboard)
-                    .exec();
-        } else {
-            context
-                    .sendMessage(chatId, telegramMessageFormatterService.buildStatusMessage())
-                    .parseMode(ParseMode.HTML)
-                    .replyMarkup(keyboard)
-                    .exec();
-        }
-
-    }
-
-    public void sendPrinterStartedMessage() {
-        sendStatusMessage();
-    }
-
-    public void sendVideo(File video) {
-        if (getBotContext() != null) {
-            getBotContext()
-                    .sendVideo(adminChatId, video)
-                    .caption("🖨 <b>" + printerService.getState().getCurrentTask() + "</b>")
-                    .parseMode(ParseMode.HTML)
-                    .exec();
-        }
-    }
-
-    public void sendControlsMessage(BotContext context, long chatId) {
-        String userMessage = "⚙️ <b>Controls. Be careful.</b>";
-
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        keyboard.addKeyboard(
-                new InlineKeyboardButton("⏸️ Pause", "pause"),
-                new InlineKeyboardButton("▶️ Resume", "resume"),
-                new InlineKeyboardButton("\uD83D\uDED1 Stop", "stpconfirm")
-        );
-        keyboard.addKeyboard(
-                new InlineKeyboardButton("\uD83D\uDCC3 Status", "status")
-        );
-
-        context.sendMessage(chatId, userMessage)
-                .parseMode(ParseMode.HTML)
-                .replyMarkup(keyboard)
-                .exec();
-    }
-
-
-    public void sendStopConfirmMessage(BotContext context, long chatId) {
-        String userMessage = "\uD83D\uDC4B <b>⚙️ Are you sure to want to stop?</b>";
-
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        keyboard.addKeyboard(
-                new InlineKeyboardButton("\uD83D\uDCC3 Status", "status"),
-                new InlineKeyboardButton("\uD83D\uDED1 Stop", "stop")
-        );
-
-        context.sendMessage(chatId, userMessage)
-                .parseMode(ParseMode.HTML)
-                .replyMarkup(keyboard)
-                .exec();
-    }
-
-    public void sendPrinterOnlineMessage() {
-        if (getBotContext() == null)
-            return;
-
-        String userMessage = "\uD83D\uDFE2 Printer ONLINE!";
-
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        keyboard.addKeyboard(
-                new InlineKeyboardButton("\uD83D\uDCC3 Status", "status")
-        );
-
-        getBotContext().sendMessage(adminChatId, userMessage)
-                .parseMode(ParseMode.HTML)
-                .replyMarkup(keyboard)
-                .exec();
-    }
-
-    public void sendPrinterOfflineMessage() {
-        if (getBotContext() == null)
-            return;
-
-        String userMessage = "\uD83D\uDD34 Printer OFFLINE!";
-
-        getBotContext().sendMessage(adminChatId, userMessage)
-                .parseMode(ParseMode.HTML)
-                .exec();
-    }
-
 }

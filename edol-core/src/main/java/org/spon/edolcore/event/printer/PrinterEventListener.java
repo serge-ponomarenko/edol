@@ -2,6 +2,7 @@ package org.spon.edolcore.event.printer;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.github.f4b6a3.uuid.UuidCreator;
 import org.spon.edol.model.ErrorCodes;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.event.PrinterEvent;
@@ -151,7 +152,7 @@ public class PrinterEventListener {
 
         runtime(printerId).setLastLogProgressMilestone(-1);
 
-        String sessionId = UUID.randomUUID().toString();
+        String sessionId = UuidCreator.getTimeOrderedEpoch().toString();
 
         logContextFactory
                 .session(

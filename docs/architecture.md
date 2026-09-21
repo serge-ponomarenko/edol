@@ -9,8 +9,8 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with Po
 | `edol-core-api` | Shared printer-state and AMS DTOs. | Consumed by all services; changes are cross-service API changes. |
 | `edol-core` | Printer provisioning, direct/agent telemetry, commands, model metadata, camera, runtime and recovery state. | Bambu printer protocols, agents, MQTT, `core` PostgreSQL schema, HTTP state API. |
 | `edol-hub` | Persistent operational domain and dashboard: inventory, spools, print jobs, allocation, maintenance, labels. | `hub` PostgreSQL schema, Core HTTP API, Core MQTT events, browser clients. |
-| `edol-notify` | Telegram bot commands and printer/print notifications. | Core HTTP API, Core MQTT events, Telegram. |
-| `edol-ams` | AMS status and spool-change workflow. | Core and Hub HTTP APIs, Core MQTT events. |
+| `edol-notify` | Printer-scoped Telegram commands and printer/print notifications. | Core HTTP API, Core MQTT events, Telegram. |
+| `edol-ams` | Printer-scoped AMS status and spool-change workflow. | Core and Hub HTTP APIs, Core MQTT events. |
 
 ## Runtime and Data Flows
 
@@ -19,9 +19,9 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with Po
 3. Hub, Notify, and AMS subscribe to `edolcore/#`. Hub persists print and inventory effects; Notify sends Telegram messages; AMS changes spool state.
 4. Hub, Notify, and AMS also call Core over HTTP for current printer state or commands. Hub owns its persistence; Core owns printer connectivity and runtime state.
 
-Core runtime is per printer. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints. Legacy default-printer endpoints remain deprecated compatibility boundaries. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
+Core runtime is per printer. New printer, connection and session identifiers use UUID v7; historical UUID v4 values are retained. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints. Legacy default-printer endpoints remain deprecated compatibility boundaries. Hub, AMS and Notify use only explicit printer endpoints. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
 
-Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, and dashboard routes are printer-scoped. During the tenant bootstrap phase, `TenantContext` resolves one database-marked default tenant; authentication and user membership remain future work. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md`.
+Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. During the tenant bootstrap phase, `TenantContext` resolves one database-marked default tenant; authentication, user membership and printer assignment remain future work. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 
 ## Lifecycle and Persistence
 

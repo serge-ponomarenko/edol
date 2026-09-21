@@ -15,12 +15,17 @@ public class StopConfirmCallback implements Callback {
     private final TelegramMessageController telegramMessageController;
 
     @Override
+    public String action() {
+        return "stpconfirm";
+    }
+
+    @Override
     public void handleCallback(BotContext context, CallbackQuery callback) {
         context.answerCallbackQuery(callback.getId()).exec();
         long chatId = callback.getMessage().getChat().getId();
         context.editMessageReplyMarkup(chatId, callback.getMessage().getMessageId())
                 .replyMarkup(null).exec();
 
-        telegramMessageController.sendStopConfirmMessage(context, chatId);
+        telegramMessageController.sendStopConfirmMessage(context, chatId, getPrinterId(callback));
     }
 }

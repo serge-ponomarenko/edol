@@ -15,12 +15,17 @@ public class PauseCallback implements Callback {
     private final PrinterService printerService;
 
     @Override
+    public String action() {
+        return "pause";
+    }
+
+    @Override
     public void handleCallback(BotContext context, CallbackQuery callback) {
         context.answerCallbackQuery(callback.getId()).exec();
         long chatId = callback.getMessage().getChat().getId();
         context.editMessageReplyMarkup(chatId, callback.getMessage().getMessageId())
                 .replyMarkup(null).exec();
 
-        printerService.sendPauseCommand();
+        printerService.sendPauseCommand(getPrinterId(callback));
     }
 }

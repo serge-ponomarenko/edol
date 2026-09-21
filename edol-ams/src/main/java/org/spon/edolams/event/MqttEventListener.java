@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.spon.edol.model.PrinterState;
 import org.spon.edolams.service.AmsSpoolChangerService;
-import org.spon.edolams.service.PrinterService;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 
 @Component
@@ -17,11 +17,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class MqttEventListener {
 
-    private final PrinterService printerService;
     private final AmsSpoolChangerService amsSpoolChangerService;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    private PrinterState printerState;
 
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public void handle(Message<?> message) {
@@ -30,10 +27,9 @@ public class MqttEventListener {
 
             JsonNode json = objectMapper.readTree(payload);
             String event = json.get("event").asText();
+            UUID printerId = UUID.fromString(json.required("printerId").asText());
 
             log.info("EdolCore MQTT EVENT: {}", event);
-
-            printerState = printerService.getState();
 
             switch (event) {
 
@@ -41,7 +37,7 @@ public class MqttEventListener {
 
                 case "ams.slot.changed" -> handleAmsSlot(json);
 
-                case "ams.slot.loaded" -> handleAmsSlotLoaded(json);
+                case "ams.slot.loaded" -> handleAmsSlotLoaded(printerId, json);
 
                 case "ams.slot.unloaded" -> handleAmsSlotUnloaded(json);
 
@@ -57,9 +53,9 @@ public class MqttEventListener {
 
     }
 
-    private void handleAmsSlotLoaded(JsonNode json) {
+    private void handleAmsSlotLoaded(UUID printerId, JsonNode json) {
         int slot = json.get("slot").asInt();
-        amsSpoolChangerService.setAmsSpoolIntoSlot(slot);
+        amsSpoolChangerService.setAmsSpoolIntoSlot(printerId, slot);
     }
 
 

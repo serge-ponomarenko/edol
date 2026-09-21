@@ -9,12 +9,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TelegramMessageFormatterService {
 
-    private final PrinterService printerService;
-
-    public String buildStatusMessage() {
-        PrinterState state = printerService.getState();
-
+    public String buildStatusMessage(PrinterState state, String printerName) {
         StringBuilder msg = new StringBuilder();
+
+        msg.append("🖨 <b>").append(printerName).append("</b>\n");
 
         if (state.getError() != null) {
             msg.append("\uD83D\uDED1 Printer Error!\n")

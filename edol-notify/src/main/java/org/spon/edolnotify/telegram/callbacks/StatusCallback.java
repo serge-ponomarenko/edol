@@ -15,13 +15,18 @@ public class StatusCallback implements Callback {
     private final TelegramMessageController telegramMessageController;
 
     @Override
+    public String action() {
+        return "status";
+    }
+
+    @Override
     public void handleCallback(BotContext context, CallbackQuery callback) {
         context.answerCallbackQuery(callback.getId()).exec();
         long chatId = callback.getMessage().getChat().getId();
         context.editMessageReplyMarkup(chatId, callback.getMessage().getMessageId())
                 .replyMarkup(null).exec();
 
-        telegramMessageController.sendStatusMessage(context, chatId);
+        telegramMessageController.sendStatusMessage(context, chatId, getPrinterId(callback));
 
     }
 }

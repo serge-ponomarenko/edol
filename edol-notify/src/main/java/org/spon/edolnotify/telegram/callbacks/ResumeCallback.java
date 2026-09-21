@@ -15,12 +15,17 @@ public class ResumeCallback implements Callback {
     private final PrinterService printerService;
 
     @Override
+    public String action() {
+        return "resume";
+    }
+
+    @Override
     public void handleCallback(BotContext context, CallbackQuery callback) {
         context.answerCallbackQuery(callback.getId()).exec();
         long chatId = callback.getMessage().getChat().getId();
         context.editMessageReplyMarkup(chatId, callback.getMessage().getMessageId())
                 .replyMarkup(null).exec();
 
-        printerService.sendResumeCommand();
+        printerService.sendResumeCommand(getPrinterId(callback));
     }
 }

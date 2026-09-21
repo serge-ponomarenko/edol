@@ -1034,19 +1034,19 @@
     refreshMaintenanceAlerts();
 
     async function pausePrint() {
-        await fetch("api/proxy/request/pause", {
+        await fetch(`/api/printers/${printerId}/commands/pause`, {
             method: "POST"
         });
     }
 
     async function resumePrint() {
-        await fetch("api/proxy/request/resume", {
+        await fetch(`/api/printers/${printerId}/commands/resume`, {
             method: "POST"
         });
     }
 
     async function stopPrint() {
-        await fetch("api/proxy/request/stop", {
+        await fetch(`/api/printers/${printerId}/commands/stop`, {
             method: "POST"
         });
         const modal =

@@ -16,6 +16,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 
 @RestController
@@ -35,10 +36,10 @@ public class AmsStatusController {
     }
 
     @GetMapping("/state")
-    public AmsStatus getState() {
+    public AmsStatus getState(@org.springframework.web.bind.annotation.RequestParam UUID printerId) {
         try {
             PrinterState printerState = edolCoreClient.get()
-                    .uri("/api/printers/state-default")
+                    .uri("/api/printers/{printerId}/state", printerId)
                     .retrieve()
                     .body(PrinterState.class);
 

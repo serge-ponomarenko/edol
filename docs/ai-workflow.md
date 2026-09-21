@@ -7,6 +7,7 @@
 - `edol-change` for non-trivial EDOL changes and documentation-impact review.
 - `edol-runtime-contract` for Core runtime, MQTT, or cross-service printer-state contracts.
 - `edol-schema-change` for JPA and Flyway changes.
+- `edol-commit-preparation` for reviewing a change and preparing a repository-style commit message without committing it.
 
 ## MCP Status
 
@@ -24,6 +25,19 @@ in `%USERPROFILE%\.postgres-mcp\connections.yaml`.
 - Consider a read-only Gitea integration only when issue or pull-request context is regularly required.
 - Consider read-only, tenant-scoped PostgreSQL or runtime diagnostics only after a concrete recurring diagnostic need. Such tooling must not expose DDL/DML, MQTT publishing, printer commands, or production deployment actions.
 - Keep versioned project documentation as the primary engineering context unless an external documentation system is explicitly adopted as authoritative.
+
+## Project TODO
+
+- Design and implement `edol-local-runtime-verification` for local development:
+  start the documented runtime, wait for health endpoints, execute read-only API
+  checks, capture redacted diagnostics and optionally navigate the Hub UI through
+  browser automation.
+- Start with a project Skill and existing CLI/browser capabilities. Add a local
+  runtime MCP server only if repeatable structured runtime inspection cannot be
+  served safely by that workflow.
+- The mechanism must allow local targets only. It must not use production or
+  shared credentials, DDL/DML, MQTT publishing, physical printer commands or
+  unredacted secret values.
 
 ## Subagent Status
 

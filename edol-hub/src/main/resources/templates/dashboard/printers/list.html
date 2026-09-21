@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Printers • Edol Hub</title>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+</head>
+<body class="layout-fluid">
+<div class="page">
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Printers</h3>
+                        <div class="card-actions">
+                            <a class="btn btn-primary" href="/printers/new">Add Printer</a>
+                        </div>
+                    </div>
+                    <div class="alert alert-danger m-3" role="alert" th:if="${printerError}" th:text="${printerError}"></div>
+                    <div class="table-responsive" th:if="${!printers.isEmpty()}">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                            <tr>
+                                <th>Display ID</th>
+                                <th>Name</th>
+                                <th>Core</th>
+                                <th>Enabled</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="printer : ${printers}">
+                                <td th:text="${printer.displayId}"></td>
+                                <td th:text="${printer.name}"></td>
+                                <td>
+                                    <span class="badge" th:classappend="${printer.availableInCore} ? ' bg-green' : ' bg-red'"
+                                          th:text="${printer.availableInCore} ? 'Available' : 'Unavailable'"></span>
+                                </td>
+                                <td th:text="${printer.enabled} ? 'Yes' : 'No'"></td>
+                                <td class="text-end">
+                                    <div class="btn-list justify-content-end">
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           th:href="@{/printers/{printerId}(printerId=${printer.id})}">Status</a>
+                                        <a class="btn btn-sm btn-outline-secondary" th:if="${printer.availableInCore}"
+                                           th:href="@{/printers/{printerId}/edit(printerId=${printer.id})}">Edit</a>
+                                        <form th:if="${printer.availableInCore}"
+                                              th:action="@{/printers/{printerId}/delete(printerId=${printer.id})}" method="post"
+                                              onsubmit="return confirm('Decommission this printer in EDOL Core?');">
+                                            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty py-5" th:if="${printers.isEmpty()}">
+                        <div class="empty-header">No printers</div>
+                        <p class="empty-subtitle text-muted">Add the first printer to start managing its status and jobs.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

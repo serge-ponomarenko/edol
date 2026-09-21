@@ -20,7 +20,7 @@ public class DashboardController {
 
     @GetMapping("/")
     public String defaultDashboard() {
-        return "redirect:/printers/" + printerAccessService.getDefaultPrinter().getId();
+        return "redirect:/printers";
     }
 
     @GetMapping("/printers/{printerId}")

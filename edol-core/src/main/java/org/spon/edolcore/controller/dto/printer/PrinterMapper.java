@@ -1,12 +1,12 @@
 package org.spon.edolcore.controller.dto.printer;
 
 import lombok.RequiredArgsConstructor;
+import com.github.f4b6a3.uuid.UuidCreator;
 import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -52,7 +52,7 @@ public class PrinterMapper {
 
     public Printer createPrinter(CreatePrinterRequest request) {
         return Printer.builder()
-                .id(UUID.randomUUID())
+                .id(UuidCreator.getTimeOrderedEpoch())
                 .displayId(request.displayId())
                 .name(request.name())
                 .description(request.description())
@@ -70,7 +70,7 @@ public class PrinterMapper {
             Printer printer,
             PrinterConnectionDto dto) {
         return PrinterConnectionConfiguration.builder()
-                .id(UUID.randomUUID())
+                .id(UuidCreator.getTimeOrderedEpoch())
                 .printer(printer)
                 .mqttHost(dto.mqttHost())
                 .mqttPort(dto.mqttPort())

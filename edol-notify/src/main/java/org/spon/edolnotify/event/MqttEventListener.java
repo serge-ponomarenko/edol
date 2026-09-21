@@ -13,6 +13,9 @@ import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
@@ -23,12 +26,10 @@ public class MqttEventListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final MessageService messageService;
 
-    private PrinterState printerState;
-
     @Value("${telegram.progress-message-step}")
     private int telegramProgressMessageStep;
 
-    private int lastNotifiedProgressMilestone = -1;
+    private final Map<UUID, Integer> lastNotifiedProgressMilestone = new ConcurrentHashMap<>();
 
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public void handle(Message<?> message) {
@@ -37,34 +38,35 @@ public class MqttEventListener {
 
             JsonNode json = objectMapper.readTree(payload);
             String event = json.get("event").asText();
+            UUID printerId = UUID.fromString(json.required("printerId").asText());
 
             log.info("EdolCore MQTT EVENT: {}", event);
 
-            printerState = printerService.getState();
+            PrinterState printerState = printerService.getState(printerId);
 
             switch (event) {
 
-                case "printer.online" -> handlePrinterOnline(json);
+                case "printer.online" -> handlePrinterOnline(printerId);
 
-                case "printer.offline" -> handlePrinterOffline(json);
+                case "printer.offline" -> handlePrinterOffline(printerId);
 
-                case "print.started" -> handlePrintStarted(json);
+                case "print.started" -> handlePrintStarted(printerId);
 
-                case "print.paused" -> handlePrintPaused(json);
+                case "print.paused" -> handlePrintPaused(printerId);
 
-                case "print.running" -> handlePrintRunning(json);
+                case "print.running" -> handlePrintRunning(printerId);
 
-                case "print.finished" -> handlePrintFinished(json);
+                case "print.finished" -> handlePrintFinished(printerId);
 
-                case "print.failed" -> handlePrintFailed(json);
+                case "print.failed" -> handlePrintFailed(printerId);
 
-                case "print.error" -> handlePrintError(json);
+                case "print.error" -> handlePrintError(printerId);
 
-                case "print.progress.changed" -> handlePrintProgress(json);
+                case "print.progress.changed" -> handlePrintProgress(printerId, printerState);
 
-                case "print.metadata.loaded" -> handlePrintMetadata(json);
+                case "print.metadata.loaded" -> handlePrintMetadata(printerId);
 
-                case "print.timelapse" -> handlePrintTimelapse(json);
+                case "print.timelapse" -> handlePrintTimelapse(printerId, json);
 
                 case "ams.status.changed" -> handleAmsStatus(json);
 
@@ -78,53 +80,53 @@ public class MqttEventListener {
         }
     }
 
-    private void handlePrintError(JsonNode json) {
+    private void handlePrintError(UUID printerId) {
         // TODO
     }
 
-    private void handlePrintTimelapse(JsonNode json) {
+    private void handlePrintTimelapse(UUID printerId, JsonNode json) {
         Path videoPath = Path.of(json.get("path").asText());
-        messageService.sendTimelapseVideoMessage(videoPath);
+        messageService.sendTimelapseVideoMessage(printerId, videoPath);
     }
 
-    private void handlePrintPaused(JsonNode json) {
-        messageService.sendStatusMessage();
+    private void handlePrintPaused(UUID printerId) {
+        messageService.sendStatusMessage(printerId);
     }
 
-    private void handlePrintRunning(JsonNode json) {
-        messageService.sendStatusMessage();
+    private void handlePrintRunning(UUID printerId) {
+        messageService.sendStatusMessage(printerId);
     }
 
-    private void handlePrinterOnline(JsonNode json) {
-        messageService.sendPrinterOnlineMessage();
+    private void handlePrinterOnline(UUID printerId) {
+        messageService.sendPrinterOnlineMessage(printerId);
     }
 
-    private void handlePrinterOffline(JsonNode json) {
-        messageService.sendPrinterOfflineMessage();
+    private void handlePrinterOffline(UUID printerId) {
+        messageService.sendPrinterOfflineMessage(printerId);
     }
 
-    private void handlePrintStarted(JsonNode json) {
-        lastNotifiedProgressMilestone = -1;
-        messageService.sendPrintStartedMessage();
+    private void handlePrintStarted(UUID printerId) {
+        lastNotifiedProgressMilestone.put(printerId, -1);
+        messageService.sendPrintStartedMessage(printerId);
     }
 
-    private void handlePrintFinished(JsonNode json) {
-        messageService.sendStatusMessage();
+    private void handlePrintFinished(UUID printerId) {
+        messageService.sendStatusMessage(printerId);
     }
 
-    private void handlePrintFailed(JsonNode json) {
-        messageService.sendStatusMessage();
+    private void handlePrintFailed(UUID printerId) {
+        messageService.sendStatusMessage(printerId);
     }
 
-    private void handlePrintProgress(JsonNode json) {
+    private void handlePrintProgress(UUID printerId, PrinterState printerState) {
         int progress = printerState.getProgress();
-        if (isProgressMessageMilestone(progress) && progress < 100) {
-            messageService.sendStatusMessage();
+        if (isProgressMessageMilestone(printerId, progress) && progress < 100) {
+            messageService.sendStatusMessage(printerId);
         }
     }
 
-    private void handlePrintMetadata(JsonNode json) {
-        messageService.sendStatusMessage();
+    private void handlePrintMetadata(UUID printerId) {
+        messageService.sendStatusMessage(printerId);
     }
 
     private void handleAmsStatus(JsonNode json) {
@@ -136,11 +138,11 @@ public class MqttEventListener {
         //log.info("Ams slot changed: {} -> {}", json.get("prev_slot"), json.get("curr_slot"));
     }
 
-    private boolean isProgressMessageMilestone(int progress) {
+    private boolean isProgressMessageMilestone(UUID printerId, int progress) {
         int milestone = progress / telegramProgressMessageStep;
 
-        if (milestone > lastNotifiedProgressMilestone && milestone > 0) {
-            lastNotifiedProgressMilestone = milestone;
+        if (milestone > lastNotifiedProgressMilestone.getOrDefault(printerId, -1) && milestone > 0) {
+            lastNotifiedProgressMilestone.put(printerId, milestone);
             return true;
         }
 

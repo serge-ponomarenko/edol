@@ -5,6 +5,7 @@ import org.spon.edolnotify.telegram.TelegramMessageController;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -13,27 +14,27 @@ public class TelegramMessageService implements MessageService {
     private final TelegramMessageController telegramMessageController;
 
     @Override
-    public void sendStatusMessage() {
-        telegramMessageController.sendStatusMessage();
+    public void sendStatusMessage(UUID printerId) {
+        telegramMessageController.sendStatusMessage(printerId);
     }
 
     @Override
-    public void sendPrinterOnlineMessage() {
-        telegramMessageController.sendPrinterOnlineMessage();
+    public void sendPrinterOnlineMessage(UUID printerId) {
+        telegramMessageController.sendPrinterOnlineMessage(printerId);
     }
 
     @Override
-    public void sendPrinterOfflineMessage() {
-        telegramMessageController.sendPrinterOfflineMessage();
+    public void sendPrinterOfflineMessage(UUID printerId) {
+        telegramMessageController.sendPrinterOfflineMessage(printerId);
     }
 
     @Override
-    public void sendPrintStartedMessage() {
-        telegramMessageController.sendPrinterStartedMessage();
+    public void sendPrintStartedMessage(UUID printerId) {
+        telegramMessageController.sendPrinterStartedMessage(printerId);
     }
 
     @Override
-    public void sendTimelapseVideoMessage(Path videoPath) {
-        telegramMessageController.sendVideo(videoPath.toFile());
+    public void sendTimelapseVideoMessage(UUID printerId, Path videoPath) {
+        telegramMessageController.sendVideo(printerId, videoPath.toFile());
     }
 }

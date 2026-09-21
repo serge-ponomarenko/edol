@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.util.UUID;
+
 @Service
 public class PrinterService {
 
@@ -14,9 +16,9 @@ public class PrinterService {
         this.edolCoreClient = edolCoreClient;
     }
 
-    public PrinterState getState() {
+    public PrinterState getState(UUID printerId) {
         return edolCoreClient.get()
-                .uri("/api/printers/state-default")
+                .uri("/api/printers/{printerId}/state", printerId)
                 .retrieve()
                 .body(PrinterState.class);
     }

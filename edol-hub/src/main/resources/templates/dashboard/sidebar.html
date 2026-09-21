@@ -29,19 +29,23 @@
 
             <ul class="navbar-nav pt-lg-3">
 
+                <li class="nav-item px-3 pt-2 text-muted small text-uppercase">Tenant</li>
+
                 <li class="nav-item">
                     <a class="nav-link"
-                       th:href="${printerId != null} ? @{/printers/{id}(id=${printerId})} : @{/}"
-                       th:classappend="${currentPath.endsWith('/')} ? ' active'">
+                       href="/printers"
+                       th:classappend="${currentPath.equals('/') or currentPath.equals('/printers')} ? ' active'">
 
                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                 <i class="ti ti-home"></i>
                             </span>
                         <span class="nav-link-title">
-                                Home
+                                Printers
                             </span>
                     </a>
                 </li>
+
+                <li class="nav-item px-3 pt-3 text-muted small text-uppercase">Inventory</li>
 
                 <li class="nav-item">
                     <a class="nav-link"
@@ -54,6 +58,17 @@
                         <span class="nav-link-title">
                                 Spools
                             </span>
+                    </a>
+                </li>
+
+                <li class="nav-item px-3 pt-3 text-muted small text-uppercase">Printer</li>
+
+                <li class="nav-item">
+                    <a class="nav-link"
+                       th:href="${printerId != null} ? @{/printers/{id}(id=${printerId})} : @{/printers}"
+                       th:classappend="${printerId != null and currentPath.matches('/printers/[^/]+')} ? ' active'">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-activity"></i></span>
+                        <span class="nav-link-title">Printer Status</span>
                     </a>
                 </li>
 
@@ -84,13 +99,21 @@
                     </a>
                 </li>
 
+                <li class="nav-item">
+                    <a class="nav-link"
+                       th:href="${printerId != null} ? @{/printers/{id}/maintenance/config(id=${printerId})} : @{/printers}"
+                       th:classappend="${currentPath.contains('/maintenance/config')} ? ' active'">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-device-ipad-cog"></i></span>
+                        <span class="nav-link-title">Maintenance Definitions</span>
+                    </a>
+                </li>
+
                 <li class="nav-item"
                     th:with="
-                        isMaintenance=${currentPath.contains('/maintenance/config')},
                         isFilaments=${currentPath.contains('/filaments')},
                         isVendors=${currentPath.contains('/vendors')},
                         isMaterials=${currentPath.contains('/materials')},
-                        isConfigActive=${isMaintenance or isFilaments or isVendors or isMaterials}
+                        isConfigActive=${isFilaments or isVendors or isMaterials}
                     ">
 
                     <a class="nav-link d-flex justify-content-between align-items-center"
@@ -101,7 +124,7 @@
 
                             <span>
                                 <i class="ti ti-settings me-2"></i>
-                                Configuration
+                                Inventory Configuration
                             </span>
 
                         <i class="ti ti-chevron-down"></i>
@@ -112,19 +135,6 @@
                          th:classappend="${isConfigActive} ? ' show'">
 
                         <ul class="nav nav-sm flex-column ms-3">
-
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   th:href="${printerId != null} ? @{/printers/{id}/maintenance/config(id=${printerId})} : @{/}"
-                                   th:classappend="${isMaintenance} ? ' active'">
-                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                            <i class="ti ti-device-ipad-cog"></i>
-                                        </span>
-                                    <span class="nav-link-title">
-                                            Maintenance Definitions
-                                        </span>
-                                </a>
-                            </li>
 
                             <li class="nav-item">
                                 <a class="nav-link"

@@ -1,11 +1,10 @@
 package org.spon.edolnotify.telegram.commands;
 
 import io.github.natanimn.telebof.BotContext;
-import io.github.natanimn.telebof.enums.ParseMode;
 import io.github.natanimn.telebof.types.updates.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
-import org.spon.edolnotify.service.PrinterService;
+import org.spon.edolnotify.telegram.TelegramMessageController;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +15,7 @@ public class PushAllCommand implements Command {
     @Value("${telegram.admin-id}")
     private Long adminId;
 
-    private final PrinterService printerService;
+    private final TelegramMessageController telegramMessageController;
 
     @Override
     @SneakyThrows
@@ -24,13 +23,7 @@ public class PushAllCommand implements Command {
         long chatId = message.getChat().getId();
         if (chatId != adminId) return;
 
-        String userMessage = "Requesting ALL information...";
-
-        ctx.sendMessage(chatId, userMessage)
-                .parseMode(ParseMode.HTML)
-                .exec();
-
-        printerService.sendPushAllCommand();
+        telegramMessageController.sendPrinterSelection(ctx, chatId, "pushall", "Select a printer to retrieve information");
     }
 
 }

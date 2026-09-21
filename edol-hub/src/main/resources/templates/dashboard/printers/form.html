@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Printer • Edol Hub</title>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+</head>
+<body class="layout-fluid">
+<div class="page">
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl mt-4">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title" th:text="${printerId == null} ? 'Add Printer' : 'Edit Printer'"></h3></div>
+                    <div class="alert alert-danger m-3" role="alert" th:if="${printerError}" th:text="${printerError}"></div>
+                    <div class="card-body">
+                        <form method="post" th:action="${printerId == null} ? @{/printers} : @{/printers/{printerId}(printerId=${printerId})}"
+                              th:object="${printerForm}">
+                            <div class="row row-cards">
+                                <div class="col-md-6"><label class="form-label">Display ID</label><input class="form-control" required th:field="*{displayId}"></div>
+                                <div class="col-md-6"><label class="form-label">Name</label><input class="form-control" required th:field="*{name}"></div>
+                                <div class="col-12"><label class="form-label">Description</label><textarea class="form-control" rows="2" th:field="*{description}"></textarea></div>
+                                <div class="col-md-6"><label class="form-label">Serial Number</label><input class="form-control" th:field="*{serialNumber}"></div>
+                                <div class="col-md-2"><label class="form-label">Model</label><select class="form-select" th:field="*{model}"><option th:each="model : ${models}" th:value="${model}" th:text="${model}"></option></select></div>
+                                <div class="col-md-2"><label class="form-label">Connection</label><select class="form-select" th:field="*{connectionMode}"><option th:each="mode : ${connectionModes}" th:value="${mode}" th:text="${mode}"></option></select></div>
+                                <div class="col-md-2"><label class="form-label">Camera</label><select class="form-select" th:field="*{cameraProvider}"><option th:each="provider : ${cameraProviders}" th:value="${provider}" th:text="${provider}"></option></select></div>
+                                <div class="col-12"><label class="form-check"><input class="form-check-input" th:field="*{enabled}" type="checkbox"><span class="form-check-label">Enabled</span></label></div>
+                            </div>
+                            <hr>
+                            <h4>Connection</h4>
+                            <div class="row row-cards">
+                                <div class="col-md-4"><label class="form-label">MQTT Host</label><input class="form-control" th:field="*{mqttHost}"></div>
+                                <div class="col-md-2"><label class="form-label">MQTT Port</label><input class="form-control" min="1" max="65535" th:field="*{mqttPort}" type="number"></div>
+                                <div class="col-md-4"><label class="form-label">FTP Host</label><input class="form-control" th:field="*{ftpHost}"></div>
+                                <div class="col-md-2"><label class="form-label">FTP Port</label><input class="form-control" min="1" max="65535" th:field="*{ftpPort}" type="number"></div>
+                                <div class="col-md-4"><label class="form-label">Model Directory</label><input class="form-control" th:field="*{modelDirectory}"></div>
+                                <div class="col-md-4"><label class="form-label">Access Code</label><input class="form-control" autocomplete="new-password" placeholder="Leave blank to keep current value" th:field="*{accessCode}" type="password"></div>
+                                <div class="col-md-4"><label class="form-label">Agent ID</label><input class="form-control" th:field="*{agentId}"></div>
+                            </div>
+                            <div class="mt-4"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-secondary" href="/printers">Cancel</a></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
