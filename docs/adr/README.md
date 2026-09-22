@@ -17,3 +17,4 @@ Keep the record concise and update its status only when a later explicit decisio
 ## Index
 
 - `0001-hub-printer-projection-and-tenant-bootstrap.md` — Core-owned printer UUIDs, Hub tenant projections, default-tenant bootstrap, and expand/backfill/contract rollout.
+- `0002-secure-multi-tenant-architecture.md` — Accepted tenant ownership, authentication, persistence isolation, service trust, MQTT, and device-enrollment architecture.

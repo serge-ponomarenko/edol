@@ -23,6 +23,34 @@ Core runtime is per printer. New printer, connection and session identifiers use
 
 Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. During the tenant bootstrap phase, `TenantContext` resolves one database-marked default tenant; authentication, user membership and printer assignment remain future work. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 
+## Accepted Multi-Tenant Direction
+
+The secure multi-tenant target is accepted but not yet implemented. Hub will
+own EDOL users, tenants, memberships and roles while Keycloak provides OIDC
+identity and credential lifecycle. Hub will operate as a BFF, and services will
+use separate OAuth client identities. Authentication identity and trusted
+tenant context remain separate.
+
+Tenant persistence will use Hibernate discriminator tenancy together with
+forced PostgreSQL row-level security. Normal tenant resolution will be
+fail-closed. The current default-tenant behavior may survive only as a named,
+measured migration compatibility scope before user authentication and will be
+removed in that authentication stage.
+
+Core will remain passive. Its printer records will store an opaque tenant UUID
+assigned by a one-time migration backfill or an authenticated Hub provisioning
+request; Core will never call Hub to infer ownership. Core background runtime
+discovery will use a narrow read-only catalog identity, not a universal RLS
+bypass. MQTT events will gain an additive tenant-aware envelope before legacy
+fields are retired. AMS will own future terminal enrollment and per-device
+credentials.
+
+See `docs/adr/0002-secure-multi-tenant-architecture.md`,
+`docs/migrations/tenant-ownership-matrix.md`, and
+`docs/migrations/secure-multi-tenant-migration-plan.md`. These documents define
+the target and rollout; the system map and flows above remain the implemented
+current state until individual stages are completed and audited.
+
 ## Lifecycle and Persistence
 
 - On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog, performs validated legacy backfill, and then attempts recovery independently for every enabled projected printer.
@@ -44,3 +72,7 @@ Hub projects Core printers with the same UUID and assigns the projection to a Hu
 ## Decision Records
 
 Use `docs/adr/README.md` for decisions that are explicitly established or newly accepted. Do not create ADRs from inferred or unfinished work.
+
+Accepted target decisions do not imply that their implementation stages are
+complete. Update this document after each stage only with behavior verified in
+the repository and deployment contract.

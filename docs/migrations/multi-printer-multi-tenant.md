@@ -1,5 +1,11 @@
 # Multi-Printer / Multi-Tenant Migration
 
+> This document records the implemented multi-printer and initial tenant
+> bootstrap work. The accepted secure multi-tenant architecture and remaining
+> staged migration are defined in
+> `docs/adr/0002-secure-multi-tenant-architecture.md` and
+> `docs/migrations/secure-multi-tenant-migration-plan.md`.
+
 ## Current State
 
 Core owns the authoritative printer catalog, lifecycle, connectivity, runtime
