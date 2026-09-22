@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -28,10 +29,13 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class PrintJobService {
 
+    private static final ZoneId KYIV_ZONE_ID = ZoneId.of("Europe/Kyiv");
+
     private final RestTemplate restTemplate;
 
     private final PrintJobRepository printJobRepository;
     private final PrinterStatsService printerStatsService;
+    private final JobSpoolUsageService jobSpoolUsageService;
 
     private final PrintRuntimeStateService runtimeStateService;
 
@@ -66,7 +70,7 @@ public class PrintJobService {
                 .fileName(printerState.getCurrentFile())
                 .taskName(printerState.getCurrentTask())
                 .status(PrintJobStatus.RUNNING)
-                .startedAt(LocalDateTime.now())
+                .startedAt(LocalDateTime.now(KYIV_ZONE_ID))
                 .build();
 
         PrintJob savedJob = printJobRepository.save(job);
@@ -124,7 +128,7 @@ public class PrintJobService {
 
         job.setCurrentLayer(printerState.getTotalLayers());
         job.setProgress(100);
-        job.setFinishedAt(LocalDateTime.now());
+        job.setFinishedAt(LocalDateTime.now(KYIV_ZONE_ID));
 
         updatePrinterStats(job);
 
@@ -198,7 +202,7 @@ public class PrintJobService {
         } else {
             job.setStatus(PrintJobStatus.FAILED);
         }
-        job.setFinishedAt(LocalDateTime.now());
+        job.setFinishedAt(LocalDateTime.now(KYIV_ZONE_ID));
 
         runtimeStateService.setAllocationPreviewReady(printerId, false);
 
@@ -330,7 +334,8 @@ public class PrintJobService {
             PrintJob job
     ) {
         long totalFilamentUsage =
-                (long) job.getJobSpoolUsages()
+                (long) jobSpoolUsageService
+                        .findByPrintJob(job.getId())
                         .stream()
                         .mapToDouble(
                                 JobSpoolUsage::getUsedGrams

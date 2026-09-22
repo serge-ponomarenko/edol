@@ -1,0 +1,10 @@
+[mcp_servers.sonarqube]
+command = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+args = [
+  "-NoProfile",
+  "-ExecutionPolicy",
+  "Bypass",
+  "-Command",
+  "& (Join-Path $env:USERPROFILE '.edol\\sonarqube\\start-sonarqube-mcp.ps1')"
+]
+startup_timeout_sec = 120

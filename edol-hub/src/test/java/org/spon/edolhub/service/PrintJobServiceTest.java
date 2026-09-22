@@ -52,6 +52,9 @@ class PrintJobServiceTest {
     private PrinterStatsService printerStatsService;
 
     @Mock
+    private JobSpoolUsageService jobSpoolUsageService;
+
+    @Mock
     private PrintRuntimeStateService runtimeStateService;
 
     @Mock
@@ -203,13 +206,18 @@ class PrintJobServiceTest {
     class Finish {
 
         @Test
-        @DisplayName("finalizes allocation and marks job finished")
-        void finalizesAndMarksFinished() {
-            job.getJobSpoolUsages().add(JobSpoolUsage.builder().usedGrams(200.0).build());
+        @DisplayName("finalizes allocation and reads usage from persistence")
+        void finalizesAndReadsUsageFromPersistence() {
+            job.setJobSpoolUsages(null);
             job.setStartedAt(LocalDateTime.now().minusMinutes(30));
+
+            JobSpoolUsage persistedUsage = JobSpoolUsage.builder()
+                    .usedGrams(200.0)
+                    .build();
 
             when(runtimeStateService.getCurrentJob(PRINTER_ID)).thenReturn(job);
             when(printJobRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(jobSpoolUsageService.findByPrintJob(JOB_ID)).thenReturn(List.of(persistedUsage));
 
             printerState.setTotalLayers(160);
             printerState.setProgress(100);
@@ -227,6 +235,7 @@ class PrintJobServiceTest {
             verify(runtimeStateService).setAllocationPreviewReady(PRINTER_ID, false);
             verify(runtimeCacheService).setCurrentAllocationPreview(PRINTER_ID, null);
             verify(runtimeStateService).setCurrentJob(PRINTER_ID, null);
+            verify(jobSpoolUsageService).findByPrintJob(JOB_ID);
             verify(printerStatsService).addPrintJob(eq(printer), anyLong(), eq(200L));
         }
 

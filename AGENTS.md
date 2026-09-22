@@ -20,7 +20,12 @@
 
 - Verify every change with the most relevant available checks; report any verification limitation.
 - Run `mvn -B clean verify` for a full reactor check when appropriate. For Hub-only changes, start with `mvn -pl edol-hub -am test`.
+- Before handoff, analyze every generated or modified supported source file with the read-only SonarQube MCP once the implementation is stable. Fix actionable findings; do not suppress findings merely to pass verification. Report and explain any false positive, MCP-analysis artifact, or finding explicitly deferred by the user. Respect requests limited to reporting or explicitly excluding fixes.
 - Before finishing, decide whether a documented architectural fact changed. Update `docs/architecture.md` or an ADR only when it did, then check the documentation against code.
+
+## Deferred Work
+
+- Do not leave source-code TODO comments for deferred work. Record postponed cross-cutting work in `docs/ai-workflow.md` under `Project TODO`, including the intended outcome and relevant safety constraints.
 
 ## Workflow Improvement
 
