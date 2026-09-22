@@ -33,9 +33,6 @@ class PrinterCommandControllerTest {
     private PrinterCommandGateway printerCommandGateway;
 
     @Mock
-    private DefaultPrinterResolver defaultPrinterResolver;
-
-    @Mock
     private ModelMetadataWorkflowService modelMetadataWorkflowService;
 
     @InjectMocks

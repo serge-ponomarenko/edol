@@ -32,6 +32,10 @@ import java.util.stream.Collectors;
 @RequestMapping("/filament-spools")
 public class FilamentSpoolController {
 
+    private static final String SPOOL_ATTRIBUTE = "spool";
+    private static final String FILAMENTS_ATTRIBUTE = "filaments";
+    private static final String FORM_VIEW = "dashboard/filament-spools/form";
+
     private final FilamentSpoolRepository filamentSpoolRepository;
     private final FilamentSpoolService filamentSpoolService;
     private final FilamentRepository filamentRepository;
@@ -84,9 +88,9 @@ public class FilamentSpoolController {
         FilamentSpool spool = new FilamentSpool();
         spool.setPurchasedAt(LocalDateTime.now());
 
-        model.addAttribute("spool", spool);
-        model.addAttribute("filaments", filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
-        return "dashboard/filament-spools/form";
+        model.addAttribute(SPOOL_ATTRIBUTE, spool);
+        model.addAttribute(FILAMENTS_ATTRIBUTE, filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
+        return FORM_VIEW;
     }
 
     @GetMapping("/duplicate/{id}")
@@ -111,10 +115,10 @@ public class FilamentSpoolController {
         spool.setLastUsedAt(null);
         spool.setLastDriedAt(null);
 
-        model.addAttribute("spool", spool);
-        model.addAttribute("filaments", filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
+        model.addAttribute(SPOOL_ATTRIBUTE, spool);
+        model.addAttribute(FILAMENTS_ATTRIBUTE, filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
 
-        return "dashboard/filament-spools/form";
+        return FORM_VIEW;
     }
 
     @PostMapping
@@ -163,9 +167,6 @@ public class FilamentSpoolController {
         copy.setStoreUrl(spool.getStoreUrl());
 
         copy.setPurchasedAt(spool.getPurchasedAt());
-        //copy.setOpenedAt(spool.getOpenedAt());
-        //copy.setLastUsedAt(spool.getLastUsedAt());
-        //copy.setLastDriedAt(spool.getLastDriedAt());
 
         copy.setStatus(spool.getStatus());
 
@@ -179,10 +180,10 @@ public class FilamentSpoolController {
                 .findByIdAndFilamentTenantId(id, tenantContext.getCurrentTenantId())
                 .orElseThrow();
 
-        model.addAttribute("spool", spool);
-        model.addAttribute("filaments", filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
+        model.addAttribute(SPOOL_ATTRIBUTE, spool);
+        model.addAttribute(FILAMENTS_ATTRIBUTE, filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
 
-        return "dashboard/filament-spools/form";
+        return FORM_VIEW;
     }
 
     @GetMapping("/delete/{id}")

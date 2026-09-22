@@ -30,7 +30,7 @@ class RtspsCameraProvider implements CameraProvider {
     }
 
     @Override
-    public byte[] capture(UUID printerId) {
+    public byte[] capture(UUID printerId) throws IOException {
         PrinterConnectionConfiguration configuration = configuration(printerId);
         String uri =
                 "rtsps://bblp:%s@%s:%d/streaming/live/1"
@@ -91,7 +91,7 @@ class RtspsCameraProvider implements CameraProvider {
 
         } catch (IOException e) {
             log.error("Error!", e);
-            throw new RuntimeException(e);
+            throw e;
         }
     }
 

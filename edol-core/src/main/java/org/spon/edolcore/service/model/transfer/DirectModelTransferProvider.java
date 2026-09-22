@@ -65,6 +65,9 @@ public class DirectModelTransferProvider implements ModelTransferProvider {
             applicationEventPublisher.publishEvent(
                     new ModelAvailableEvent(printerId, localFile)
             );
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ModelTransferException(fileName, e);
         } catch (Exception e) {
             throw new ModelTransferException(fileName, e);
         }

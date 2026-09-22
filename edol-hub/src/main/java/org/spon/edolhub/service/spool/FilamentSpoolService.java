@@ -21,6 +21,8 @@ import java.util.Optional;
 @Slf4j
 public class FilamentSpoolService {
 
+    private static final String FILAMENT_PROPERTY = "filament";
+
     private final FilamentSpoolRepository filamentSpoolRepository;
     private final TenantContext tenantContext;
 
@@ -33,20 +35,20 @@ public class FilamentSpoolService {
             List<Predicate> predicates = new ArrayList<>();
 
             predicates.add(cb.equal(
-                    root.get("filament").get("tenant").get("id"),
+                    root.get(FILAMENT_PROPERTY).get("tenant").get("id"),
                     tenantContext.getCurrentTenantId()
             ));
 
             if (vendor != null && !vendor.isEmpty()) {
                 predicates.add(cb.equal(
-                        root.get("filament").get("vendor").get("name"),
+                        root.get(FILAMENT_PROPERTY).get("vendor").get("name"),
                         vendor
                 ));
             }
 
             if (material != null && !material.isEmpty()) {
                 predicates.add(cb.equal(
-                        root.get("filament").get("materialType").get("name"),
+                        root.get(FILAMENT_PROPERTY).get("materialType").get("name"),
                         material
                 ));
             }

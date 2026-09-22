@@ -4,10 +4,7 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
-import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.FilamentSpool;
-import org.spon.edolhub.model.entity.MaterialType;
-import org.spon.edolhub.model.entity.Vendor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,8 +12,6 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -25,25 +20,6 @@ public class LabelService {
 
     @Value("${edol-hub.qr-url}")
     private String baseUrl;
-
-    public static void main(String[] args) throws Exception {
-//        FilamentSpool spool = new FilamentSpool();
-//        spool.setId(3564L);
-//        Filament filament = new Filament();
-//        Vendor vendor = new Vendor(1L, "JAMG HE", "");
-//        filament.setVendor(vendor);
-//        MaterialType materialType = new MaterialType(1L, "PETG-HS");
-//        filament.setMaterialType(materialType);
-//        filament.setBrand("High Speed");
-//        filament.setColorHex("#FFAABB");
-//        spool.setOpenedAt(LocalDateTime.now());
-//        spool.setFilament(filament);
-//
-//        LabelService labelService = new LabelService();
-//        labelService.baseUrl = "http://edol.local:8090";
-//        byte[] bytes = labelService.generateLabel(spool);
-//        Files.write(Paths.get("./qr.png"), bytes);
-    }
 
     public byte[] generateLabel(FilamentSpool spool) throws Exception {
         int width = 384;  // 58mm thermal printer

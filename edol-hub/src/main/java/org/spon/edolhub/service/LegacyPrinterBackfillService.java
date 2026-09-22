@@ -12,6 +12,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LegacyPrinterBackfillService {
 
+    private static final String PRINTER_ID_PARAMETER = "printerId";
+
     private final JdbcClient jdbcClient;
 
     public boolean hasPendingBackfill() {
@@ -50,7 +52,7 @@ public class LegacyPrinterBackfillService {
                         where printer_id_uuid is null
                           and printer_id = 1
                         """)
-                .param("printerId", defaultPrinter.getId())
+                .param(PRINTER_ID_PARAMETER, defaultPrinter.getId())
                 .update();
 
         jdbcClient.sql("""
@@ -58,7 +60,7 @@ public class LegacyPrinterBackfillService {
                         set printer_id = :printerId
                         where printer_id is null
                         """)
-                .param("printerId", defaultPrinter.getId())
+                .param(PRINTER_ID_PARAMETER, defaultPrinter.getId())
                 .update();
 
         jdbcClient.sql("""
@@ -66,7 +68,7 @@ public class LegacyPrinterBackfillService {
                         set printer_id = :printerId
                         where printer_id is null
                         """)
-                .param("printerId", defaultPrinter.getId())
+                .param(PRINTER_ID_PARAMETER, defaultPrinter.getId())
                 .update();
     }
 }

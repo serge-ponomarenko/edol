@@ -10,7 +10,6 @@ import org.spon.edolcore.service.camera.PrinterStatusImageService;
 import org.spon.edolcore.service.model.metadata.ModelMetadataWorkflowService;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -30,9 +29,6 @@ class CameraControllerTest {
 
     @Mock
     private ModelMetadataWorkflowService modelMetadataWorkflowService;
-
-    @Mock
-    private DefaultPrinterResolver defaultPrinterResolver;
 
     @InjectMocks
     private CameraController controller;

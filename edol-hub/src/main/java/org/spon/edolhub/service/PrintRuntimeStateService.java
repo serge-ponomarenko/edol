@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class PrintRuntimeStateService {
@@ -12,11 +13,11 @@ public class PrintRuntimeStateService {
     private final ConcurrentMap<UUID, PrinterRuntimeState> states = new ConcurrentHashMap<>();
 
     public PrintJob getCurrentJob(UUID printerId) {
-        return state(printerId).currentJob;
+        return state(printerId).currentJob.get();
     }
 
     public void setCurrentJob(UUID printerId, PrintJob currentJob) {
-        state(printerId).currentJob = currentJob;
+        state(printerId).currentJob.set(currentJob);
     }
 
     public boolean isAllocationPreviewReady(UUID printerId) {
@@ -39,7 +40,7 @@ public class PrintRuntimeStateService {
 
         private volatile boolean allocationPreviewReady;
 
-        private volatile PrintJob currentJob;
+        private final AtomicReference<PrintJob> currentJob = new AtomicReference<>();
     }
 
 }

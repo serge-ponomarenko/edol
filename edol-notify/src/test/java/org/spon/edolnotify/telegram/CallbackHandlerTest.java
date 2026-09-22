@@ -41,8 +41,9 @@ class CallbackHandlerTest {
         Callback second = mock(Callback.class);
         when(first.action()).thenReturn("metadata");
         when(second.action()).thenReturn("metadata");
+        List<Callback> callbacks = List.of(first, second);
 
-        assertThatThrownBy(() -> new CallbackHandler(List.of(first, second)))
+        assertThatThrownBy(() -> new CallbackHandler(callbacks))
                 .isInstanceOf(IllegalStateException.class);
     }
 

@@ -26,7 +26,6 @@ public class PrinterCommandController {
 
     private final PrinterStateService printerStateService;
     private final PrinterCommandGateway printerCommandGateway;
-    private final DefaultPrinterResolver defaultPrinterResolver;
     private final ModelMetadataWorkflowService modelMetadataWorkflowService;
 
     private static final ResponseEntity<Map<String, Object>> okResponseEntity =
@@ -34,15 +33,6 @@ public class PrinterCommandController {
                     "status", "ok"
             ));
     private static final Set<Integer> PRINT_SPEED_LEVELS = Set.of(1, 2, 3, 4);
-
-    @Deprecated(forRemoval = true)
-    @PostMapping("/request/skip-objects")
-    public ResponseEntity<Map<String, Object>> skipObjects(@RequestBody SkipObjectsRequest request) {
-        return skipObjects(
-                defaultPrinterResolver.resolve(),
-                request
-        );
-    }
 
     @PostMapping("/printers/{printerId}/commands/skip-objects")
     public ResponseEntity<Map<String, Object>> skipObjects(
@@ -74,15 +64,6 @@ public class PrinterCommandController {
         return okResponseEntity;
     }
 
-    @Deprecated(forRemoval = true)
-    @PostMapping("/request/spool-change")
-    public ResponseEntity<Map<String, Object>> spoolChange(@RequestBody SpoolChangeRequestDto request) {
-        return spoolChange(
-                defaultPrinterResolver.resolve(),
-                request
-        );
-    }
-
     @PostMapping("/printers/{printerId}/commands/spool-change")
     public ResponseEntity<Map<String, Object>> spoolChange(
             @PathVariable UUID printerId,
@@ -105,14 +86,6 @@ public class PrinterCommandController {
         return okResponseEntity;
     }
 
-    @Deprecated(forRemoval = true)
-    @PostMapping("/request/pause")
-    public ResponseEntity<Map<String, Object>> pause() {
-        return pause(
-                defaultPrinterResolver.resolve()
-        );
-    }
-
     @PostMapping("/printers/{printerId}/commands/pause")
     public ResponseEntity<Map<String, Object>> pause(
             @PathVariable UUID printerId
@@ -131,14 +104,6 @@ public class PrinterCommandController {
         return okResponseEntity;
     }
 
-    @Deprecated(forRemoval = true)
-    @PostMapping("/request/resume")
-    public ResponseEntity<Map<String, Object>> resume() {
-        return resume(
-                defaultPrinterResolver.resolve()
-        );
-    }
-
     @PostMapping("/printers/{printerId}/commands/resume")
     public ResponseEntity<Map<String, Object>> resume(
             @PathVariable UUID printerId
@@ -155,14 +120,6 @@ public class PrinterCommandController {
                 );
 
         return okResponseEntity;
-    }
-
-    @Deprecated(forRemoval = true)
-    @PostMapping("/request/stop")
-    public ResponseEntity<Map<String, Object>> stop() {
-        return stop(
-                defaultPrinterResolver.resolve()
-        );
     }
 
     @PostMapping("/printers/{printerId}/commands/stop")
@@ -210,14 +167,6 @@ public class PrinterCommandController {
         return okResponseEntity;
     }
 
-    @Deprecated(forRemoval = true)
-    @PostMapping("/request/pushall")
-    public ResponseEntity<Map<String, Object>> pushAll() {
-        return pushAll(
-                defaultPrinterResolver.resolve()
-        );
-    }
-
     @PostMapping("/printers/{printerId}/commands/pushall")
     public ResponseEntity<Map<String, Object>> pushAll(
             @PathVariable UUID printerId
@@ -234,14 +183,6 @@ public class PrinterCommandController {
                 );
 
         return okResponseEntity;
-    }
-
-    @Deprecated(forRemoval = true)
-    @PostMapping("/request/fetchmetadata")
-    public ResponseEntity<Map<String, Object>> requestMetadata() {
-        return requestMetadata(
-                defaultPrinterResolver.resolve()
-        );
     }
 
     @PostMapping("/printers/{printerId}/commands/fetchmetadata")

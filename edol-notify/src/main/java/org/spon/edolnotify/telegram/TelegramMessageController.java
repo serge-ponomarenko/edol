@@ -25,6 +25,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class TelegramMessageController {
 
+    private static final String STATUS_ACTION = "status";
+    private static final String STATUS_BUTTON_LABEL = "📃 Status";
+
     private final TelegramMessageFormatterService formatter;
     private final PrinterService printerService;
     private final TelegramBotService telegramBotService;
@@ -70,7 +73,7 @@ public class TelegramMessageController {
         PrinterSummary printer = getPrinter(printerId);
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         keyboard.addKeyboard(
-                new InlineKeyboardButton("📃 Status", callback("status", printerId)),
+                new InlineKeyboardButton(STATUS_BUTTON_LABEL, callback(STATUS_ACTION, printerId)),
                 new InlineKeyboardButton("⚙️ Controls", callback("controls", printerId))
         );
         keyboard.addKeyboard(new InlineKeyboardButton("🖨 Printers", "printers"));
@@ -95,7 +98,7 @@ public class TelegramMessageController {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         statusSelections(printerService.getPrinters(), printerService.getStates())
                 .forEach(selection -> keyboard.addKeyboard(new InlineKeyboardButton(
-                        statusSelectionLabel(selection), callback("status", selection.printer().printerId())
+                        statusSelectionLabel(selection), callback(STATUS_ACTION, selection.printer().printerId())
                 )));
         context.sendMessage(chatId, "Select a printer")
                 .parseMode(ParseMode.HTML)
@@ -125,7 +128,7 @@ public class TelegramMessageController {
                 new InlineKeyboardButton("▶️ Resume", callback("resume", printerId)),
                 new InlineKeyboardButton("🛑 Stop", callback("stpconfirm", printerId))
         );
-        keyboard.addKeyboard(new InlineKeyboardButton("📃 Status", callback("status", printerId)));
+        keyboard.addKeyboard(new InlineKeyboardButton(STATUS_BUTTON_LABEL, callback(STATUS_ACTION, printerId)));
         context.sendMessage(chatId, "⚙️ <b>Controls. Be careful.</b>")
                 .parseMode(ParseMode.HTML)
                 .replyMarkup(keyboard)
@@ -135,7 +138,7 @@ public class TelegramMessageController {
     public void sendStopConfirmMessage(BotContext context, long chatId, UUID printerId) {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         keyboard.addKeyboard(
-                new InlineKeyboardButton("📃 Status", callback("status", printerId)),
+                new InlineKeyboardButton(STATUS_BUTTON_LABEL, callback(STATUS_ACTION, printerId)),
                 new InlineKeyboardButton("🛑 Stop", callback("stop", printerId))
         );
         context.sendMessage(chatId, "👋 <b>Are you sure you want to stop this printer?</b>")
@@ -158,7 +161,7 @@ public class TelegramMessageController {
             return;
         }
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        keyboard.addKeyboard(new InlineKeyboardButton("📃 Status", callback("status", printerId)));
+        keyboard.addKeyboard(new InlineKeyboardButton(STATUS_BUTTON_LABEL, callback(STATUS_ACTION, printerId)));
         context.sendMessage(adminChatId, "<b>" + getPrinter(printerId).name() + "</b>\n" + message)
                 .parseMode(ParseMode.HTML)
                 .replyMarkup(keyboard)

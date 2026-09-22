@@ -19,17 +19,8 @@ import java.util.UUID;
 @Slf4j
 public class PrinterStateController {
 
-    private final DefaultPrinterResolver defaultPrinterResolver;
     private final PrinterConnectivityProvider connectivityProvider;
     private final PrinterStateService printerStateService;
-
-    @GetMapping("/state-default")
-    @Deprecated(forRemoval = true)
-    public PrinterState getStateDefault() {
-        return getState(
-                defaultPrinterResolver.resolve()
-        );
-    }
 
     @GetMapping("/state")
     public List<PrinterState> getAllStates() {

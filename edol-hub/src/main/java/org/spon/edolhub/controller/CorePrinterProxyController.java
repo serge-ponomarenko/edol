@@ -22,6 +22,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CorePrinterProxyController {
 
+    private static final String CORE_PRINTERS_API_PATH = "/api/printers/";
     private static final Set<String> COMMANDS = Set.of(
             "skip-objects",
             "spool-change",
@@ -51,7 +52,7 @@ public class CorePrinterProxyController {
         }
 
         return restTemplate.exchange(
-                edolCoreUrl + "/api/printers/" + printerId + "/commands/" + command,
+                edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/commands/" + command,
                 HttpMethod.POST,
                 body == null ? null : new org.springframework.http.HttpEntity<>(body),
                 String.class
@@ -68,7 +69,7 @@ public class CorePrinterProxyController {
             return ResponseEntity.badRequest().build();
         }
         return restTemplate.exchange(
-                edolCoreUrl + "/api/printers/" + printerId + "/media/model/" + image,
+                edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/media/model/" + image,
                 HttpMethod.GET,
                 null,
                 byte[].class
@@ -79,7 +80,7 @@ public class CorePrinterProxyController {
     public ResponseEntity<byte[]> camera(@PathVariable UUID printerId) {
         printerAccessService.getPrinter(printerId);
         return restTemplate.exchange(
-                edolCoreUrl + "/api/printers/" + printerId + "/camera/snapshot",
+                edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/camera/snapshot",
                 HttpMethod.GET,
                 null,
                 byte[].class

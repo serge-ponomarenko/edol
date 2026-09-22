@@ -17,6 +17,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MaintenanceConfigController {
 
+    private static final String PRINTER_ID_ATTRIBUTE = "printerId";
+    private static final String CONFIG_REDIRECT_PREFIX = "redirect:/printers/";
+    private static final String CONFIG_REDIRECT_SUFFIX = "/maintenance/config";
+
     private final MaintenanceDefinitionRepository repository;
     private final PrinterStatsService printerStatsService;
     private final PrinterAccessService printerAccessService;
@@ -27,7 +31,7 @@ public class MaintenanceConfigController {
                 "definitions",
                 repository.findAllByPrinterId(printerId)
         );
-        model.addAttribute("printerId", printerId);
+        model.addAttribute(PRINTER_ID_ATTRIBUTE, printerId);
 
         return "dashboard/maintenance/config";
     }
@@ -36,7 +40,7 @@ public class MaintenanceConfigController {
     public String createForm(@PathVariable UUID printerId, Model model) {
 
         model.addAttribute("definition", new MaintenanceDefinition());
-        model.addAttribute("printerId", printerId);
+        model.addAttribute(PRINTER_ID_ATTRIBUTE, printerId);
 
         return "dashboard/maintenance/config-form";
     }
@@ -47,7 +51,7 @@ public class MaintenanceConfigController {
         MaintenanceDefinition definition = repository.findByIdAndPrinterId(id, printerId).orElseThrow();
 
         model.addAttribute("definition", definition);
-        model.addAttribute("printerId", printerId);
+        model.addAttribute(PRINTER_ID_ATTRIBUTE, printerId);
 
         return "dashboard/maintenance/config-form";
     }
@@ -59,7 +63,7 @@ public class MaintenanceConfigController {
         definition.setPrinter(printerAccessService.getPrinter(printerId));
         repository.save(definition);
 
-        return "redirect:/printers/" + printerId + "/maintenance/config";
+        return configRedirect(printerId);
     }
 
     @PostMapping("/{id}/delete")
@@ -67,7 +71,7 @@ public class MaintenanceConfigController {
 
         repository.delete(repository.findByIdAndPrinterId(id, printerId).orElseThrow());
 
-        return "redirect:/printers/" + printerId + "/maintenance/config";
+        return configRedirect(printerId);
     }
 
     @PostMapping("/{id}/toggle")
@@ -78,7 +82,7 @@ public class MaintenanceConfigController {
 
         repository.save(m);
 
-        return "redirect:/printers/" + printerId + "/maintenance/config";
+        return configRedirect(printerId);
     }
 
     @GetMapping("/printer-stats-form")
@@ -87,7 +91,7 @@ public class MaintenanceConfigController {
                 "stats",
                 printerStatsService.getStats(printerId)
         );
-        model.addAttribute("printerId", printerId);
+        model.addAttribute(PRINTER_ID_ATTRIBUTE, printerId);
         return "dashboard/maintenance/printer-stats-form";
     }
 
@@ -96,7 +100,11 @@ public class MaintenanceConfigController {
             @PathVariable UUID printerId,
             @ModelAttribute PrinterStats stats) {
         printerStatsService.updateStats(printerId, stats);
-        return "redirect:/printers/" + printerId + "/maintenance/config";
+        return configRedirect(printerId);
+    }
+
+    private String configRedirect(UUID printerId) {
+        return CONFIG_REDIRECT_PREFIX + printerId + CONFIG_REDIRECT_SUFFIX;
     }
 
 }

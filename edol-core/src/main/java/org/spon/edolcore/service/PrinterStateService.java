@@ -331,6 +331,12 @@ public class PrinterStateService {
     }
 
     private void updateScalarFields(UUID printerId, JsonNode print) {
+        updateCurrentFile(printerId, print);
+        updateCurrentTask(printerId, print);
+        updateNumericScalarFields(printerId, print);
+    }
+
+    private void updateCurrentFile(UUID printerId, JsonNode print) {
         if (
                 print.has(FIELD_COMMAND_NAME)
                         && print.get(FIELD_COMMAND_NAME).asText().equals(PROJECT_FILE)
@@ -346,11 +352,15 @@ public class PrinterStateService {
         ) {
             getState(printerId).setCurrentFile(print.get(FIELD_SUBTASK_NAME).asText() + ".gcode.3mf");
         }
+    }
 
+    private void updateCurrentTask(UUID printerId, JsonNode print) {
         if (print.has(FIELD_SUBTASK_NAME)) {
             getState(printerId).setCurrentTask(print.get(FIELD_SUBTASK_NAME).asText());
         }
+    }
 
+    private void updateNumericScalarFields(UUID printerId, JsonNode print) {
         if (print.has(FIELD_TOTAL_LAYER_NUM))
             getState(printerId).setTotalLayers(print.get(FIELD_TOTAL_LAYER_NUM).asInt());
 

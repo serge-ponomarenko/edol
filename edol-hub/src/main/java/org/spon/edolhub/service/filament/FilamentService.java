@@ -27,6 +27,7 @@ public class FilamentService {
     private final TenantContext tenantContext;
 
     @Transactional
+    @CacheEvict(value = "spools", allEntries = true)
     public Filament findByBrandIndexOrCreate(String filamentBrandIndex, String color, String fullId) {
         return filamentRepository
                 .findFirstByTenantIdAndPrinterFilamentProfileIdAndColorHexIgnoreCase(
@@ -35,13 +36,17 @@ public class FilamentService {
                         color
                 )
                 .orElseGet(
-                        () -> findOrCreateFilament(fullId, color, filamentBrandIndex)
+                        () -> createFilament(fullId, color, filamentBrandIndex)
                 );
     }
 
     @Transactional
     @CacheEvict(value = "spools", allEntries = true)
     public Filament findOrCreateFilament(String fullId, String color, String filamentBrandIndex) {
+        return createFilament(fullId, color, filamentBrandIndex);
+    }
+
+    private Filament createFilament(String fullId, String color, String filamentBrandIndex) {
         Optional<Filament> existing =
                 filamentRepository.findFirstByTenantIdAndFullIdAndColorHexIgnoreCase(
                         tenantContext.getCurrentTenantId(),

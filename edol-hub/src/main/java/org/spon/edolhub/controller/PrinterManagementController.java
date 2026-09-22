@@ -22,6 +22,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PrinterManagementController {
 
+    private static final String PRINTER_ERROR_ATTRIBUTE = "printerError";
+
     private final PrinterAccessService printerAccessService;
     private final PrinterManagementService printerManagementService;
     private final PrinterCatalogSyncService printerCatalogSyncService;
@@ -48,7 +50,7 @@ public class PrinterManagementController {
             printerCatalogSyncService.synchronize(printer.printerId());
             return "redirect:/printers/" + printer.printerId();
         } catch (RuntimeException exception) {
-            redirectAttributes.addFlashAttribute("printerError", "Unable to create printer in EDOL Core");
+            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, "Unable to create printer in EDOL Core");
             return "redirect:/printers/new";
         }
     }
@@ -79,7 +81,7 @@ public class PrinterManagementController {
             printerManagementService.updatePrinter(printerId, printerForm);
             printerCatalogSyncService.synchronize(printerId);
         } catch (RuntimeException exception) {
-            redirectAttributes.addFlashAttribute("printerError", "Unable to update printer in EDOL Core");
+            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, "Unable to update printer in EDOL Core");
         }
         return "redirect:/printers/" + printerId + "/edit";
     }
@@ -91,7 +93,7 @@ public class PrinterManagementController {
             printerManagementService.deletePrinter(printerId);
             printerCatalogSyncService.synchronize();
         } catch (RuntimeException exception) {
-            redirectAttributes.addFlashAttribute("printerError", "Unable to decommission printer in EDOL Core");
+            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, "Unable to decommission printer in EDOL Core");
         }
         return "redirect:/printers";
     }

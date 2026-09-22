@@ -13,11 +13,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PrinterManagementService {
 
+    private static final String PRINTER_ENDPOINT = "/api/printers/{printerId}";
+
     private final RestClient edolCoreClient;
 
     public CorePrinterDto getPrinter(UUID printerId) {
         return edolCoreClient.get()
-                .uri("/api/printers/{printerId}", printerId)
+                .uri(PRINTER_ENDPOINT, printerId)
                 .retrieve()
                 .body(CorePrinterDto.class);
     }
@@ -39,7 +41,7 @@ public class PrinterManagementService {
 
     public void updatePrinter(UUID printerId, PrinterForm form) {
         edolCoreClient.patch()
-                .uri("/api/printers/{printerId}", printerId)
+                .uri(PRINTER_ENDPOINT, printerId)
                 .body(new PrinterRequest(form))
                 .retrieve()
                 .toBodilessEntity();
@@ -53,7 +55,7 @@ public class PrinterManagementService {
 
     public void deletePrinter(UUID printerId) {
         edolCoreClient.delete()
-                .uri("/api/printers/{printerId}", printerId)
+                .uri(PRINTER_ENDPOINT, printerId)
                 .retrieve()
                 .toBodilessEntity();
     }

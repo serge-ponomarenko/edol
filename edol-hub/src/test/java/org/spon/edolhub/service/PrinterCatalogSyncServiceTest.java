@@ -55,6 +55,9 @@ class PrinterCatalogSyncServiceTest {
         tenant.setId(TENANT_ID);
         CorePrinterDto printer = new CorePrinterDto(PRINTER_ID, "P1", "Printer", true);
         CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch synchronizationsStarted = new CountDownLatch(2);
+        CountDownLatch saveStarted = new CountDownLatch(1);
+        CountDownLatch releaseSave = new CountDownLatch(1);
         AtomicInteger activeSaves = new AtomicInteger();
         AtomicInteger maximumConcurrentSaves = new AtomicInteger();
 
@@ -67,8 +70,12 @@ class PrinterCatalogSyncServiceTest {
         when(printerRepository.save(any(Printer.class))).thenAnswer(invocation -> {
             int concurrentSaves = activeSaves.incrementAndGet();
             maximumConcurrentSaves.accumulateAndGet(concurrentSaves, Math::max);
+            saveStarted.countDown();
             try {
-                TimeUnit.MILLISECONDS.sleep(100);
+                releaseSave.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
             } finally {
                 activeSaves.decrementAndGet();
             }
@@ -77,10 +84,21 @@ class PrinterCatalogSyncServiceTest {
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Future<?> catalogSync = executor.submit(() -> awaitAndSynchronize(start, () -> syncService.synchronize()));
-            Future<?> mqttSync = executor.submit(() -> awaitAndSynchronize(start, () -> syncService.synchronize(PRINTER_ID)));
+            Future<?> catalogSync = executor.submit(() -> awaitAndSynchronize(
+                    start,
+                    synchronizationsStarted,
+                    () -> syncService.synchronize()
+            ));
+            Future<?> mqttSync = executor.submit(() -> awaitAndSynchronize(
+                    start,
+                    synchronizationsStarted,
+                    () -> syncService.synchronize(PRINTER_ID)
+            ));
 
             start.countDown();
+            assertThat(synchronizationsStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(saveStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            releaseSave.countDown();
             catalogSync.get(5, TimeUnit.SECONDS);
             mqttSync.get(5, TimeUnit.SECONDS);
         } finally {
@@ -90,9 +108,14 @@ class PrinterCatalogSyncServiceTest {
         assertThat(maximumConcurrentSaves.get()).isEqualTo(1);
     }
 
-    private void awaitAndSynchronize(CountDownLatch start, Runnable synchronization) {
+    private void awaitAndSynchronize(
+            CountDownLatch start,
+            CountDownLatch synchronizationsStarted,
+            Runnable synchronization
+    ) {
         try {
             start.await();
+            synchronizationsStarted.countDown();
             synchronization.run();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

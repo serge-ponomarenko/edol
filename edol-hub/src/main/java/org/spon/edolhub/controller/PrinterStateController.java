@@ -50,24 +50,6 @@ public class PrinterStateController {
                 .toList();
     }
 
-    @Deprecated(forRemoval = true)
-    @GetMapping("/printer/state")
-    public PrinterStateEnriched getDefaultState() {
-        return getState(printerAccessService.getDefaultPrinter().getId());
-    }
-
-    @Deprecated(forRemoval = true)
-    @GetMapping("/printer/stats")
-    public PrinterStats getDefaultStats() {
-        return getStats(printerAccessService.getDefaultPrinter().getId());
-    }
-
-    @Deprecated(forRemoval = true)
-    @GetMapping("/printer/alerts")
-    public List<MaintenanceStatusDto> getDefaultMaintenanceAlerts() {
-        return getMaintenanceAlerts(printerAccessService.getDefaultPrinter().getId());
-    }
-
     @Data
     public static class PrinterStateEnriched {
         Long jobId;

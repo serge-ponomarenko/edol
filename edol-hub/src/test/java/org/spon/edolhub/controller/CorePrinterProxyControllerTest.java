@@ -18,9 +18,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,10 +48,10 @@ class CorePrinterProxyControllerTest {
         ResponseEntity<byte[]> coreResponse = ResponseEntity.status(HttpStatus.OK).body(image);
         when(printerAccessService.getPrinter(PRINTER_ID)).thenReturn(printer);
         when(restTemplate.exchange(
-                eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/camera/snapshot"),
-                eq(HttpMethod.GET),
-                isNull(),
-                eq(byte[].class)
+                "http://edolcore:8080/api/printers/" + PRINTER_ID + "/camera/snapshot",
+                HttpMethod.GET,
+                null,
+                byte[].class
         )).thenReturn(coreResponse);
 
         ResponseEntity<byte[]> response = controller.camera(PRINTER_ID);
@@ -71,10 +68,10 @@ class CorePrinterProxyControllerTest {
         ResponseEntity<String> coreResponse = ResponseEntity.ok("ok");
         when(printerAccessService.getPrinter(PRINTER_ID)).thenReturn(printer);
         when(restTemplate.exchange(
-                eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/print-speed"),
-                eq(HttpMethod.POST),
-                any(org.springframework.http.HttpEntity.class),
-                eq(String.class)
+                "http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/print-speed",
+                HttpMethod.POST,
+                new org.springframework.http.HttpEntity<>(body),
+                String.class
         )).thenReturn(coreResponse);
 
         ResponseEntity<String> response = controller.command(PRINTER_ID, "print-speed", body);
@@ -82,10 +79,10 @@ class CorePrinterProxyControllerTest {
         assertThat(response).isSameAs(coreResponse);
         verify(printerAccessService).getPrinter(PRINTER_ID);
         verify(restTemplate).exchange(
-                eq("http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/print-speed"),
-                eq(HttpMethod.POST),
-                eq(new org.springframework.http.HttpEntity<>(body)),
-                eq(String.class)
+                "http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/print-speed",
+                HttpMethod.POST,
+                new org.springframework.http.HttpEntity<>(body),
+                String.class
         );
     }
 }

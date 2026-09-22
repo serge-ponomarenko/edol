@@ -23,18 +23,6 @@ public class CameraController {
     private final CameraSnapshotStore store;
     private final PrinterStatusImageService printerStatusImageService;
     private final ModelMetadataWorkflowService modelMetadataWorkflowService;
-    private final DefaultPrinterResolver defaultPrinterResolver;
-
-    @Deprecated(forRemoval = true)
-    @GetMapping(
-            value = "/camera/latest",
-            produces = MediaType.IMAGE_JPEG_VALUE
-    )
-    public byte[] latest() {
-        return latest(
-                defaultPrinterResolver.resolve()
-        );
-    }
 
     @GetMapping(
             value = "/printers/{printerId}/camera/snapshot",
@@ -51,14 +39,6 @@ public class CameraController {
         }
 
         return snap.getImage();
-    }
-
-    @Deprecated(forRemoval = true)
-    @GetMapping("/camera/status-image")
-    public Path getLatestStatusImagePath() {
-        return getLatestStatusImagePath(
-                defaultPrinterResolver.resolve()
-        );
     }
 
     @GetMapping("/printers/{printerId}/camera/status-image")

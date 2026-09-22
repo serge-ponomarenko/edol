@@ -60,7 +60,7 @@ public class MqttEventListener {
 
                 case "print.failed" -> handlePrintFailed(printerId);
 
-                case "print.error" -> handlePrintError(printerId);
+                case "print.error" -> log.debug("Print error event received for printer {}", printerId);
 
                 case "print.progress.changed" -> handlePrintProgress(printerId, printerState);
 
@@ -68,20 +68,12 @@ public class MqttEventListener {
 
                 case "print.timelapse" -> handlePrintTimelapse(printerId, json);
 
-                case "ams.status.changed" -> handleAmsStatus(json);
-
-                case "ams.slot.changed" -> handleAmsSlot(json);
-
                 default -> log.debug("Unhandled event: {}", event);
             }
 
         } catch (Exception e) {
             log.error("Failed to process MQTT message", e);
         }
-    }
-
-    private void handlePrintError(UUID printerId) {
-        // TODO
     }
 
     private void handlePrintTimelapse(UUID printerId, JsonNode json) {
@@ -127,15 +119,6 @@ public class MqttEventListener {
 
     private void handlePrintMetadata(UUID printerId) {
         messageService.sendStatusMessage(printerId);
-    }
-
-    private void handleAmsStatus(JsonNode json) {
-        //JsonNode amsNode = json.get("ams");
-        //log.info("Ams status changed: {}", amsNode);
-    }
-
-    private void handleAmsSlot(JsonNode json) {
-        //log.info("Ams slot changed: {} -> {}", json.get("prev_slot"), json.get("curr_slot"));
     }
 
     private boolean isProgressMessageMilestone(UUID printerId, int progress) {

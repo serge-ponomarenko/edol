@@ -25,17 +25,8 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class PrinterMediaController {
 
-    private final DefaultPrinterResolver defaultPrinterResolver;
     private final PrinterStateService printerStateService;
     private final ModelMetadataWorkflowService modelMetadataWorkflowService;
-
-    @Deprecated(forRemoval = true)
-    @GetMapping(value = "/modelimage", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<Resource> getModelImage() {
-        return getModelImage(
-                defaultPrinterResolver.resolve()
-        );
-    }
 
     @GetMapping(
             value = "/printers/{printerId}/media/model/plate",
@@ -47,14 +38,6 @@ public class PrinterMediaController {
         return getImageResponseEntity(
                 printerId,
                 "plate"
-        );
-    }
-
-    @Deprecated(forRemoval = true)
-    @GetMapping(value = "/modeltopimage", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<Resource> getModelTopImage() {
-        return getModelImage(
-                defaultPrinterResolver.resolve()
         );
     }
 

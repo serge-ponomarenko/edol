@@ -64,28 +64,7 @@ public class AmsStatusController {
                 List<AmsStatus.Slot> slots = new ArrayList<>();
 
                 for (AmsSlot amsSlot : ams.getSlots()) {
-                    AmsStatus.Slot slot = new AmsStatus.Slot();
-                    slot.setId(amsSlot.getId());
-                    slot.setActive(amsStatus.getActiveSlot() == amsSlot.getId());
-                    slot.setEmpty(amsSlot.isEmpty());
-                    if (amsSlot.isEmpty()) {
-                        slots.add(slot);
-                        continue;
-                    }
-                    slot.setMaterial(amsSlot.getFilamentType());
-                    String colorHex = amsSlot.getColor();
-                    slot.setColor(colorHex);
-
-                    String printerFilamentProfileId = amsSlot.getFilamentBrandIndex();
-                    FilamentSpool spool = findSpool(printerFilamentProfileId, colorHex);
-                    if (spool != null) {
-                        slot.setVendor(spool.getFilament().getVendor().getName());
-                        slot.setBrand(spool.getFilament().getBrand());
-                        slot.setSpoolId(spool.getId());
-                        slot.setRemaining(spool.getWeightRemaining());
-                    }
-
-                    slots.add(slot);
+                    slots.add(toSlot(amsSlot, amsStatus.getActiveSlot()));
                 }
 
                 amsStatus.setSlots(slots);
@@ -131,6 +110,34 @@ public class AmsStatusController {
                         .build())
                 .retrieve()
                 .body(FilamentSpool.class);
+    }
+
+    private AmsStatus.Slot toSlot(AmsSlot amsSlot, int activeSlot) {
+        AmsStatus.Slot slot = new AmsStatus.Slot();
+        slot.setId(amsSlot.getId());
+        slot.setActive(activeSlot == amsSlot.getId());
+        slot.setEmpty(amsSlot.isEmpty());
+        if (amsSlot.isEmpty()) {
+            return slot;
+        }
+
+        slot.setMaterial(amsSlot.getFilamentType());
+        String colorHex = amsSlot.getColor();
+        slot.setColor(colorHex);
+        enrichSlot(slot, amsSlot.getFilamentBrandIndex(), colorHex);
+        return slot;
+    }
+
+    private void enrichSlot(AmsStatus.Slot slot, String printerFilamentProfileId, String colorHex) {
+        FilamentSpool spool = findSpool(printerFilamentProfileId, colorHex);
+        if (spool == null) {
+            return;
+        }
+
+        slot.setVendor(spool.getFilament().getVendor().getName());
+        slot.setBrand(spool.getFilament().getBrand());
+        slot.setSpoolId(spool.getId());
+        slot.setRemaining(spool.getWeightRemaining());
     }
 
 }
