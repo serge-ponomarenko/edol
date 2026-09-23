@@ -8,6 +8,7 @@
 - `edol-runtime-contract` for Core runtime, MQTT, or cross-service printer-state contracts.
 - `edol-schema-change` for JPA and Flyway changes.
 - `edol-commit-preparation` for reviewing a change and preparing a repository-style commit message without committing it.
+- `edol-remote-docker-verification` for Docker/Testcontainers verification from Windows through the temporary remote Docker tunnel.
 
 ## MCP Status
 
