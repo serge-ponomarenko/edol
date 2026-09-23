@@ -8,6 +8,7 @@
 - `edol-runtime-contract` for Core runtime, MQTT, or cross-service printer-state contracts.
 - `edol-schema-change` for JPA and Flyway changes.
 - `edol-commit-preparation` for reviewing a change and preparing a repository-style commit message without committing it.
+- `edol-local-runtime-verification` for starting one EDOL module in the isolated local `dev` environment and checking bounded runtime readiness.
 - `edol-remote-docker-verification` for Docker/Testcontainers verification from Windows through the temporary remote Docker tunnel.
 
 ## MCP Status
@@ -49,16 +50,6 @@ must never be copied into the repository or a Codex configuration file.
   configuration, then migrate direct `now()` calls consistently. Preserve the
   current `Europe/Kyiv` business-time behavior until a persistence-time
   strategy is explicitly decided.
-- Design and implement `edol-local-runtime-verification` for local development:
-  start the documented runtime, wait for health endpoints, execute read-only API
-  checks, capture redacted diagnostics and optionally navigate the Hub UI through
-  browser automation.
-- Start with a project Skill and existing CLI/browser capabilities. Add a local
-  runtime MCP server only if repeatable structured runtime inspection cannot be
-  served safely by that workflow.
-- The mechanism must allow local targets only. It must not use production or
-  shared credentials, DDL/DML, MQTT publishing, physical printer commands or
-  unredacted secret values.
 
 ## Subagent Status
 

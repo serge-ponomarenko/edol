@@ -17,7 +17,7 @@ locally, or operations on existing home-server containers.
    `edol-core`:
 
    ```powershell
-   ..\.agents\scripts\with-remote-docker.ps1 mvn -Dtest=CoreMigrationTest test
+   ..\.agents\skills\edol-remote-docker-verification\scripts\with-remote-docker.ps1 mvn -Dtest=CoreMigrationTest test
    ```
 
    Alternatively, construct a reactor command scoped to that module and its
@@ -27,7 +27,8 @@ locally, or operations on existing home-server containers.
    wrapper to work around this Maven behavior.
 
 2. Invoke Docker-dependent commands only through
-   `.agents/scripts/with-remote-docker.ps1`. It opens a temporary tunnel to the
+   `.agents/skills/edol-remote-docker-verification/scripts/with-remote-docker.ps1`.
+   It opens a temporary tunnel to the
    Debian Docker socket, waits for it, scopes `DOCKER_HOST` and
    `TESTCONTAINERS_HOST_OVERRIDE` to the wrapped command, preserves the child
    exit code, and removes the tunnel in cleanup. Do not use a Docker `ssh://`
