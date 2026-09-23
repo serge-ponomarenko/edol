@@ -54,7 +54,7 @@ public class PrinterCatalogSyncService {
                         .map(dto -> upsert(dto, tenant))
                         .toList();
 
-                backfillService.validateAndBackfill(corePrinters);
+                backfillService.validateOwnership(corePrinters);
 
                 status.synchronizedSuccessfully();
             } catch (IllegalStateException e) {

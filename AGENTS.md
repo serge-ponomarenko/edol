@@ -15,6 +15,7 @@
 - Make the smallest complete change. Do not refactor, clean up, or alter adjacent behavior outside the request.
 - Request confirmation before destructive or irreversible actions, production changes, history rewrites, force pushes, or deleting data/files.
 - Do not expose, copy, or commit credentials. Treat environment files, printer commands, MQTT publish paths, database migrations, and deployment configuration as high-risk.
+- For local test PostgreSQL inspection, discover an existing profile through the `edol-postgres` MCP before connecting; use only a local profile in read-only mode and read `docs/ai-workflow.md` for the user-local profile location and safety constraints. Never add, modify, or commit connection credentials while diagnosing access.
 
 ## Verification and Documentation
 

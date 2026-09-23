@@ -48,65 +48,42 @@ class HubMigrationTest {
         assertThat(jdbc.sql("select count(*) from hub.printers")
                 .query(Integer.class).single()).isZero();
 
-        new LegacyPrinterBackfillService(jdbc).validateAndBackfill(List.of());
+        new LegacyPrinterBackfillService(jdbc).validateOwnership(List.of());
     }
 
     @Test
-    void preservesLegacyJobsUntilCorePrinterMappingIsAvailable() {
+    void blocksLegacyPrintJobsDuringContraction() {
         flyway(MigrationVersion.fromVersion("3")).migrate();
         JdbcClient jdbc = JdbcClient.create(dataSource);
         jdbc.sql("""
                         insert into hub.print_jobs (id, printer_id, session_id, status)
                         values ('00000000-0000-0000-0000-000000000201', 1, 'legacy-session', 'FINISHED')
                         """).update();
+        flyway(MigrationVersion.fromVersion("4")).migrate();
 
-        flyway(null).migrate();
-
-        assertThat(jdbc.sql("select count(*) from hub.print_jobs where session_id = 'legacy-session'")
-                .query(Integer.class).single()).isEqualTo(1);
-        assertThat(jdbc.sql("select printer_id from hub.print_jobs where session_id = 'legacy-session'")
-                .query(Integer.class).single()).isEqualTo(1);
-        assertThat(jdbc.sql("select printer_id_uuid from hub.print_jobs where session_id = 'legacy-session'")
-                .query(String.class).optional()).isEmpty();
+        assertThatThrownBy(() -> flyway(null).migrate())
+                .hasMessageContaining("Cannot contract print job printer ownership");
     }
 
     @Test
-    void backfillsTheDocumentedSingletonLegacyJobIdempotently() {
-        flyway(MigrationVersion.fromVersion("3")).migrate();
+    void blocksOrphanedPrintJobOwnershipDuringContraction() {
+        flyway(MigrationVersion.fromVersion("4")).migrate();
         JdbcClient jdbc = JdbcClient.create(dataSource);
-        UUID printerId = UUID.fromString("00000000-0000-0000-0000-000000000101");
+        jdbc.sql("alter table hub.print_jobs drop constraint fk_print_jobs_printer_uuid").update();
         jdbc.sql("""
-                        insert into hub.print_jobs (id, printer_id, session_id, status)
-                        values ('00000000-0000-0000-0000-000000000201', 1, 'legacy-session', 'FINISHED')
+                        insert into hub.print_jobs (id, printer_id_uuid, session_id, status)
+                        values ('00000000-0000-0000-0000-000000000202',
+                                '00000000-0000-0000-0000-000000000999', 'orphaned-session', 'FINISHED')
                         """).update();
-        flyway(null).migrate();
-        insertProjection(jdbc, printerId);
 
-        LegacyPrinterBackfillService service = new LegacyPrinterBackfillService(jdbc);
-        List<CorePrinterDto> coreCatalog = List.of(new CorePrinterDto(printerId, "P1", "Printer", true));
-
-        service.validateAndBackfill(coreCatalog);
-        service.validateAndBackfill(coreCatalog);
-
-        assertThat(jdbc.sql("select printer_id_uuid from hub.print_jobs where session_id = 'legacy-session'")
-                .query(UUID.class).single()).isEqualTo(printerId);
+        assertThatThrownBy(() -> flyway(null).migrate())
+                .hasMessageContaining("Cannot contract print job printer ownership");
     }
 
     @Test
-    void blocksMissingAndOrphanedDirectPrinterOwnership() {
-        flyway(null).migrate();
+    void blocksOrphanedMaintenanceOwnershipDuringContraction() {
+        flyway(MigrationVersion.fromVersion("4")).migrate();
         JdbcClient jdbc = JdbcClient.create(dataSource);
-        UUID printerId = UUID.fromString("00000000-0000-0000-0000-000000000101");
-        insertProjection(jdbc, printerId);
-        LegacyPrinterBackfillService service = new LegacyPrinterBackfillService(jdbc);
-        List<CorePrinterDto> coreCatalog = List.of(new CorePrinterDto(printerId, "P1", "Printer", true));
-
-        jdbc.sql("insert into hub.maintenance_definition (active) values (true)").update();
-
-        assertThatThrownBy(() -> service.validateAndBackfill(coreCatalog))
-                .hasMessageContaining("Missing or orphaned printer ownership in maintenance definitions");
-
-        jdbc.sql("delete from hub.maintenance_definition").update();
         jdbc.sql("alter table hub.maintenance_definition drop constraint fk_maintenance_definition_printer")
                 .update();
         jdbc.sql("""
@@ -114,49 +91,88 @@ class HubMigrationTest {
                         values (true, '00000000-0000-0000-0000-000000000999')
                         """).update();
 
-        assertThatThrownBy(() -> service.validateAndBackfill(coreCatalog))
-                .hasMessageContaining("Missing or orphaned printer ownership in maintenance definitions");
+        assertThatThrownBy(() -> flyway(null).migrate())
+                .hasMessageContaining("Cannot contract maintenance ownership");
     }
 
     @Test
-    void blocksAmbiguousLegacyMappingsAndDuplicateStatistics() {
-        flyway(MigrationVersion.fromVersion("3")).migrate();
+    void blocksDuplicatePrinterStatisticsDuringContraction() {
+        flyway(MigrationVersion.fromVersion("4")).migrate();
         JdbcClient jdbc = JdbcClient.create(dataSource);
-        jdbc.sql("""
-                        insert into hub.print_jobs (id, printer_id, session_id, status)
-                        values ('00000000-0000-0000-0000-000000000201', 1, 'legacy-session', 'FINISHED')
-                        """).update();
-        flyway(null).migrate();
-        UUID firstPrinterId = UUID.fromString("00000000-0000-0000-0000-000000000101");
-        UUID secondPrinterId = UUID.fromString("00000000-0000-0000-0000-000000000102");
-        insertProjection(jdbc, firstPrinterId);
-        insertProjection(jdbc, secondPrinterId);
-        LegacyPrinterBackfillService service = new LegacyPrinterBackfillService(jdbc);
-        List<CorePrinterDto> coreCatalog = List.of(
-                new CorePrinterDto(firstPrinterId, "P1", "First", true),
-                new CorePrinterDto(secondPrinterId, "P2", "Second", true)
-        );
-
-        assertThatThrownBy(() -> service.validateAndBackfill(coreCatalog))
-                .hasMessageContaining("exactly one Hub/Core printer UUID mapping");
-
-        jdbc.sql("update hub.print_jobs set printer_id_uuid = :printerId")
-                .param("printerId", firstPrinterId)
-                .update();
+        UUID printerId = UUID.fromString("00000000-0000-0000-0000-000000000101");
+        insertProjection(jdbc, printerId);
         jdbc.sql("drop index hub.uk_printer_stats_printer").update();
         jdbc.sql("insert into hub.printer_stats (printer_id) values (:printerId)")
-                .param("printerId", firstPrinterId)
+                .param("printerId", printerId)
                 .update();
         jdbc.sql("insert into hub.printer_stats (printer_id) values (:printerId)")
-                .param("printerId", firstPrinterId)
+                .param("printerId", printerId)
                 .update();
 
-        assertThatThrownBy(() -> service.validateAndBackfill(coreCatalog))
-                .hasMessageContaining("Multiple printer statistics rows map to the same printer");
+        assertThatThrownBy(() -> flyway(null).migrate())
+                .hasMessageContaining("Cannot contract printer statistics ownership");
     }
 
     @Test
-    void blocksOrphanedJobsDuplicateCoreUuidAndProjectionDisagreement() {
+    void contractsValidatedPrinterOwnershipAndRetainsValidation() {
+        flyway(MigrationVersion.fromVersion("4")).migrate();
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        UUID printerId = UUID.fromString("00000000-0000-0000-0000-000000000101");
+        insertProjection(jdbc, printerId);
+        jdbc.sql("""
+                        insert into hub.print_jobs (id, printer_id_uuid, session_id, status)
+                        values ('00000000-0000-0000-0000-000000000201', :printerId, 'session', 'FINISHED')
+                        """)
+                .param("printerId", printerId)
+                .update();
+        jdbc.sql("insert into hub.maintenance_definition (active, printer_id) values (true, :printerId)")
+                .param("printerId", printerId)
+                .update();
+        jdbc.sql("insert into hub.printer_stats (printer_id) values (:printerId)")
+                .param("printerId", printerId)
+                .update();
+
+        flyway(null).migrate();
+
+        assertThat(jdbc.sql("""
+                        select count(*)
+                        from information_schema.columns
+                        where table_schema = 'hub'
+                          and ((table_name = 'print_jobs' and column_name = 'printer_id')
+                            or (table_name = 'maintenance_definition' and column_name = 'printer_id')
+                            or (table_name = 'printer_stats' and column_name = 'printer_id'))
+                          and is_nullable = 'NO'
+                        """).query(Integer.class).single()).isEqualTo(3);
+        assertThat(jdbc.sql("""
+                        select count(*)
+                        from information_schema.columns
+                        where table_schema = 'hub' and table_name = 'print_jobs' and column_name = 'printer_id_uuid'
+                        """).query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                        select count(*)
+                        from pg_constraint constraint_record
+                        join pg_class relation on relation.oid = constraint_record.conrelid
+                        join pg_namespace schema on schema.oid = relation.relnamespace
+                        where schema.nspname = 'hub' and relation.relname = 'print_jobs'
+                          and constraint_record.conname = 'fk_print_jobs_printer'
+                        """).query(Integer.class).single()).isEqualTo(1);
+        assertThatThrownBy(() -> jdbc.sql("""
+                        insert into hub.print_jobs (id, printer_id, status)
+                        values ('00000000-0000-0000-0000-000000000202', null, 'FINISHED')
+                        """).update()).hasMessageContaining("null value");
+        assertThatThrownBy(() -> jdbc.sql("""
+                        insert into hub.print_jobs (id, printer_id, status)
+                        values ('00000000-0000-0000-0000-000000000203',
+                                '00000000-0000-0000-0000-000000000999', 'FINISHED')
+                        """).update()).hasMessageContaining("fk_print_jobs_printer");
+
+        new LegacyPrinterBackfillService(jdbc).validateOwnership(
+                List.of(new CorePrinterDto(printerId, "P1", "Printer", true))
+        );
+    }
+
+    @Test
+    void blocksDuplicateCoreUuidAndProjectionDisagreementAfterContraction() {
         flyway(null).migrate();
         JdbcClient jdbc = JdbcClient.create(dataSource);
         UUID printerId = UUID.fromString("00000000-0000-0000-0000-000000000101");
@@ -164,22 +180,10 @@ class HubMigrationTest {
         LegacyPrinterBackfillService service = new LegacyPrinterBackfillService(jdbc);
         CorePrinterDto printer = new CorePrinterDto(printerId, "P1", "Printer", true);
 
-        assertThatThrownBy(() -> service.validateAndBackfill(List.of(printer, printer)))
+        assertThatThrownBy(() -> service.validateOwnership(List.of(printer, printer)))
                 .hasMessageContaining("duplicate printer UUIDs");
-
-        assertThatThrownBy(() -> service.validateAndBackfill(List.of()))
+        assertThatThrownBy(() -> service.validateOwnership(List.of()))
                 .hasMessageContaining("projection does not match");
-
-        jdbc.sql("alter table hub.print_jobs drop constraint fk_print_jobs_printer_uuid").update();
-        jdbc.sql("""
-                        insert into hub.print_jobs (id, printer_id_uuid, session_id, status)
-                        values ('00000000-0000-0000-0000-000000000201',
-                                '00000000-0000-0000-0000-000000000999',
-                                'orphan-session', 'FINISHED')
-                        """).update();
-
-        assertThatThrownBy(() -> service.validateAndBackfill(List.of(printer)))
-                .hasMessageContaining("Missing or orphaned printer ownership in print jobs");
     }
 
     private void insertProjection(JdbcClient jdbc, UUID printerId) {

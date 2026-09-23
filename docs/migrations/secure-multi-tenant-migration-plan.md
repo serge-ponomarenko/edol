@@ -25,7 +25,9 @@ factual current system remains described in `docs/architecture.md`.
 - The resolved dependency set uses Hibernate ORM 7.2.1.Final, Spring Security
   7.0.2, and PostgreSQL JDBC 42.7.9. Deployment configuration uses PostgreSQL
   17.
-- Hub Flyway is at V4 and Core Flyway is at V6 in the inspected databases.
+- Hub Flyway source is at V5 and Core Flyway source is at V7. The local Hub
+  deployment applied V5 successfully on 2026-09-23; the earlier read-only audit
+  found Hub at V4 and Core at V7 before that deployment.
 - Hub owns `hub.tenants`, its printer projection, inventory, jobs, allocation,
   maintenance, and statistics. Core owns its printer catalog, connection
   configuration, and active print context.
@@ -45,14 +47,15 @@ Repository evidence for these findings is:
 | Area | Source of truth inspected |
 | --- | --- |
 | Versions and reactor | Root `pom.xml` and resolved Maven dependency versions |
-| Hub schema | `edol-hub/src/main/resources/db/migration` V1 through V4 |
-| Core schema | `edol-core/src/main/resources/db/migration` V1 through V6 |
+| Hub schema | `edol-hub/src/main/resources/db/migration` V1 through V5 |
+| Core schema | `edol-core/src/main/resources/db/migration` V1 through V7 |
 | Ownership model | All Hub and Core `@Entity` types and repository interfaces |
 | Default tenant | Hub `TenantContext`, tenant repository, and V3/V4 migrations |
 | Native/background access | `LegacyPrinterBackfillService`, `PrintJobService`, startup recovery, and scheduled catalog/runtime services |
 | HTTP security and clients | Module `SecurityConfig` types and every Core/Hub `RestClient` or `RestTemplate` caller |
 | MQTT contracts | Core event listeners plus Hub, Notify, and AMS MQTT adapters |
 | Deployment | `docker/compose.yaml` and module application configuration |
+| Hub V5 deployment | 2026-09-23 Spring Boot startup log: Flyway validated V1-V5, applied V5, and Hibernate completed schema validation |
 
 ### Authentication and transport
 
@@ -148,7 +151,7 @@ Make every existing Hub/Core printer ownership path deterministic before adding
 tenant enforcement. The current V4 projection and application-assisted
 backfill must already report healthy.
 
-### Implemented increment: validation and preflight
+### Implemented increments
 
 The first Stage 1 increment adds an application-assisted Hub preflight without
 contracting Hub columns. It verifies the complete Core catalog has unique UUIDs
@@ -161,10 +164,17 @@ idempotent. Core unavailability skips the preflight and leaves contraction
 unready. Core V7 independently adds the active print context printer FK after
 a fail-fast orphan check.
 
-This increment does not make Hub ownership columns mandatory, drop or rename
-the legacy job column, or complete Stage 1 acceptance. The destructive Hub
-contraction remains a separately reviewed increment with its own SQL guards
-and deployment backup evidence.
+The second increment adds Hub V5. It repeats null, orphan, and duplicate guards
+in Flyway before making the three Hub printer relationships mandatory, dropping
+the legacy integer job column, and renaming the UUID job column to
+`printer_id`. Runtime validation becomes read-only and continues to reject a
+Core/Hub catalog mismatch. V5 contains no ownership backfill or inferred
+mapping.
+
+Hub V5 was applied successfully to the local database from a quiesced startup;
+Flyway and Hibernate schema validation completed. Stage 1 is not accepted until
+fresh preflight, recorded Flyway history, and verified backup/restore evidence
+are attached to its deployment audit.
 
 ### Scope and modules
 
@@ -176,9 +186,8 @@ and deployment backup evidence.
 
 - Verify that every legacy Hub print job, maintenance definition, and printer
   statistics row maps to exactly one Hub printer projection.
-- Make the Hub UUID printer relationships mandatory only after verification.
-- Contract the print-job legacy integer printer column and rename the UUID
-  column to the stable printer column in a separate contract migration.
+- Hub V5 makes the UUID printer relationships mandatory, removes the legacy
+  integer print-job column, and names the stable UUID column `printer_id`.
 - Add the missing foreign key from Core active print context to Core printer.
 - Preserve Core UUID as the cross-service printer identity.
 
@@ -201,7 +210,8 @@ the migration must not guess, delete, or silently reassign data.
 
 - Empty, current, and legacy schema Flyway chains in PostgreSQL Testcontainers.
 - Null, orphan, duplicate, and ambiguous printer fixtures.
-- Application-assisted backfill idempotency and Core-unavailable behavior.
+- V5 guard failures for null, orphan, duplicate, and legacy printer ownership;
+  Core-unavailable and catalog-mismatch validation behavior.
 - Existing multi-printer recovery and management tests.
 
 ### Rollback
@@ -1021,6 +1031,6 @@ change record; compatibility is removed only after zero use is demonstrated.
 
 ## Recommended Next Stage
 
-The first implementation stage is **Stage 1: Legacy Ownership Contract
-Closure**. Do not begin it until the documentation-only audit deliverables are
-reviewed and committed.
+Complete the Stage 1 V5 deployment audit, including verified backup/restore and
+PostgreSQL migration evidence. Do not begin Stage 2 until Stage 1 acceptance is
+recorded.

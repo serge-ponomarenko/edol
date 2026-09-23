@@ -15,8 +15,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class LegacyPrinterBackfillService {
 
-    private static final String PRINTER_ID_PARAMETER = "printerId";
-    private static final int LEGACY_SINGLETON_PRINTER_ID = 1;
     private static final String INVALID_MAINTENANCE_OWNERSHIP_QUERY = """
             select count(*)
             from hub.maintenance_definition definition
@@ -32,8 +30,8 @@ public class LegacyPrinterBackfillService {
     private static final String INVALID_JOB_OWNERSHIP_QUERY = """
             select count(*)
             from hub.print_jobs job
-            left join hub.printers printer on printer.id = job.printer_id_uuid
-            where job.printer_id_uuid is null or printer.id is null
+            left join hub.printers printer on printer.id = job.printer_id
+            where job.printer_id is null or printer.id is null
             """;
 
     private final JdbcClient jdbcClient;
@@ -52,7 +50,7 @@ public class LegacyPrinterBackfillService {
     }
 
     @Transactional
-    public void validateAndBackfill(List<CorePrinterDto> corePrinters) {
+    public void validateOwnership(List<CorePrinterDto> corePrinters) {
         validateCoreCatalog(corePrinters);
 
         Set<UUID> corePrinterIds = corePrinters.stream()
@@ -75,44 +73,6 @@ public class LegacyPrinterBackfillService {
                 INVALID_STATISTICS_OWNERSHIP_QUERY
         );
         assertNoDuplicatePrinterStatistics();
-
-        List<Integer> legacyPrinterIds = jdbcClient.sql("""
-                        select distinct printer_id
-                        from hub.print_jobs
-                        where printer_id_uuid is null
-                          and printer_id is not null
-                        order by printer_id
-                        """)
-                .query(Integer.class)
-                .list();
-
-        if (count("select count(*) from hub.print_jobs where printer_id_uuid is null and printer_id is null") > 0) {
-            throw new IllegalStateException("Legacy print jobs are missing both UUID and legacy printer ownership");
-        }
-
-        if (!legacyPrinterIds.isEmpty() && !legacyPrinterIds.equals(List.of(LEGACY_SINGLETON_PRINTER_ID))) {
-            throw new IllegalStateException(
-                    "Unsupported legacy printer identifiers: " + legacyPrinterIds
-            );
-        }
-
-        if (!legacyPrinterIds.isEmpty()) {
-            if (corePrinterIds.size() != 1) {
-                throw new IllegalStateException(
-                        "Legacy print jobs require exactly one Hub/Core printer UUID mapping"
-                );
-            }
-            UUID printerId = corePrinterIds.iterator().next();
-            jdbcClient.sql("""
-                            update hub.print_jobs
-                            set printer_id_uuid = :printerId
-                            where printer_id_uuid is null
-                              and printer_id = :legacyPrinterId
-                            """)
-                    .param(PRINTER_ID_PARAMETER, printerId)
-                    .param("legacyPrinterId", LEGACY_SINGLETON_PRINTER_ID)
-                    .update();
-        }
 
         assertNoMissingOrOrphanedOwnership("print jobs", INVALID_JOB_OWNERSHIP_QUERY);
     }

@@ -53,8 +53,8 @@ current state until individual stages are completed and audited.
 
 ## Lifecycle and Persistence
 
-- On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog, validates its UUID projection and printer-owned Hub data, and only backfills documented singleton legacy jobs when there is exactly one Hub/Core UUID candidate. Missing, orphaned, duplicate, or ambiguous ownership blocks the later contraction; Core catalog unavailability skips the preflight and reports the catalog unavailable. Hub then attempts recovery independently for every enabled projected printer.
-- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract. Core V7 adds the foreign key from `active_print_context.printer_id` to `printers.id` after failing on existing orphaned contexts.
+- On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog and validates its UUID projection and printer-owned Hub data. Hub V5 rechecks Hub ownership paths, makes the Hub job, maintenance, and statistics printer relationships mandatory, and removes the legacy integer job printer ID without inferring a mapping. Missing, orphaned, or duplicate Hub ownership blocks the migration; a Core catalog mismatch blocks runtime validation, while catalog unavailability skips that validation and reports the catalog unavailable. Hub then attempts recovery independently for every enabled projected printer.
+- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract. Core V7 adds the foreign key from `active_print_context.printer_id` to `printers.id` after failing on existing orphaned contexts; Hub V5 contracts the validated printer ownership columns.
 - Core stores models and camera snapshots on mounted volumes. Docker Compose also mounts service logs.
 
 ## Operational Contracts

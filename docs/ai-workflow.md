@@ -16,9 +16,10 @@ The local PostgreSQL MCP server is configured in `.ai/mcp/mcp.json` as
 telemetry disabled and uses connection profiles stored outside the repository
 in `%USERPROFILE%\.postgres-mcp\connections.yaml`.
 
-- Use only a local development profile. The MCP server does not expose a
-  read-only mode, so do not configure shared, staging, or production database
-  credentials.
+- Use only a local development profile. Discover profiles with
+  `postgres_mcp_list_connection_profiles` before connecting, and require the
+  profile's `access_mode: ro`. Do not configure shared, staging, or production
+  database credentials.
 - Connection profiles and passwords are user-local and must never be committed.
 
 The read-only SonarQube MCP server is registered for JetBrains AI Assistant in
