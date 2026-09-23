@@ -53,8 +53,8 @@ current state until individual stages are completed and audited.
 
 ## Lifecycle and Persistence
 
-- On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog, performs validated legacy backfill, and then attempts recovery independently for every enabled projected printer.
-- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract.
+- On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog, validates its UUID projection and printer-owned Hub data, and only backfills documented singleton legacy jobs when there is exactly one Hub/Core UUID candidate. Missing, orphaned, duplicate, or ambiguous ownership blocks the later contraction; Core catalog unavailability skips the preflight and reports the catalog unavailable. Hub then attempts recovery independently for every enabled projected printer.
+- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract. Core V7 adds the foreign key from `active_print_context.printer_id` to `printers.id` after failing on existing orphaned contexts.
 - Core stores models and camera snapshots on mounted volumes. Docker Compose also mounts service logs.
 
 ## Operational Contracts

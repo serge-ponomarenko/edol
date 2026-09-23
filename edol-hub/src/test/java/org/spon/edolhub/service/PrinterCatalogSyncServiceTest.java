@@ -23,6 +23,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -106,6 +108,16 @@ class PrinterCatalogSyncServiceTest {
         }
 
         assertThat(maximumConcurrentSaves.get()).isEqualTo(1);
+    }
+
+    @Test
+    void skipsOwnershipPreflightWhenCoreCatalogIsUnavailable() {
+        when(printerService.getPrinters()).thenThrow(new RuntimeException("Core unavailable"));
+
+        syncService.synchronize();
+
+        verify(status).coreUnavailable("EDOL Core printer catalog is unavailable");
+        verifyNoInteractions(backfillService, printerRepository, tenantContext);
     }
 
     private void awaitAndSynchronize(

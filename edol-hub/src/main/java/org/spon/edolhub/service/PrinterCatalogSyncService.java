@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -39,6 +38,7 @@ public class PrinterCatalogSyncService {
         try {
             try {
                 List<CorePrinterDto> corePrinters = printerService.getPrinters();
+                backfillService.validateCoreCatalog(corePrinters);
                 Tenant tenant = tenantContext.getCurrentTenant();
                 Set<UUID> corePrinterIds = corePrinters.stream()
                         .map(CorePrinterDto::printerId)
@@ -50,22 +50,11 @@ public class PrinterCatalogSyncService {
                 );
                 printerRepository.saveAll(existingPrinters);
 
-                List<Printer> printers = corePrinters.stream()
+                corePrinters.stream()
                         .map(dto -> upsert(dto, tenant))
                         .toList();
 
-                if (printers.isEmpty() && backfillService.hasPendingBackfill()) {
-                    throw new IllegalStateException(
-                            "Legacy printer data exists, but EDOL Core has no printer to map it to"
-                    );
-                }
-
-                if (!printers.isEmpty()) {
-                    Printer defaultPrinter = printers.stream()
-                            .min(Comparator.comparing(Printer::getDisplayId))
-                            .orElseThrow();
-                    backfillService.backfill(defaultPrinter);
-                }
+                backfillService.validateAndBackfill(corePrinters);
 
                 status.synchronizedSuccessfully();
             } catch (IllegalStateException e) {

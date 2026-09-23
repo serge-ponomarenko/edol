@@ -148,6 +148,24 @@ Make every existing Hub/Core printer ownership path deterministic before adding
 tenant enforcement. The current V4 projection and application-assisted
 backfill must already report healthy.
 
+### Implemented increment: validation and preflight
+
+The first Stage 1 increment adds an application-assisted Hub preflight without
+contracting Hub columns. It verifies the complete Core catalog has unique UUIDs
+and exactly matches the Hub projection, validates direct UUID ownership for
+jobs, maintenance definitions, and printer statistics, and fails closed on
+missing, orphaned, duplicate, or ambiguous mappings. It may backfill the
+documented singleton legacy `print_jobs.printer_id = 1` only when the complete
+Hub/Core catalog has exactly one UUID candidate; repeated execution is
+idempotent. Core unavailability skips the preflight and leaves contraction
+unready. Core V7 independently adds the active print context printer FK after
+a fail-fast orphan check.
+
+This increment does not make Hub ownership columns mandatory, drop or rename
+the legacy job column, or complete Stage 1 acceptance. The destructive Hub
+contraction remains a separately reviewed increment with its own SQL guards
+and deployment backup evidence.
+
 ### Scope and modules
 
 - Hub and Core Flyway migrations, persistence models, backfill validation, and

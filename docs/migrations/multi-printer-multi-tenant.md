@@ -16,7 +16,7 @@ APIs. Printer UUID is the cross-service identity.
 | Area | Status |
 | --- | --- |
 | Core per-printer runtime and management API | Complete |
-| Hub V3/V4 foundation, catalog projection, validated legacy backfill | Complete and locally verified |
+| Hub V3/V4 foundation and catalog projection | Complete; V4 legacy-ownership preflight is implemented, while destructive contraction remains pending |
 | Hub printer-scoped dashboard, jobs, maintenance, allocation, camera and commands | Complete |
 | Hub printer management UI and scope-grouped navigation | Complete |
 | New Core persisted and session UUID generation | Complete; UUID v7 |
@@ -26,9 +26,11 @@ APIs. Printer UUID is the cross-service identity.
 
 V3 is deployed and immutable. V4 is additive: it introduces a nullable UUID
 relationship for legacy Hub print jobs without inserting or hardcoding a Core
-printer UUID. `PrinterCatalogSyncService` uses the Core catalog and validated
-application-assisted backfill to map legacy singleton data. It supports an
-empty database and blocks ambiguous historical mappings.
+printer UUID. `PrinterCatalogSyncService` validates the full Core UUID catalog
+against the Hub projection and direct ownership links before an
+application-assisted backfill. It maps the documented legacy singleton only
+when exactly one Hub/Core UUID candidate exists, supports an empty database,
+and blocks missing, orphaned, duplicate, or ambiguous ownership.
 
 ## Implemented Scope
 
