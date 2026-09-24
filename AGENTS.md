@@ -36,3 +36,9 @@
 - Recommend an MCP server or MCP integration when work repeatedly requires structured access to an external system such as a database, API, service, runtime, or infrastructure environment.
 - Prefer the smallest appropriate mechanism. Do not propose automation for trivial, rare, or already well-documented tasks.
 - Do not create Skills, documentation, MCP integrations, or other workflow infrastructure unless requested. Briefly explain the recurring friction observed and the expected benefit.
+
+## Low-Cost Subagents
+
+- Delegate only a clearly matching, self-contained operation to one project role; the main agent retains design, safety, and integration decisions. Do not create nested agent workflows.
+- After a completed coherent stage, route every explicit request to commit changes (including Ukrainian equivalents such as `закоміть це` or `закомітай`) to `commit-agent`. Treat that intent as authorization for the agent to identify, stage, and create one local commit for the completed stage; route a request to run or select verification to `test-agent`; route a request for current local PostgreSQL schema, constraint, data, or Flyway evidence to `db-inspect-agent`.
+- Do not delegate architecture, security, cross-service contracts, migration design, production/deployment work, source implementation, or an ambiguous task solely to reduce model use. Read `docs/codex-subagents.md` for role contracts and the periodic delegation review rule.

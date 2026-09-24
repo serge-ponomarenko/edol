@@ -53,9 +53,7 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Subagent Status
 
-No persistent subagent configuration is configured. Delegate only when independence adds value:
-
-- **Architecture scout:** read-only tracing of cross-module contracts before a risky change; does not edit.
-- **Implementer:** owns one bounded change; does not overwrite concurrent work.
-- **Verifier/reviewer:** independently inspects the diff and relevant contracts or runs checks; does not expand scope.
-- **Documentation reviewer:** checks documented architectural facts against code only after an architectural change.
+Project-scoped Codex roles are configured under `.codex/agents`. They are
+limited to commit execution, targeted verification, and read-only database
+evidence. The active routing rules and full role contracts are in
+`AGENTS.md` and `docs/codex-subagents.md`.
