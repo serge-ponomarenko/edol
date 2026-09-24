@@ -46,6 +46,9 @@ public class Printer {
     @Column(nullable = false)
     private boolean enabled;
 
+    @Column(name = "tenant_id")
+    private UUID tenantId;
+
     @Column(nullable = false)
     private Instant createdAt;
 

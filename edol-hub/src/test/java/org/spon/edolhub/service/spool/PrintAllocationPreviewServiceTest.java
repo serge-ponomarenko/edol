@@ -47,13 +47,16 @@ class PrintAllocationPreviewServiceTest {
     private Filament filament;
     private Vendor vendor;
     private MaterialType materialType;
+    private Tenant tenant;
 
     @BeforeEach
     void setUp() {
-        vendor = Vendor.builder().id(1L).name("JAMG HE").build();
-        materialType = MaterialType.builder().id(1L).name("PLA").build();
+        tenant = new Tenant();
+        tenant.setId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        vendor = Vendor.builder().id(1L).tenant(tenant).name("JAMG HE").build();
+        materialType = MaterialType.builder().id(1L).tenant(tenant).name("PLA").build();
         filament = Filament.builder()
-                .id(1L).fullId("JAMG HE PLA Matte").vendor(vendor)
+                .id(1L).tenant(tenant).fullId("JAMG HE PLA Matte").vendor(vendor)
                 .materialType(materialType).brand("Matte").colorHex("#F95D73")
                 .build();
         job = PrintJob.builder()
@@ -61,6 +64,9 @@ class PrintAllocationPreviewServiceTest {
                 .taskName("Test Print").status(PrintJobStatus.RUNNING)
                 .build();
         job.setId(UUID.fromString("00000000-0000-0000-0000-000000000201"));
+        Printer printer = new Printer();
+        printer.setTenant(tenant);
+        job.setPrinter(printer);
     }
 
     @Nested
@@ -84,6 +90,7 @@ class PrintAllocationPreviewServiceTest {
             assertThat(result.getGroups()).hasSize(1);
 
             PrintAllocationGroup group = result.getGroups().getFirst();
+            assertThat(group.getTenant()).isEqualTo(tenant);
             assertThat(group.getFilament()).isEqualTo(filament);
             assertThat(group.getRequestedGrams()).isEqualTo(200.0);
             assertThat(group.getAllocatedGrams()).isEqualTo(200.0);
@@ -92,6 +99,7 @@ class PrintAllocationPreviewServiceTest {
             assertThat(group.getUserOverridden()).isFalse();
             assertThat(group.getAmsSlot()).isZero();
             assertThat(group.getItems()).hasSize(1);
+            assertThat(group.getItems().getFirst().getTenant()).isEqualTo(tenant);
             assertThat(group.getItems().getFirst().getSpool()).isEqualTo(spool);
             assertThat(group.getItems().getFirst().getAllocatedGrams()).isEqualTo(200.0);
 
@@ -103,7 +111,7 @@ class PrintAllocationPreviewServiceTest {
         @DisplayName("adds group to existing preview with different filament")
         void addsGroupToExistingPreview() {
             Filament filament2 = Filament.builder()
-                    .id(2L).fullId("JAMG HE PETG Basic").vendor(vendor)
+                    .id(2L).tenant(tenant).fullId("JAMG HE PETG Basic").vendor(vendor)
                     .materialType(materialType).brand("Basic").colorHex("#161616")
                     .build();
 

@@ -98,8 +98,9 @@ SELECT SETVAL(
                'print_jobs_public_id_seq',
                COALESCE(
                        (SELECT MAX(public_id) FROM print_jobs),
-                       0
-               )
+                       1
+               ),
+               EXISTS (SELECT 1 FROM print_jobs)
        );
 
 ALTER TABLE print_jobs

@@ -13,6 +13,7 @@ public class AllocationResultMapper {
             AllocationResult allocation
     ) {
         return PrintAllocationItem.builder()
+                .tenant(group.getTenant())
                 .group(group)
                 .spool(allocation.getSpool())
                 .allocatedGrams(allocation.getAllocatedGrams())

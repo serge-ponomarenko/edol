@@ -16,13 +16,13 @@ APIs. Printer UUID is the cross-service identity.
 | Area | Status |
 | --- | --- |
 | Core per-printer runtime and management API | Complete |
-| Hub V3/V4 foundation and catalog projection | Complete; V4 legacy-ownership preflight is implemented, while destructive contraction remains pending |
+| Hub V3/V5 foundation and catalog projection | Complete; the V5 ownership contract was deployed and Stage 1 was accepted on 2026-09-23 |
 | Hub printer-scoped dashboard, jobs, maintenance, allocation, camera and commands | Complete |
 | Hub printer management UI and scope-grouped navigation | Complete |
 | New Core persisted and session UUID generation | Complete; UUID v7 |
 | AMS and Notify default-printer contract removal | Complete |
 | Authentication, tenant membership and printer assignment | Pending |
-| Hub V5 legacy-column contraction and compatibility retirement | Pending |
+| Hub V5 legacy-column contraction | Complete; rollback relies on the verified database backup and restore drill |
 
 V3 is deployed and immutable. V4 is additive: it introduces a nullable UUID
 relationship for legacy Hub print jobs without inserting or hardcoding a Core
@@ -81,20 +81,19 @@ and blocks missing, orphaned, duplicate, or ambiguous ownership.
 4. Add end-to-end Core/Hub/AMS/Notify contract tests with two printers and two
    tenants. Cover MQTT events, status/media, commands, inventory mutation and
    recipient isolation.
-5. Deploy V5 only after every `print_jobs.printer_id_uuid` is non-null, all
-   maintenance/statistics references are non-null, Core catalog synchronization
-   is stable and all consumers use UUID identity. V5 must validate those
-   preconditions, make UUID ownership mandatory, drop the obsolete integer
-   column and rename `printer_id_uuid` to `printer_id`. It must fail rather than
-   guess or delete data.
+5. V5 completed the validated printer-ownership contraction: it made UUID
+   ownership mandatory, dropped the obsolete integer column, and renamed
+   `printer_id_uuid` to `printer_id`. Its deployment audit includes a verified
+   backup and restore drill.
 6. After the V5 rollback window, audit every deprecated Core and Hub
    default-printer adapter. Remove an adapter only after its consumers are
    migrated and verified.
 
 ## Verification and Rollout
 
-1. Back up Hub and record Flyway history before deployment. Do not pair V4/V5
-   changes in one release.
+1. Hub was backed up and its Flyway history was recorded for the V5 deployment;
+   the Stage 1 audit includes a successful isolated restore drill. V4 and V5
+   were deployed as separate releases.
 2. Confirm `/api/printers/catalog-status` is healthy and that `hub.printers`
    contains the expected Core UUIDs before exercising the UI.
 3. Exercise two printers concurrently: lifecycle events, dashboard state and

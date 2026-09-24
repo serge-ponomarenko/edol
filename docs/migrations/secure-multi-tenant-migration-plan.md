@@ -25,15 +25,22 @@ factual current system remains described in `docs/architecture.md`.
 - The resolved dependency set uses Hibernate ORM 7.2.1.Final, Spring Security
   7.0.2, and PostgreSQL JDBC 42.7.9. Deployment configuration uses PostgreSQL
   17.
-- Hub Flyway source is at V5 and Core Flyway source is at V7. The local Hub
-  deployment applied V5 successfully on 2026-09-23; the earlier read-only audit
-  found Hub at V4 and Core at V7 before that deployment.
+- The local development database has Hub V6 and Core V8 applied. Stage 2
+  source, PostgreSQL-backed migration, and local runtime acceptance checks are
+  complete. Production acceptance remains pending the controlled Hub V2 repair
+  and its deployment evidence. The local Hub deployment applied V5 successfully
+  on 2026-09-23; the earlier read-only audit found Hub at V4 and Core at V7
+  before that deployment.
 - Hub owns `hub.tenants`, its printer projection, inventory, jobs, allocation,
   maintenance, and statistics. Core owns its printer catalog, connection
   configuration, and active print context.
-- Hub currently stores `tenant_id` directly only on printers, filaments,
-  vendors, and material types. Other ownership is derived or not yet enforced.
-- There is no `User`, tenant membership, or tenant role table or entity.
+- Hub stores `tenant_id` directly on printers, filaments, vendors, material
+  types, allocation groups, allocation items, and job spool usage. Other
+  ownership remains derived and is protected by the Stage 2 foreign-key and
+  constraint-trigger paths.
+- Hub persists global `User` identities and `TenantMembership` rows with the
+  initial `OWNER` role and lifecycle status. Authentication and membership
+  selection are not implemented in this stage.
 - `TenantContext` resolves the database-marked default tenant. This is bootstrap
   behavior, not authorization.
 - Repository/service code contains both tenant-scoped and ordinary unscoped
@@ -47,8 +54,8 @@ Repository evidence for these findings is:
 | Area | Source of truth inspected |
 | --- | --- |
 | Versions and reactor | Root `pom.xml` and resolved Maven dependency versions |
-| Hub schema | `edol-hub/src/main/resources/db/migration` V1 through V5 |
-| Core schema | `edol-core/src/main/resources/db/migration` V1 through V7 |
+| Hub schema | `edol-hub/src/main/resources/db/migration` V1 through V6 (verified locally; production V2 history repair pending) |
+| Core schema | `edol-core/src/main/resources/db/migration` V1 through V8 (verified locally) |
 | Ownership model | All Hub and Core `@Entity` types and repository interfaces |
 | Default tenant | Hub `TenantContext`, tenant repository, and V3/V4 migrations |
 | Native/background access | `LegacyPrinterBackfillService`, `PrintJobService`, startup recovery, and scheduled catalog/runtime services |
@@ -172,9 +179,240 @@ Core/Hub catalog mismatch. V5 contains no ownership backfill or inferred
 mapping.
 
 Hub V5 was applied successfully to the local database from a quiesced startup;
-Flyway and Hibernate schema validation completed. Stage 1 is not accepted until
-fresh preflight, recorded Flyway history, and verified backup/restore evidence
-are attached to its deployment audit.
+Flyway and Hibernate schema validation completed.
+
+### Deployment audit and acceptance
+
+Stage 1 was accepted on 2026-09-23 after the following local deployment
+evidence was recorded:
+
+- Hub Flyway V5 (`V5__contract_printer_ownership.sql`) completed successfully
+  at `2026-09-23 12:56:49.887694` with checksum `-1155544412`; Core Flyway V7
+  (`V7__add_active_print_context_printer_foreign_key.sql`) completed
+  successfully at `2026-09-22 21:18:55.866024` with checksum `1871985063`.
+- A source preflight at `2026-09-23 11:37:59 UTC` found zero invalid print
+  jobs, maintenance definitions, printer statistics, duplicate statistics,
+  Core/Hub catalog differences, and orphaned Core active print contexts.
+- An operator-held custom-format backup archive has SHA-256
+  `063706F032CEB9E26DD5BC9BF6FD494FA4CFB9359EA5D0E3FB1ED4942D34A0AA`.
+  On 2026-09-23 it restored with exit code zero into an isolated local
+  PostgreSQL 17 UTF-8 cluster. The restored V5/V7 history, constraints, and
+  the same seven preflight checks all passed.
+- `mvn -B -q verify` previously passed. The Core and Hub Testcontainers
+  migration tests were skipped because Docker was unavailable.
+
+The restore drill used `--no-owner --no-privileges`; it verifies the Stage 1
+schema and data recovery path, not PostgreSQL role or grant restoration. Roles,
+grants, RLS, and database TLS remain later-stage concerns. The post-stage audit
+found no change to ADR 0002, the ownership matrix, public HTTP/MQTT contracts,
+or downstream consumer behavior. Stage 2 remains a separately authorized
+implementation stage.
+
+### Stage 2 local deployment evidence
+
+- Core Flyway V8 (`V8__add_printer_tenant_ownership.sql`) completed on the
+  local development database at `2026-09-23 16:45:20.720596` with checksum
+  `-910844633`; Core subsequently completed Hibernate initialization and
+  started.
+- Hub Flyway V6 (`V6__add_tenant_domain_foundation.sql`) completed on the same
+  database at `2026-09-23 16:45:38.603607` with checksum `1065354040`.
+- The initial Hub process failed before startup because its original JPA
+  mappings mixed writable and read-only columns in composite joins. The mapping
+  was corrected without changing the applied V6 migration.
+- PostgreSQL Testcontainers passed the Hub V1-to-V6 chain, including a
+  disposable historical-V2 checksum repair rehearsal (`HubMigrationTest`,
+  12 tests), and the Core migration suite (`CoreMigrationTest`, 8 tests).
+  The full remote-Docker reactor check, `mvn -B clean verify`, passed for all
+  six modules.
+- The local development Hub V2 history was repaired from `-1212277217` to
+  `818545878` without rerunning V2. Flyway history V1 through V6 is successful;
+  the corrected Hub started and passed its parameter-free read-only `GET /`
+  smoke check. Core also passed its local startup smoke check.
+- A read-only local audit found two Core printers and zero with a null tenant
+  UUID, and zero null ownership values in Hub allocation groups, allocation
+  items, and job spool usage. Core production code has no Hub runtime lookup;
+  V8 is the migration-only cross-schema backfill.
+
+### Stage 2 acceptance status
+
+Stage 2 is accepted for source and local-development verification on
+2026-09-24. The accepted scope is limited to the persistence foundation:
+direct/derived ownership paths, migration guards, and opaque Core ownership.
+RLS, `@TenantId`, login, tenant selection, and secure service transport remain
+Stage 3 or later work.
+
+Production acceptance remains pending. Do not mark the release deployed or
+begin Stage 3 implementation until the production V2 repair evidence below is
+attached to this audit.
+
+### Historical Hub V2 correction
+
+`V2__migrate_print_jobs_to_uuid.sql` was corrected to initialize an empty
+`print_jobs_public_id_seq` at `1` with `is_called = false`; the next generated
+public ID is therefore `1`. The previous `setval(..., 0)` fails on PostgreSQL
+17 when `print_jobs` is empty, preventing a clean Hub migration chain.
+
+Hub databases that already recorded the earlier V2 checksum must not receive
+this source revision through normal application startup. After a rehearsal on
+a disposable copy, an approved operator must run a one-time Flyway `repair`
+against the exact release migration locations, record the old and new V2
+checksums and backup evidence, validate the history, and then deploy only the
+matching application artifact. The repair changes Flyway metadata; it does
+not re-execute V2. Do not automate `repair` in application startup.
+
+#### V2 repair and rollback runbook
+
+The source-level regression test creates a disposable PostgreSQL database with
+the historical V2 checksum, applies `repair` from the corrected migration
+locations, and validates the repaired history without re-executing V2. This is
+not a substitute for a rehearsal on a copy of a deployed database.
+
+Before `repair` is permitted on a test or production database, all of the
+following must be true:
+
+1. The matching release has passed the Hub PostgreSQL migration suite,
+   including the clean V1-to-V6 path and the checksum-repair rehearsal.
+2. A restorable backup and its identifier or checksum have been recorded.
+3. `hub.flyway_schema_history` contains successful, resolvable V1 through V6
+   entries, with the expected earlier V2 checksum and no failed, missing, or
+   out-of-order entries.
+4. The target's `hub.print_jobs` and `hub.print_jobs_public_id_seq` state has
+   been recorded for the deployment evidence.
+5. All Hub instances using the earlier V2 source are stopped; they will fail
+   validation after the checksum has been repaired.
+6. The operator uses the exact full migration location set packaged by the
+   corrected release. A partial migration location must not be used with
+   `repair`.
+
+For a target that satisfies the gate, execute the following controlled flow:
+
+1. Run Flyway `info` and `validate` with the corrected release locations and
+   retain their output. The initial validation is expected to report only the
+   V2 checksum mismatch.
+2. Run Flyway `repair` for schema `hub` exactly once.
+3. Run Flyway `validate`, then `migrate`; validation must pass and migration
+   must report no pending migrations.
+4. Record the resulting V2 checksum and complete Flyway history. Deploy and
+   start only the matching corrected Hub artifact, then run the normal
+   post-deployment read-only audit.
+
+#### Docker Compose production procedure
+
+This procedure is for the Debian Docker Compose deployment described by
+`docker/compose.yaml`. Run it from the checked-out release's `docker`
+directory after CI/CD has built the corrected release and Hub has stopped on
+the expected V2 checksum mismatch. It does not modify any service other than
+Hub, does not run SQL writes directly, and does not use `docker compose down`,
+prune, or volume operations.
+
+1. Verify that the checkout is the commit deployed by CI/CD and create a
+   private evidence directory outside the repository. Record `git rev-parse
+   HEAD`, `docker compose config --images`, and `docker compose ps` there.
+   Resolve the repository and environment roots without sourcing secret files:
+
+   ```bash
+   set -euo pipefail
+   repository_root="$(cd .. && pwd)"
+   environment_root="$(cd "$repository_root/.." && pwd)"
+   postgres_env="$environment_root/.env"
+   migrations="$repository_root/edol-hub/src/main/resources/db/migration"
+   audit_dir="$HOME/edol-v2-repair-$(date -u +%Y%m%dT%H%M%SZ)"
+   umask 077
+   mkdir -p "$audit_dir"
+   test -f "$postgres_env"
+   test -d "$migrations"
+   git -C "$repository_root" rev-parse HEAD | tee "$audit_dir/release-commit.txt"
+   docker compose config --images | tee "$audit_dir/compose-images.txt"
+   docker compose ps | tee "$audit_dir/compose-ps-before.txt"
+   ```
+
+2. Stop only Hub and verify PostgreSQL is healthy. Create a restorable custom
+   format backup before repair; retain its SHA-256 with the evidence. Do not
+   copy the backup or any environment file into source control.
+
+   ```bash
+   docker compose stop edolhub
+   docker compose ps edolhub | tee "$audit_dir/hub-stopped.txt"
+   docker compose exec -T postgres sh -ec 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+   docker compose exec -T postgres sh -ec 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --no-owner --no-privileges' > "$audit_dir/pre-repair.dump"
+   sha256sum "$audit_dir/pre-repair.dump" | tee "$audit_dir/pre-repair.dump.sha256"
+   ```
+
+3. Capture read-only preflight state. It must show successful V1 through V6,
+   the earlier V2 checksum, and no failed or out-of-order entry. Keep the
+   print-job and sequence output as deployment evidence.
+
+   ```bash
+   docker compose exec -T postgres sh -ec 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "SELECT installed_rank, version, script, checksum, success FROM hub.flyway_schema_history ORDER BY installed_rank"' | tee "$audit_dir/history-before.txt"
+   docker compose exec -T postgres sh -ec 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "SELECT COUNT(*) AS print_job_count, MAX(public_id) AS max_public_id FROM hub.print_jobs"' | tee "$audit_dir/print-jobs-before.txt"
+   docker compose exec -T postgres sh -ec 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "SELECT last_value, is_called FROM hub.print_jobs_public_id_seq"' | tee "$audit_dir/sequence-before.txt"
+   ```
+
+4. Define a one-shot Flyway runner. It uses the same PostgreSQL 17 network as
+   Compose, the exact checked-out Hub V1-to-V6 locations mounted read-only, and
+   Flyway `11.14.1`, matching the Hub dependency. Passwords remain inside the
+   runner container and are never command-line literals on the host.
+
+   ```bash
+   run_flyway() {
+     docker run --rm --network edol-network \
+       --env-file "$postgres_env" \
+       --mount "type=bind,src=$migrations,dst=/flyway/sql,readonly" \
+       --entrypoint sh flyway/flyway:11.14.1 \
+       -ec 'exec flyway -url="jdbc:postgresql://postgres:5432/${POSTGRES_DB}" -user="$POSTGRES_USER" -password="$POSTGRES_PASSWORD" -schemas=hub -defaultSchema=hub -locations=filesystem:/flyway/sql "$@"' \
+       flyway "$@"
+   }
+   ```
+
+5. Run `info` and `validate`, retaining output. `validate` must fail, and a
+   human must confirm that V2 checksum is the only discrepancy. Stop for any
+   other finding; do not repair an unexplained history.
+
+   ```bash
+   run_flyway info > "$audit_dir/flyway-info-before.txt" 2>&1
+   set +e
+   run_flyway validate > "$audit_dir/flyway-validate-before.txt" 2>&1
+   validate_exit=$?
+   set -e
+   test "$validate_exit" -ne 0
+   ```
+
+6. After that review, run exactly one repair, then validate and migrate. The
+   final migrate must report no pending migrations.
+
+   ```bash
+   run_flyway repair > "$audit_dir/flyway-repair.txt" 2>&1
+   run_flyway validate > "$audit_dir/flyway-validate-after.txt" 2>&1
+   run_flyway migrate > "$audit_dir/flyway-migrate-after.txt" 2>&1
+   docker compose exec -T postgres sh -ec 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "SELECT installed_rank, version, script, checksum, success FROM hub.flyway_schema_history ORDER BY installed_rank"' | tee "$audit_dir/history-after.txt"
+   ```
+
+7. Start only the corrected Hub artifact and retain the startup/read-only
+   evidence. Hub must start, and the local service check must return a 2xx
+   status. Redact secrets before sharing evidence; never share `.env` files or
+   the database dump.
+
+   ```bash
+   docker compose up -d --no-deps edolhub
+   docker compose ps edolhub | tee "$audit_dir/hub-after.txt"
+   docker compose logs --no-color --tail=200 edolhub > "$audit_dir/hub-startup.txt"
+   curl --fail --silent --show-error --output /dev/null --write-out '%{http_code}\n' http://127.0.0.1:8090/ | tee "$audit_dir/hub-read-only-http.txt"
+   ```
+
+Provide these redacted artifacts for the production acceptance audit: release
+commit and Compose image identities; backup filename and checksum; pre/post
+Flyway history; `info`, expected failing pre-repair `validate`, `repair`,
+passing post-repair `validate`, and no-op `migrate` outputs; pre-repair
+print-job and sequence state; Hub startup status/log excerpt; and the 2xx
+read-only check. The expected repaired V2 checksum is `818545878`.
+
+If the corrected Hub artifact must be rolled back after a successful repair,
+do not start the earlier artifact against the repaired history. With explicit
+approval, use the exact earlier release migration locations to run a second
+controlled `repair`, validate that earlier history, and only then start the
+earlier artifact. The repair itself changes metadata rather than schema or
+application data; database restoration remains the recovery path for an
+unexpected schema or data discrepancy.
 
 ### Scope and modules
 
@@ -288,7 +526,9 @@ MQTT remains unchanged.
 Use nullable/additive columns and not-yet-validated constraints first. Backfill
 in bounded batches where production data size requires it. The Core backfill is
 the only migration-time cross-schema operation; no runtime component receives
-Hub schema access.
+Hub schema access. V8 must succeed without a Hub schema when the Core catalog is
+empty; when the Core catalog is non-empty, apply Hub V6 first and V8 fails if
+the validated Hub projection is unavailable or invalid.
 
 ### Required tests
 
@@ -1031,6 +1271,6 @@ change record; compatibility is removed only after zero use is demonstrated.
 
 ## Recommended Next Stage
 
-Complete the Stage 1 V5 deployment audit, including verified backup/restore and
-PostgreSQL migration evidence. Do not begin Stage 2 until Stage 1 acceptance is
-recorded.
+Complete the controlled production V2 repair and attach its deployment
+evidence. Do not begin Stage 3 implementation until production Stage 2
+acceptance is recorded.

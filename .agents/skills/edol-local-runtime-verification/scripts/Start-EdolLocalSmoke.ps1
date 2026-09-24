@@ -317,9 +317,10 @@ try {
     $temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("edol-local-smoke-" + [guid]::NewGuid().ToString('N'))
     [System.IO.Directory]::CreateDirectory($temporaryDirectory) | Out-Null
 
+    $applicationLog = Join-Path $temporaryDirectory 'application.log'
     $applicationArguments = @(
         '--spring.profiles.active=dev',
-        '--logging.file.name=' + (Join-Path $temporaryDirectory 'application.log')
+        '--logging.file.name=' + $applicationLog
     )
     $argumentsValue = [string]::Join(' ', $applicationArguments)
     $mavenInvocation = '"{0}" spring-boot:run "-Dspring-boot.run.profiles=dev" "-Dspring-boot.run.arguments={1}"' -f $maven.Source, $argumentsValue
@@ -335,6 +336,13 @@ try {
         $startInfo.EnvironmentVariables[$entry.Key] = $entry.Value
     }
     $startInfo.EnvironmentVariables['SPRING_PROFILES_ACTIVE'] = 'dev'
+    $existingJavaToolOptions = $startInfo.EnvironmentVariables['JAVA_TOOL_OPTIONS']
+    $temporaryLogJvmOptions = '-DLOG_FILE="{0}" -Dlogging.file.name="{0}"' -f $applicationLog
+    if ([string]::IsNullOrWhiteSpace($existingJavaToolOptions)) {
+        $startInfo.EnvironmentVariables['JAVA_TOOL_OPTIONS'] = $temporaryLogJvmOptions
+    } else {
+        $startInfo.EnvironmentVariables['JAVA_TOOL_OPTIONS'] = "$existingJavaToolOptions $temporaryLogJvmOptions"
+    }
 
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo

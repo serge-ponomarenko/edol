@@ -50,9 +50,7 @@ public class PrinterCatalogSyncService {
                 );
                 printerRepository.saveAll(existingPrinters);
 
-                corePrinters.stream()
-                        .map(dto -> upsert(dto, tenant))
-                        .toList();
+                corePrinters.forEach(dto -> upsert(dto, tenant));
 
                 backfillService.validateOwnership(corePrinters);
 

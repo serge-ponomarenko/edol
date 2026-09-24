@@ -22,6 +22,7 @@ public class JobSpoolUsageService {
             FilamentSpool filamentSpool
     ) {
         JobSpoolUsage usage = JobSpoolUsage.builder()
+                .tenant(printJob.getPrinter().getTenant())
                 .printJob(printJob)
                 .filamentSpool(filamentSpool)
                 .usedGrams(0.0)

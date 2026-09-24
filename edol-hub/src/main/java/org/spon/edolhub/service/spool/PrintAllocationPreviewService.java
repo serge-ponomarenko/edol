@@ -86,6 +86,7 @@ public class PrintAllocationPreviewService {
 
         PrintAllocationGroup group =
                 PrintAllocationGroup.builder()
+                        .tenant(job.getPrinter().getTenant())
                         .preview(preview)
                         .filament(filament)
                         .status(status)
@@ -100,6 +101,7 @@ public class PrintAllocationPreviewService {
         for (AllocationResult allocation : allocations) {
             PrintAllocationItem item =
                     PrintAllocationItem.builder()
+                            .tenant(group.getTenant())
                             .group(group)
                             .spool(allocation.getSpool())
                             .allocatedGrams(

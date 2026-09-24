@@ -31,6 +31,15 @@ identity and credential lifecycle. Hub will operate as a BFF, and services will
 use separate OAuth client identities. Authentication identity and trusted
 tenant context remain separate.
 
+Stage 2 adds the Hub user and membership domain, direct tenant ownership for
+allocation and usage links, tenant-safe cross-aggregate constraints, and
+nullable opaque tenant ownership on Core printers with a guarded one-time
+Hub-projection backfill. The source and local-development acceptance checks
+are complete. Production acceptance remains pending the documented one-time
+repair of Hub Flyway V2 history and the matching deployment evidence. Stage 2
+does not enable Hibernate tenancy, RLS, authentication, service transport, or
+MQTT tenant propagation.
+
 Tenant persistence will use Hibernate discriminator tenancy together with
 forced PostgreSQL row-level security. Normal tenant resolution will be
 fail-closed. The current default-tenant behavior may survive only as a named,
@@ -54,7 +63,7 @@ current state until individual stages are completed and audited.
 ## Lifecycle and Persistence
 
 - On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog and validates its UUID projection and printer-owned Hub data. Hub V5 rechecks Hub ownership paths, makes the Hub job, maintenance, and statistics printer relationships mandatory, and removes the legacy integer job printer ID without inferring a mapping. Missing, orphaned, or duplicate Hub ownership blocks the migration; a Core catalog mismatch blocks runtime validation, while catalog unavailability skips that validation and reports the catalog unavailable. Hub then attempts recovery independently for every enabled projected printer.
-- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract. Core V7 adds the foreign key from `active_print_context.printer_id` to `printers.id` after failing on existing orphaned contexts; Hub V5 contracts the validated printer ownership columns.
+- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract. Core V7 adds the foreign key from `active_print_context.printer_id` to `printers.id` after failing on existing orphaned contexts; Hub V5 contracts the validated printer ownership columns. Stage 2 Core V8 adds nullable opaque printer ownership without requiring a Hub schema when Core has no printers, and uses the Hub projection only to backfill a non-empty Core catalog. Local migration, mapping, and runtime checks passed. Production Hub V2 history must be repaired once from the exact corrected release before that Hub artifact can start.
 - Core stores models and camera snapshots on mounted volumes. Docker Compose also mounts service logs.
 
 ## Operational Contracts

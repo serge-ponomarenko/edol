@@ -84,12 +84,13 @@ using it.
 application runtime failure, distinct from an infrastructure/configuration or
 startup failure.
 
-The wrapper creates one controlled temporary directory for application output
-and removes only that directory. Its `finally` block terminates the Maven
-process tree and the service process that bound its previously free port, then
-confirms that its expected port is free. It never stops a process discovered
-during preflight. If it cannot confirm cleanup, report that fact without
-stopping anything else.
+The wrapper injects the temporary log path as JVM logging properties before
+Logback initializes, so application output does not create repository-relative
+log files. It removes only its controlled temporary directory. Its `finally`
+block terminates the Maven process tree and the service process that bound its
+previously free port, then confirms that its expected port is free. It never
+stops a process discovered during preflight. If it cannot confirm cleanup,
+report that fact without stopping anything else.
 
 Before editing this skill or its script, run its no-secret static check:
 
