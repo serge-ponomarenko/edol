@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolhub.model.dto.CorePrinterDto;
 import org.spon.edolhub.model.entity.Printer;
-import org.spon.edolhub.model.entity.Tenant;
 import org.spon.edolhub.repository.PrinterRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -27,6 +26,8 @@ public class PrinterCatalogSyncService {
     private final TenantContext tenantContext;
     private final LegacyPrinterBackfillService backfillService;
     private final PrinterCatalogStatus status;
+    private final LegacyDefaultTenantCompatibilityScope compatibilityScope;
+    private final TenantAwareTransactionalExecutor transactionalExecutor;
     private final ReentrantLock synchronizationLock = new ReentrantLock();
 
     @Scheduled(
@@ -34,37 +35,44 @@ public class PrinterCatalogSyncService {
             initialDelayString = "${edol-hub.printer-sync-interval-ms:60000}"
     )
     public void synchronize() {
-        synchronizationLock.lock();
-        try {
-            try {
-                List<CorePrinterDto> corePrinters = printerService.getPrinters();
-                backfillService.validateCoreCatalog(corePrinters);
-                Tenant tenant = tenantContext.getCurrentTenant();
-                Set<UUID> corePrinterIds = corePrinters.stream()
-                        .map(CorePrinterDto::printerId)
-                        .collect(Collectors.toSet());
-
-                List<Printer> existingPrinters = printerRepository.findAllByTenantIdOrderByDisplayId(tenant.getId());
-                existingPrinters.forEach(
-                        printer -> printer.setAvailableInCore(corePrinterIds.contains(printer.getId()))
-                );
-                printerRepository.saveAll(existingPrinters);
-
-                corePrinters.forEach(dto -> upsert(dto, tenant));
-
-                backfillService.validateOwnership(corePrinters);
-
-                status.synchronizedSuccessfully();
-            } catch (IllegalStateException e) {
-                status.migrationBlocked(e.getMessage());
-                log.error("Printer catalog migration is blocked", e);
-            } catch (Exception e) {
-                status.coreUnavailable("EDOL Core printer catalog is unavailable");
-                log.warn("Cannot synchronize EDOL Core printer catalog", e);
-            }
-        } finally {
-            synchronizationLock.unlock();
+        var scope = compatibilityScope.openIfConfigured("scheduled-printer-catalog-sync");
+        if (scope.isEmpty()) {
+            status.migrationBlocked("Legacy tenant compatibility is not configured");
+            return;
         }
+        try (TenantContext.TenantScope ignored = scope.get()) {
+            synchronizationLock.lock();
+            try {
+                try {
+                    transactionalExecutor.executeInCurrentTenantTransaction(this::synchronizeCurrentTenant);
+                    status.synchronizedSuccessfully();
+                } catch (IllegalStateException e) {
+                    status.migrationBlocked(e.getMessage());
+                    log.error("Printer catalog migration is blocked", e);
+                } catch (Exception e) {
+                    status.coreUnavailable("EDOL Core printer catalog is unavailable");
+                    log.warn("Cannot synchronize EDOL Core printer catalog", e);
+                }
+            } finally {
+                synchronizationLock.unlock();
+            }
+        }
+    }
+
+    private void synchronizeCurrentTenant() {
+        List<CorePrinterDto> corePrinters = printerService.getPrinters();
+        backfillService.validateCoreCatalog(corePrinters);
+        UUID tenantId = tenantContext.getCurrentTenantId();
+        Set<UUID> corePrinterIds = corePrinters.stream()
+                .map(CorePrinterDto::printerId)
+                .collect(Collectors.toSet());
+
+        List<Printer> existingPrinters = printerRepository.findAllByTenantIdOrderByDisplayId(tenantId);
+        existingPrinters.forEach(printer -> printer.setAvailableInCore(corePrinterIds.contains(printer.getId())));
+        printerRepository.saveAll(existingPrinters);
+
+        corePrinters.forEach(dto -> upsert(dto, tenantId));
+        backfillService.validateOwnership(corePrinters);
     }
 
     @Transactional
@@ -77,7 +85,7 @@ public class PrinterCatalogSyncService {
                 if (dto == null) {
                     throw new IllegalStateException("Printer is missing from EDOL Core: " + printerId);
                 }
-                return upsert(dto, existing == null ? tenantContext.getCurrentTenant() : existing.getTenant());
+                return upsert(dto, existing == null ? tenantContext.getCurrentTenantId() : existing.getTenantId());
             } catch (Exception e) {
                 status.coreUnavailable("EDOL Core printer catalog is unavailable");
                 throw e;
@@ -87,12 +95,12 @@ public class PrinterCatalogSyncService {
         }
     }
 
-    private Printer upsert(CorePrinterDto dto, Tenant tenant) {
+    private Printer upsert(CorePrinterDto dto, UUID tenantId) {
         Printer printer = printerRepository.findById(dto.printerId())
                 .orElseGet(Printer::new);
         printer.setId(dto.printerId());
-        if (printer.getTenant() == null) {
-            printer.setTenant(tenant);
+        if (printer.getTenantId() == null) {
+            printer.setTenantId(tenantId);
         }
         printer.setDisplayId(dto.displayId());
         printer.setName(dto.name());

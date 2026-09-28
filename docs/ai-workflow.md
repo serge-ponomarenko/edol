@@ -50,6 +50,24 @@ must never be copied into the repository or a Codex configuration file.
   configuration, then migrate direct `now()` calls consistently. Preserve the
   current `Europe/Kyiv` business-time behavior until a persistence-time
   strategy is explicitly decided.
+- Restore and test AGENT camera visibility as an explicit end-to-end contract.
+  The external agent implementation is not in this repository. It must upload
+  JPEG snapshots to `POST /api/agent/camera/snapshot` with `X-Agent-Id`; Core
+  resolves that ID to its printer and Hub reads the printer-scoped snapshot.
+  Hub currently accepts `agentId` as manually entered connection data and does
+  not generate, provision, or rotate it on the device. Determine from agent
+  HTTP and MQTT evidence whether its configured ID matches Core, whether it
+  receives `ENABLE_SNAPSHOT_SCHEDULER`, and whether it uses a removed legacy
+  camera-read route. Do not publish commands or change a live device merely to
+  diagnose this; establish contract coverage before changing either side.
+- Close the Core printer ownership write gap in Stage 5. Core Flyway V8
+  backfilled historical `core.printers.tenant_id` rows, but the current
+  unauthenticated provisioning endpoint can create a new row with a null
+  tenant (observed in local development on 2026-09-26). Do not repair this by
+  accepting a client-controlled tenant field or by adding a runtime
+  cross-schema lookup. After Stage 4, propagate the verified Hub service
+  tenant context, repair any pre-existing null rows through a controlled
+  preflight, then enforce `NOT NULL`, Core RLS, and non-bypass runtime roles.
 
 ## Subagent Status
 

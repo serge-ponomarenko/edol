@@ -8,6 +8,7 @@ import org.spon.edolhub.service.TenantContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +34,7 @@ public class SpoolChangeController {
     private String edolCoreUrl;
 
     @PostMapping("/{printerId}/{spoolId}/{trayId}")
+    @Transactional
     public String spoolChange(@PathVariable UUID printerId,
                               @PathVariable Long spoolId,
                               @PathVariable Integer trayId,

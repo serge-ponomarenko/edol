@@ -22,13 +22,20 @@ public class PrintJobRecoveryService {
     private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
     private final PrinterAccessService printerAccessService;
     private final PrinterCatalogSyncService printerCatalogSyncService;
+    private final LegacyDefaultTenantCompatibilityScope compatibilityScope;
 
     @EventListener(ApplicationReadyEvent.class)
     public void recover() {
-        printerCatalogSyncService.synchronize();
-        printerAccessService.getPrinters().stream()
-                .filter(printer -> printer.isEnabled() && printer.isAvailableInCore())
-                .forEach(printer -> recover(printer.getId()));
+        var scope = compatibilityScope.openIfConfigured("application-ready-print-job-recovery");
+        if (scope.isEmpty()) {
+            return;
+        }
+        try (var ignored = scope.get()) {
+            printerCatalogSyncService.synchronize();
+            printerAccessService.getPrinters().stream()
+                    .filter(printer -> printer.isEnabled() && printer.isAvailableInCore())
+                    .forEach(printer -> recover(printer.getId()));
+        }
     }
 
     private void recover(java.util.UUID printerId) {

@@ -100,7 +100,7 @@ public class FilamentService {
                 .orElseGet(() ->
                         vendorRepository.save(
                                 Vendor.builder()
-                                        .tenant(tenantContext.getCurrentTenant())
+                                        .tenantId(tenantContext.getCurrentTenantId())
                                         .name(vendorName)
                                         .build()
                         )
@@ -108,7 +108,7 @@ public class FilamentService {
 
         Filament filament = new Filament();
 
-        filament.setTenant(tenantContext.getCurrentTenant());
+        filament.setTenantId(tenantContext.getCurrentTenantId());
         filament.setFullId(fullId);
         filament.setBrand(brand);
         filament.setColorHex(color.toUpperCase());

@@ -12,7 +12,6 @@ import org.spon.edolhub.model.dto.FilamentDeletePreviewDto;
 import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.MaterialType;
 import org.spon.edolhub.model.entity.Vendor;
-import org.spon.edolhub.model.entity.Tenant;
 import org.spon.edolhub.repository.FilamentRepository;
 import org.spon.edolhub.repository.MaterialTypeRepository;
 import org.spon.edolhub.repository.VendorRepository;
@@ -34,8 +33,6 @@ import static org.mockito.Mockito.*;
 class FilamentControllerTest {
 
     private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    private final Tenant tenant = new Tenant();
-
     @Mock
     private FilamentRepository filamentRepository;
 
@@ -62,9 +59,7 @@ class FilamentControllerTest {
 
     @BeforeEach
     void setUp() {
-        tenant.setId(TENANT_ID);
         lenient().when(tenantContext.getCurrentTenantId()).thenReturn(TENANT_ID);
-        lenient().when(tenantContext.getCurrentTenant()).thenReturn(tenant);
     }
 
     @Nested
@@ -75,7 +70,7 @@ class FilamentControllerTest {
         @DisplayName("returns list view with all filaments")
         void returnsListView() {
             List<Filament> filaments = List.of(new Filament());
-            when(filamentRepository.findAllByTenantIdOrderByFullId(TENANT_ID)).thenReturn(filaments);
+            when(filamentRepository.findAllByTenantIdWithDetailsOrderByFullId(TENANT_ID)).thenReturn(filaments);
 
             String view = controller.list(model);
 

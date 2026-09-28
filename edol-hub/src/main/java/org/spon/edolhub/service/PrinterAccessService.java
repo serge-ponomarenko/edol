@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.entity.Printer;
 import org.spon.edolhub.repository.PrinterRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PrinterAccessService {
 
     private final PrinterRepository printerRepository;

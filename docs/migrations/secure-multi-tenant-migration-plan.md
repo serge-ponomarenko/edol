@@ -26,11 +26,11 @@ factual current system remains described in `docs/architecture.md`.
   7.0.2, and PostgreSQL JDBC 42.7.9. Deployment configuration uses PostgreSQL
   17.
 - The local development database has Hub V6 and Core V8 applied. Stage 2
-  source, PostgreSQL-backed migration, and local runtime acceptance checks are
-  complete. Production acceptance remains pending the controlled Hub V2 repair
-  and its deployment evidence. The local Hub deployment applied V5 successfully
-  on 2026-09-23; the earlier read-only audit found Hub at V4 and Core at V7
-  before that deployment.
+  source, PostgreSQL-backed migration, local runtime, and production acceptance
+  checks are complete. The controlled production Hub V2 repair on 2026-09-24
+  changed only Flyway history, after which the exact release applied Hub V5 and
+  V6. The local Hub deployment applied V5 successfully on 2026-09-23; the
+  earlier read-only audit found Hub at V4 and Core at V7 before that deployment.
 - Hub owns `hub.tenants`, its printer projection, inventory, jobs, allocation,
   maintenance, and statistics. Core owns its printer catalog, connection
   configuration, and active print context.
@@ -54,7 +54,7 @@ Repository evidence for these findings is:
 | Area | Source of truth inspected |
 | --- | --- |
 | Versions and reactor | Root `pom.xml` and resolved Maven dependency versions |
-| Hub schema | `edol-hub/src/main/resources/db/migration` V1 through V6 (verified locally; production V2 history repair pending) |
+| Hub schema | `edol-hub/src/main/resources/db/migration` V1 through V6 (verified locally and through the controlled 2026-09-24 production V2 repair and V5/V6 migration) |
 | Core schema | `edol-core/src/main/resources/db/migration` V1 through V8 (verified locally) |
 | Ownership model | All Hub and Core `@Entity` types and repository interfaces |
 | Default tenant | Hub `TenantContext`, tenant repository, and V3/V4 migrations |
@@ -235,15 +235,20 @@ implementation stage.
 
 ### Stage 2 acceptance status
 
-Stage 2 is accepted for source and local-development verification on
-2026-09-24. The accepted scope is limited to the persistence foundation:
+Stage 2 is accepted on 2026-09-24 for source, local-development, and production
+verification. The accepted scope is limited to the persistence foundation:
 direct/derived ownership paths, migration guards, and opaque Core ownership.
 RLS, `@TenantId`, login, tenant selection, and secure service transport remain
 Stage 3 or later work.
 
-Production acceptance remains pending. Do not mark the release deployed or
-begin Stage 3 implementation until the production V2 repair evidence below is
-attached to this audit.
+The production V2 repair evidence is retained outside source control in the
+private `edol-v2-repair-20260924T110200Z` audit directory. It records the
+release commit `097d67bd66a9f9a8079ff9c686c6e3b5912870dc`, the pre-repair
+backup SHA-256, 584 existing print jobs with sequence value 1854, and the
+Flyway history change from V2 checksum `-1212277217` to `818545878`. The
+repair did not re-execute V2. Flyway then applied V5 and V6 successfully, and
+the final history records V1 through V6 as successful. Hub was relaunched and
+the parameter-free read-only root request returned the expected `302` redirect.
 
 ### Historical Hub V2 correction
 
@@ -273,9 +278,10 @@ following must be true:
 1. The matching release has passed the Hub PostgreSQL migration suite,
    including the clean V1-to-V6 path and the checksum-repair rehearsal.
 2. A restorable backup and its identifier or checksum have been recorded.
-3. `hub.flyway_schema_history` contains successful, resolvable V1 through V6
-   entries, with the expected earlier V2 checksum and no failed, missing, or
-   out-of-order entries.
+3. `hub.flyway_schema_history` contains successful, resolvable entries through
+   the currently deployed baseline, with the expected earlier V2 checksum and
+   no failed or out-of-order entry. Migrations supplied only by the corrected
+   release may still be pending and must be identified explicitly.
 4. The target's `hub.print_jobs` and `hub.print_jobs_public_id_seq` state has
    been recorded for the deployment evidence.
 5. All Hub instances using the earlier V2 source are stopped; they will fail
@@ -287,11 +293,15 @@ following must be true:
 For a target that satisfies the gate, execute the following controlled flow:
 
 1. Run Flyway `info` and `validate` with the corrected release locations and
-   retain their output. The initial validation is expected to report only the
-   V2 checksum mismatch.
+   retain their output. The initial validation is expected to report the V2
+   checksum mismatch and may also report migrations pending from that same
+   corrected release. Any failed, missing, out-of-order, or otherwise
+   unexplained discrepancy blocks repair.
 2. Run Flyway `repair` for schema `hub` exactly once.
-3. Run Flyway `validate`, then `migrate`; validation must pass and migration
-   must report no pending migrations.
+3. Run Flyway `validate`, then `migrate`. The post-repair validation must no
+   longer report a V2 checksum mismatch; the migration step applies any
+   identified release migrations. Run a final `validate` after migration; it
+   must pass with no pending migrations.
 4. Record the resulting V2 checksum and complete Flyway history. Deploy and
    start only the matching corrected Hub artifact, then run the normal
    post-deployment read-only audit.
@@ -338,9 +348,11 @@ prune, or volume operations.
    sha256sum "$audit_dir/pre-repair.dump" | tee "$audit_dir/pre-repair.dump.sha256"
    ```
 
-3. Capture read-only preflight state. It must show successful V1 through V6,
-   the earlier V2 checksum, and no failed or out-of-order entry. Keep the
-   print-job and sequence output as deployment evidence.
+3. Capture read-only preflight state. It must show successful history through
+   the currently deployed baseline, the earlier V2 checksum, and no failed or
+   out-of-order entry. V5/V6 may be pending when this corrected release has
+   not previously run. Keep the print-job and sequence output as deployment
+   evidence.
 
    ```bash
    docker compose exec -T postgres sh -ec 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "SELECT installed_rank, version, script, checksum, success FROM hub.flyway_schema_history ORDER BY installed_rank"' | tee "$audit_dir/history-before.txt"
@@ -365,8 +377,9 @@ prune, or volume operations.
    ```
 
 5. Run `info` and `validate`, retaining output. `validate` must fail, and a
-   human must confirm that V2 checksum is the only discrepancy. Stop for any
-   other finding; do not repair an unexplained history.
+   human must confirm the V2 checksum mismatch plus only the expected pending
+   migrations supplied by this release. Stop for any other finding; do not
+   repair an unexplained history.
 
    ```bash
    run_flyway info > "$audit_dir/flyway-info-before.txt" 2>&1
@@ -378,18 +391,32 @@ prune, or volume operations.
    ```
 
 6. After that review, run exactly one repair, then validate and migrate. The
-   final migrate must report no pending migrations.
+   intermediate validation must not report a V2 checksum mismatch; it may show
+   the identified pending release migrations. Run a final validation after the
+   migrate; it must pass with no pending migrations.
 
    ```bash
    run_flyway repair > "$audit_dir/flyway-repair.txt" 2>&1
+   set +e
    run_flyway validate > "$audit_dir/flyway-validate-after.txt" 2>&1
+   intermediate_validate_exit=$?
+   set -e
+   if grep -q 'Migration checksum mismatch for migration version 2' "$audit_dir/flyway-validate-after.txt"; then
+     echo 'V2 checksum mismatch remains after repair' >&2
+     exit 1
+   fi
+   if [ "$intermediate_validate_exit" -ne 0 ]; then
+     grep -q 'Detected resolved migration not applied to database:' "$audit_dir/flyway-validate-after.txt"
+   fi
    run_flyway migrate > "$audit_dir/flyway-migrate-after.txt" 2>&1
+   run_flyway validate > "$audit_dir/flyway-validate-final.txt" 2>&1
    docker compose exec -T postgres sh -ec 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "SELECT installed_rank, version, script, checksum, success FROM hub.flyway_schema_history ORDER BY installed_rank"' | tee "$audit_dir/history-after.txt"
    ```
 
 7. Start only the corrected Hub artifact and retain the startup/read-only
-   evidence. Hub must start, and the local service check must return a 2xx
-   status. Redact secrets before sharing evidence; never share `.env` files or
+   evidence. Hub must start, and the local service check must return a success
+   response or the application's expected unauthenticated redirect (2xx or
+   3xx). Redact secrets before sharing evidence; never share `.env` files or
    the database dump.
 
    ```bash
@@ -402,9 +429,10 @@ prune, or volume operations.
 Provide these redacted artifacts for the production acceptance audit: release
 commit and Compose image identities; backup filename and checksum; pre/post
 Flyway history; `info`, expected failing pre-repair `validate`, `repair`,
-passing post-repair `validate`, and no-op `migrate` outputs; pre-repair
-print-job and sequence state; Hub startup status/log excerpt; and the 2xx
-read-only check. The expected repaired V2 checksum is `818545878`.
+intermediate and final post-repair `validate`, and `migrate` outputs;
+pre-repair print-job and sequence state; Hub startup status/log excerpt; and
+the successful read-only check. The expected repaired V2 checksum is
+`818545878`.
 
 If the corrected Hub artifact must be rolled back after a successful repair,
 do not start the earlier artifact against the repaired history. With explicit
@@ -1271,6 +1299,33 @@ change record; compatibility is removed only after zero use is demonstrated.
 
 ## Recommended Next Stage
 
-Complete the controlled production V2 repair and attach its deployment
-evidence. Do not begin Stage 3 implementation until production Stage 2
-acceptance is recorded.
+Stage 2 production acceptance was recorded on 2026-09-24. Stage 3 source and
+the Hub V7 RLS migration are implemented. Local acceptance evidence on
+2026-09-28 confirms V7 remains successful; every Stage 3 policy table has
+enabled, forced RLS with one policy; the three Hub database roles have the
+intended ownership and privilege separation; and Hub starts successfully using
+the Flyway and runtime roles. Hub Testcontainers includes a single-connection
+Hikari rollback/reuse proof, and unit contracts cover the exact HTTP allowlist
+and MQTT compatibility ingress.
+
+Stage 3 remains pending controlled production acceptance. Perform this one
+release before beginning Stage 4, using
+`hub-stage3-deployment-verification.md` as the executable runbook:
+
+1. Commit and build the reviewed Stage 3 Hub release. Do not change, repair, or
+   rerun accepted Flyway history.
+2. Open a production change record, take a restorable Hub backup, capture the
+   role/ownership/RLS/Flyway baseline, and stop only Hub instances.
+3. Have a production database administrator run
+   `hub-stage3-database-roles.sql` exactly once. It creates the Hub schema
+   owner, Flyway, and runtime roles; transfers Hub ownership; and never changes
+   Hub data or the Core schema.
+4. Set distinct `hub_flyway` and `hub_runtime` passwords only in the approved
+   secret store. Inject the four `HUB_FLYWAY_*` and `HUB_RUNTIME_*` variables,
+   plus the verified legacy migration-tenant UUID, into the Hub deployment.
+5. Deploy Hub only. Verify Flyway history without repair, runtime-role startup,
+   forced RLS policies, two-tenant RLS denial, pooled-connection cleanup, and
+   measured legacy compatibility ingress according to the runbook. Do not
+   publish MQTT commands or operate live devices for this verification.
+6. Retain the evidence in the change record and record Stage 3 acceptance only
+   after every runbook check passes. Stage 4 may begin after that acceptance.

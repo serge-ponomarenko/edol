@@ -10,9 +10,12 @@ import org.spon.edolhub.repository.PrintJobRepository;
 import org.spon.edolhub.service.spool.AllocationPreviewRuntimeSyncService;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyString;
 
 @ExtendWith(MockitoExtension.class)
 class PrintJobRecoveryServiceTest {
@@ -38,15 +41,31 @@ class PrintJobRecoveryServiceTest {
     @Mock
     private PrinterCatalogSyncService printerCatalogSyncService;
 
+    @Mock
+    private LegacyDefaultTenantCompatibilityScope compatibilityScope;
+
+    @Mock
+    private TenantContext.TenantScope tenantScope;
+
     @InjectMocks
     private PrintJobRecoveryService recoveryService;
 
     @Test
     void synchronizesCatalogOnceBeforeRecoveringPrinters() {
+        when(compatibilityScope.openIfConfigured(anyString())).thenReturn(Optional.of(tenantScope));
         when(printerAccessService.getPrinters()).thenReturn(List.of());
 
         recoveryService.recover();
 
         verify(printerCatalogSyncService).synchronize();
+    }
+
+    @Test
+    void skipsRecoveryWhenNoLegacyMigrationTenantIsConfigured() {
+        when(compatibilityScope.openIfConfigured(anyString())).thenReturn(Optional.empty());
+
+        recoveryService.recover();
+
+        verifyNoInteractions(printerCatalogSyncService, printerAccessService, printerService);
     }
 }

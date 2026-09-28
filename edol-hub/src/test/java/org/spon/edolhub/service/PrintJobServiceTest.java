@@ -78,6 +78,9 @@ class PrintJobServiceTest {
     @Mock
     private AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
 
+    @Mock
+    private TenantAwareTransactionalExecutor tenantAwareTransactionalExecutor;
+
     @InjectMocks
     private PrintJobService printJobService;
 

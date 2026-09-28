@@ -2,6 +2,8 @@ package org.spon.edolhub.repository;
 
 import org.spon.edolhub.model.entity.Filament;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 import java.util.List;
@@ -20,6 +22,16 @@ public interface FilamentRepository extends JpaRepository<Filament, Long> {
     );
 
     List<Filament> findAllByTenantIdOrderByFullId(UUID tenantId);
+
+    @Query("""
+            select filament
+            from Filament filament
+            join fetch filament.vendor
+            join fetch filament.materialType
+            where filament.tenantId = :tenantId
+            order by filament.fullId
+            """)
+    List<Filament> findAllByTenantIdWithDetailsOrderByFullId(@Param("tenantId") UUID tenantId);
 
     Optional<Filament> findByIdAndTenantId(Long id, UUID tenantId);
 

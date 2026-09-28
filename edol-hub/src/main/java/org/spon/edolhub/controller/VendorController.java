@@ -5,12 +5,14 @@ import org.spon.edolhub.model.entity.Vendor;
 import org.spon.edolhub.repository.VendorRepository;
 import org.spon.edolhub.service.TenantContext;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/vendors")
+@Transactional
 public class VendorController {
 
     private final VendorRepository vendorRepository;
@@ -30,7 +32,7 @@ public class VendorController {
 
     @PostMapping
     public String save(@ModelAttribute Vendor vendor) {
-        vendor.setTenant(tenantContext.getCurrentTenant());
+        vendor.setTenantId(tenantContext.getCurrentTenantId());
         vendorRepository.save(vendor);
         return "redirect:/vendors";
     }

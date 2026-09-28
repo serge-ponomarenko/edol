@@ -16,6 +16,7 @@ import org.spon.edolhub.service.spool.AllocationMutationService;
 import org.spon.edolhub.service.spool.PrintAllocationPreviewMapper;
 import org.spon.edolhub.service.spool.PrintAllocationReconciliationService;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +29,7 @@ import static org.spon.edolhub.config.GramUtils.GRAM_EPSILON;
 
 @Controller
 @RequiredArgsConstructor
+@Transactional
 public class PrintAllocationController {
 
     private final PrintAllocationPreviewRepository previewRepository;

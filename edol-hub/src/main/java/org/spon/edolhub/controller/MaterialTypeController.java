@@ -5,12 +5,14 @@ import org.spon.edolhub.model.entity.MaterialType;
 import org.spon.edolhub.repository.MaterialTypeRepository;
 import org.spon.edolhub.service.TenantContext;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/materials")
+@Transactional
 public class MaterialTypeController {
 
     private final MaterialTypeRepository materialRepository;
@@ -32,7 +34,7 @@ public class MaterialTypeController {
 
     @PostMapping
     public String save(@ModelAttribute MaterialType material) {
-        material.setTenant(tenantContext.getCurrentTenant());
+        material.setTenantId(tenantContext.getCurrentTenantId());
         materialRepository.save(material);
 
         return "redirect:/materials";

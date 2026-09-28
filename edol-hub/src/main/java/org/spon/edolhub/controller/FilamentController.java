@@ -9,6 +9,7 @@ import org.spon.edolhub.repository.VendorRepository;
 import org.spon.edolhub.service.filament.FilamentDeleteService;
 import org.spon.edolhub.service.TenantContext;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -16,7 +17,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/filaments")
+@Transactional
 public class FilamentController {
+
+    private static final String FILAMENTS_REDIRECT = "redirect:/filaments";
 
     private final FilamentRepository filamentRepository;
     private final VendorRepository vendorRepository;
@@ -26,7 +30,10 @@ public class FilamentController {
 
     @GetMapping
     public String list(Model model) {
-        model.addAttribute("filaments", filamentRepository.findAllByTenantIdOrderByFullId(tenantContext.getCurrentTenantId()));
+        model.addAttribute(
+                "filaments",
+                filamentRepository.findAllByTenantIdWithDetailsOrderByFullId(tenantContext.getCurrentTenantId())
+        );
 
         return "dashboard/filaments/list";
     }
@@ -42,11 +49,11 @@ public class FilamentController {
 
     @PostMapping
     public String save(@ModelAttribute Filament filament) {
-        filament.setTenant(tenantContext.getCurrentTenant());
+        filament.setTenantId(tenantContext.getCurrentTenantId());
         filament.setColorHex(filament.getColorHex().toUpperCase());
         filamentRepository.save(filament);
 
-        return "redirect:/filaments";
+        return FILAMENTS_REDIRECT;
     }
 
     @GetMapping("/edit/{id}")
@@ -77,12 +84,12 @@ public class FilamentController {
                     "deleteError",
                     "Filament is used by other entities"
             );
-            return "redirect:/filaments";
+            return FILAMENTS_REDIRECT;
         }
 
         filamentRepository.delete(filament);
 
-        return "redirect:/filaments";
+        return FILAMENTS_REDIRECT;
     }
 
 }

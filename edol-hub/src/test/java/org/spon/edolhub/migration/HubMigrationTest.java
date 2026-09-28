@@ -2,19 +2,28 @@ package org.spon.edolhub.migration;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.spon.edolhub.config.HubTenantIdentifierResolver;
+import org.spon.edolhub.config.TenantAwareJpaTransactionManager;
 import org.spon.edolhub.model.dto.CorePrinterDto;
 import org.spon.edolhub.model.entity.Filament;
+import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.model.entity.PrintAllocationGroup;
 import org.spon.edolhub.model.entity.PrintAllocationItem;
 import org.spon.edolhub.service.LegacyPrinterBackfillService;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.orm.jpa.EntityManagerFactoryUtils;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -31,6 +40,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import org.junit.jupiter.api.io.TempDir;
 
 @Testcontainers(disabledWithoutDocker = true)
@@ -489,7 +499,9 @@ class HubMigrationTest {
                 .query(Long.class)
                 .single();
 
-        try (EntityManagerFactory entityManagerFactory = entityManagerFactory()) {
+        TenantContext tenantContext = new TenantContext();
+        try (TenantContext.TenantScope ignored = tenantContext.open(tenantId);
+             EntityManagerFactory entityManagerFactory = entityManagerFactory(tenantContext)) {
             EntityManager entityManager = entityManagerFactory.createEntityManager();
             try {
                 Filament filament = entityManager.find(Filament.class, filamentId);
@@ -504,6 +516,307 @@ class HubMigrationTest {
                 entityManager.close();
             }
         }
+    }
+
+    @Test
+    void fetchesFilamentAndSpoolTemplateGraphsInsideTheTenantBoundary() {
+        flyway(null).migrate();
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        UUID tenantId = ensureTenant(jdbc, "Template tenant");
+        long filamentId = insertFilament(jdbc, tenantId, "TEMPLATE");
+        long spoolId = insertSpool(jdbc, filamentId);
+        jdbc.sql("update hub.filament_spools set status = 'SEALED' where id = :spoolId")
+                .param("spoolId", spoolId)
+                .update();
+
+        TenantContext tenantContext = new TenantContext();
+        List<Filament> filaments;
+        List<FilamentSpool> spools;
+        try (TenantContext.TenantScope ignored = tenantContext.open(tenantId);
+             EntityManagerFactory entityManagerFactory = entityManagerFactory(tenantContext)) {
+            EntityManager entityManager = entityManagerFactory.createEntityManager();
+            try {
+                filaments = entityManager.createQuery("""
+                                select filament
+                                from Filament filament
+                                join fetch filament.vendor
+                                join fetch filament.materialType
+                                where filament.tenantId = :tenantId
+                                order by filament.fullId
+                                """, Filament.class)
+                        .setParameter("tenantId", tenantId)
+                        .getResultList();
+                spools = entityManager.createQuery("""
+                                select spool
+                                from FilamentSpool spool
+                                join fetch spool.filament filament
+                                join fetch filament.vendor
+                                join fetch filament.materialType
+                                where filament.tenantId = :tenantId
+                                  and (:vendor is null or filament.vendor.name = :vendor)
+                                  and (:material is null or filament.materialType.name = :material)
+                                  and spool.status in :statuses
+                                """, FilamentSpool.class)
+                        .setParameter("tenantId", tenantId)
+                        .setParameter("vendor", null)
+                        .setParameter("material", null)
+                        .setParameter("statuses", List.of(FilamentSpool.FilamentSpoolStatus.SEALED))
+                        .getResultList();
+            } finally {
+                entityManager.close();
+            }
+        }
+
+        assertThat(filaments).singleElement().satisfies(filament -> {
+            assertThat(filament.getVendor().getName()).isEqualTo("Vendor TEMPLATE");
+            assertThat(filament.getMaterialType().getName()).isEqualTo("Material TEMPLATE");
+        });
+        assertThat(spools).singleElement().extracting(spool -> spool.getFilament().getVendor().getName())
+                .isEqualTo("Vendor TEMPLATE");
+    }
+
+    @Test
+    void runtimeRoleRlsContainsNativeSqlAndTransactionLocalTenantState() {
+        JdbcClient administratorJdbc = JdbcClient.create(dataSource);
+        administratorJdbc.sql("""
+                        DO
+                        $$
+                        BEGIN
+                            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hub_runtime') THEN
+                                CREATE ROLE hub_runtime LOGIN PASSWORD 'test-runtime-password'
+                                    NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+                            END IF;
+                        END;
+                        $$
+                        """).update();
+        flyway(null).migrate();
+
+        UUID firstTenantId = UUID.fromString("00000000-0000-0000-0000-000000000401");
+        UUID secondTenantId = UUID.fromString("00000000-0000-0000-0000-000000000402");
+        administratorJdbc.sql("insert into hub.tenants (id, name) values (:id, 'First')")
+                .param("id", firstTenantId)
+                .update();
+        administratorJdbc.sql("insert into hub.tenants (id, name) values (:id, 'Second')")
+                .param("id", secondTenantId)
+                .update();
+        long firstVendorId = administratorJdbc.sql("""
+                        insert into hub.vendors (tenant_id, name)
+                        values (:tenantId, 'First vendor')
+                        returning id
+                        """)
+                .param("tenantId", firstTenantId)
+                .query(Long.class)
+                .single();
+        administratorJdbc.sql("""
+                        insert into hub.vendors (tenant_id, name)
+                        values (:tenantId, 'Second vendor')
+                        """)
+                .param("tenantId", secondTenantId)
+                .update();
+
+        DataSource runtimeDataSource = new DriverManagerDataSource(
+                POSTGRES.getJdbcUrl(),
+                "hub_runtime",
+                "test-runtime-password"
+        );
+        JdbcClient runtimeJdbc = JdbcClient.create(runtimeDataSource);
+        TransactionTemplate transactionTemplate = new TransactionTemplate(
+                new DataSourceTransactionManager(runtimeDataSource)
+        );
+
+        assertThat(runtimeJdbc.sql("select count(*) from hub.vendors")
+                .query(Integer.class)
+                .single()).isZero();
+
+        Integer firstTenantVendorCount = transactionTemplate.execute(status -> {
+            setTenant(runtimeJdbc, firstTenantId.toString());
+            return runtimeJdbc.sql("select count(*) from hub.vendors")
+                    .query(Integer.class)
+                    .single();
+        });
+        assertThat(firstTenantVendorCount).isEqualTo(1);
+
+        Integer derivedTenantCount = transactionTemplate.execute(status -> {
+            setTenant(runtimeJdbc, firstTenantId.toString());
+            return runtimeJdbc.sql("""
+                            select count(*)
+                            from hub.filament_spools spool
+                            join hub.filaments filament on filament.id = spool.filament_id
+                            where filament.vendor_id = :vendorId
+                            """)
+                    .param("vendorId", firstVendorId)
+                    .query(Integer.class)
+                    .single();
+        });
+        assertThat(derivedTenantCount).isZero();
+
+        Throwable rlsViolation = catchThrowable(() -> transactionTemplate.executeWithoutResult(status -> {
+            setTenant(runtimeJdbc, firstTenantId.toString());
+            runtimeJdbc.sql("""
+                            insert into hub.vendors (tenant_id, name)
+                            values (:tenantId, 'Denied cross-tenant write')
+                            """)
+                    .param("tenantId", secondTenantId)
+                    .update();
+        }));
+        assertThat(rlsViolation.getCause()).hasMessageContaining("row-level security");
+
+        Integer malformedContextCount = transactionTemplate.execute(status -> {
+            setTenant(runtimeJdbc, "not-a-uuid");
+            return runtimeJdbc.sql("select count(*) from hub.vendors")
+                    .query(Integer.class)
+                    .single();
+        });
+        assertThat(malformedContextCount).isZero();
+
+        String pooledStateAfterCommit = transactionTemplate.execute(status -> runtimeJdbc
+                .sql("select coalesce(current_setting('edol.tenant_id', true), '')")
+                .query(String.class)
+                .single());
+        assertThat(pooledStateAfterCommit).isEmpty();
+    }
+
+    @Test
+    void rollbackDoesNotLeakTenantStateThroughAReusedHikariConnection() {
+        JdbcClient administratorJdbc = JdbcClient.create(dataSource);
+        administratorJdbc.sql("""
+                        DO
+                        $$
+                        BEGIN
+                            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hub_runtime') THEN
+                                CREATE ROLE hub_runtime LOGIN PASSWORD 'test-runtime-password'
+                                    NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+                            END IF;
+                        END;
+                        $$
+                        """).update();
+        flyway(null).migrate();
+
+        UUID tenantId = UUID.fromString("00000000-0000-0000-0000-000000000451");
+        administratorJdbc.sql("insert into hub.tenants (id, name) values (:id, 'Rollback tenant')")
+                .param("id", tenantId)
+                .update();
+        administratorJdbc.sql("""
+                        insert into hub.vendors (tenant_id, name)
+                        values (:tenantId, 'Rollback vendor')
+                        """)
+                .param("tenantId", tenantId)
+                .update();
+
+        HikariConfig configuration = new HikariConfig();
+        configuration.setJdbcUrl(POSTGRES.getJdbcUrl());
+        configuration.setUsername("hub_runtime");
+        configuration.setPassword("test-runtime-password");
+        configuration.setMaximumPoolSize(1);
+        configuration.setMinimumIdle(0);
+        configuration.setPoolName("hub-stage3-rollback-test");
+
+        try (HikariDataSource runtimeDataSource = new HikariDataSource(configuration)) {
+            JdbcClient runtimeJdbc = JdbcClient.create(runtimeDataSource);
+            TransactionTemplate transactionTemplate = new TransactionTemplate(
+                    new DataSourceTransactionManager(runtimeDataSource)
+            );
+
+            Integer rollbackConnectionId = transactionTemplate.execute(status -> {
+                setTenant(runtimeJdbc, tenantId.toString());
+                assertThat(runtimeJdbc.sql("select count(*) from hub.vendors")
+                        .query(Integer.class)
+                        .single()).isEqualTo(1);
+                Integer connectionId = runtimeJdbc.sql("select pg_backend_pid()")
+                        .query(Integer.class)
+                        .single();
+                status.setRollbackOnly();
+                return connectionId;
+            });
+
+            Integer reusedConnectionId = transactionTemplate.execute(status -> runtimeJdbc
+                    .sql("select pg_backend_pid()")
+                    .query(Integer.class)
+                    .single());
+            String stateAfterRollback = transactionTemplate.execute(status -> runtimeJdbc
+                    .sql("select coalesce(current_setting('edol.tenant_id', true), '')")
+                    .query(String.class)
+                    .single());
+            Integer visibleWithoutTenant = transactionTemplate.execute(status -> runtimeJdbc
+                    .sql("select count(*) from hub.vendors")
+                    .query(Integer.class)
+                    .single());
+
+            assertThat(reusedConnectionId).isEqualTo(rollbackConnectionId);
+            assertThat(stateAfterRollback).isEmpty();
+            assertThat(visibleWithoutTenant).isZero();
+        }
+    }
+
+    @Test
+    void tenantAwareJpaTransactionsIsolateOrmAndNativeQueriesOnTheSameConnection() {
+        JdbcClient administratorJdbc = JdbcClient.create(dataSource);
+        administratorJdbc.sql("""
+                        DO
+                        $$
+                        BEGIN
+                            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hub_runtime') THEN
+                                CREATE ROLE hub_runtime LOGIN PASSWORD 'test-runtime-password'
+                                    NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+                            END IF;
+                        END;
+                        $$
+                        """).update();
+        flyway(null).migrate();
+
+        UUID firstTenantId = UUID.fromString("00000000-0000-0000-0000-000000000501");
+        UUID secondTenantId = UUID.fromString("00000000-0000-0000-0000-000000000502");
+        UUID firstPrinterId = UUID.fromString("00000000-0000-0000-0000-000000000511");
+        UUID secondPrinterId = UUID.fromString("00000000-0000-0000-0000-000000000512");
+        administratorJdbc.sql("insert into hub.tenants (id, name) values (:id, 'First')")
+                .param("id", firstTenantId)
+                .update();
+        administratorJdbc.sql("insert into hub.tenants (id, name) values (:id, 'Second')")
+                .param("id", secondTenantId)
+                .update();
+        insertProjection(administratorJdbc, firstPrinterId, firstTenantId);
+        insertProjection(administratorJdbc, secondPrinterId, secondTenantId);
+
+        DataSource runtimeDataSource = new DriverManagerDataSource(
+                POSTGRES.getJdbcUrl(),
+                "hub_runtime",
+                "test-runtime-password"
+        );
+        JdbcClient runtimeJdbc = JdbcClient.create(runtimeDataSource);
+        TenantContext tenantContext = new TenantContext();
+
+        try (EntityManagerFactory runtimeEntityManagerFactory = entityManagerFactory(runtimeDataSource, tenantContext)) {
+            TransactionTemplate transactionTemplate = new TransactionTemplate(
+                    new TenantAwareJpaTransactionManager(runtimeEntityManagerFactory, runtimeDataSource, tenantContext)
+            );
+
+            try (TenantContext.TenantScope ignored = tenantContext.open(firstTenantId)) {
+                List<UUID> visiblePrinterIds = transactionTemplate.execute(status -> EntityManagerFactoryUtils
+                        .getTransactionalEntityManager(runtimeEntityManagerFactory)
+                        .createQuery("select printer.id from Printer printer order by printer.id", UUID.class)
+                        .getResultList());
+                Integer nativeVisiblePrinterCount = transactionTemplate.execute(status -> runtimeJdbc
+                        .sql("select count(*) from hub.printers")
+                        .query(Integer.class)
+                        .single());
+
+                assertThat(visiblePrinterIds).containsExactly(firstPrinterId);
+                assertThat(nativeVisiblePrinterCount).isEqualTo(1);
+            }
+
+            try (TenantContext.TenantScope ignored = tenantContext.open(secondTenantId)) {
+                List<UUID> visiblePrinterIds = transactionTemplate.execute(status -> EntityManagerFactoryUtils
+                        .getTransactionalEntityManager(runtimeEntityManagerFactory)
+                        .createQuery("select printer.id from Printer printer order by printer.id", UUID.class)
+                        .getResultList());
+
+                assertThat(visiblePrinterIds).containsExactly(secondPrinterId);
+            }
+        }
+
+        assertThat(runtimeJdbc.sql("select count(*) from hub.printers")
+                .query(Integer.class)
+                .single()).isZero();
     }
 
     private void insertProjection(JdbcClient jdbc, UUID printerId) {
@@ -578,9 +891,20 @@ class HubMigrationTest {
                 .single();
     }
 
-    private EntityManagerFactory entityManagerFactory() {
+    private void setTenant(JdbcClient jdbc, String tenantId) {
+        jdbc.sql("select set_config('edol.tenant_id', :tenantId, true)")
+                .param("tenantId", tenantId)
+                .query(String.class)
+                .single();
+    }
+
+    private EntityManagerFactory entityManagerFactory(TenantContext tenantContext) {
+        return entityManagerFactory(dataSource, tenantContext);
+    }
+
+    private EntityManagerFactory entityManagerFactory(DataSource entityManagerDataSource, TenantContext tenantContext) {
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
-        factory.setDataSource(dataSource);
+        factory.setDataSource(entityManagerDataSource);
         factory.setPackagesToScan("org.spon.edolhub.model.entity");
         HibernateJpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
         vendorAdapter.setDatabasePlatform("org.hibernate.dialect.PostgreSQLDialect");
@@ -588,6 +912,7 @@ class HubMigrationTest {
         factory.setJpaPropertyMap(Map.of(
                 "hibernate.default_schema", "hub",
                 "hibernate.hbm2ddl.auto", "validate",
+                "hibernate.tenant_identifier_resolver", new HubTenantIdentifierResolver(tenantContext),
                 "hibernate.physical_naming_strategy",
                 "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy"
         ));

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -44,6 +45,7 @@ public class PrinterStateController {
     }
 
     @GetMapping("/printers/{printerId}/alerts")
+    @Transactional(readOnly = true)
     public List<MaintenanceStatusDto> getMaintenanceAlerts(@PathVariable UUID printerId) {
         return maintenanceService.getMaintenanceStatus(printerId).stream()
                 .filter(MaintenanceStatusDto::isDue)

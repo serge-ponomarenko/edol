@@ -84,7 +84,7 @@ function Get-ModuleDefinition {
         }
         Hub = @{
             Directory = 'edol-hub'; SecretFile = '.env_edol_hub_secret'; Port = 8090
-            RequiredEnvironment = @('POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'QR_URL')
+            RequiredEnvironment = @('POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'QR_URL', 'HUB_FLYWAY_DB_USER', 'HUB_FLYWAY_DB_PASSWORD', 'HUB_RUNTIME_DB_USER', 'HUB_RUNTIME_DB_PASSWORD', 'EDOL_HUB_LEGACY_DEFAULT_TENANT_COMPATIBILITY_TENANT_ID')
             Web = $true; LocalDatabase = $true; ReadinessPath = '/'; ReadOnlyPath = '/'
         }
         Ams = @{

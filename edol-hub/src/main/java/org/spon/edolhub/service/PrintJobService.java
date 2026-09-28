@@ -22,7 +22,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +46,7 @@ public class PrintJobService {
     private final PrinterRepository printerRepository;
     private final AllocationPreviewRuntimeCacheService runtimeCacheService;
     private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
+    private final TenantAwareTransactionalExecutor tenantAwareTransactionalExecutor;
 
 
     @Value("${edol-core.url}")
@@ -244,10 +244,11 @@ public class PrintJobService {
     }
 
     public void saveModelImage(UUID printerId, PrintJob job) {
-        CompletableFuture.runAsync(() -> fetchAndSave(printerId, job));
+        UUID jobId = job.getId();
+        tenantAwareTransactionalExecutor.execute(() -> fetchAndSave(printerId, jobId));
     }
 
-    private void fetchAndSave(UUID printerId, PrintJob job) {
+    private void fetchAndSave(UUID printerId, UUID jobId) {
         String url = edolCoreUrl + "/api/printers/" + printerId + "/media/model/plate";
 
         ResponseEntity<byte[]> response = restTemplate.exchange(
@@ -257,6 +258,8 @@ public class PrintJobService {
                 byte[].class
         );
 
+        PrintJob job = printJobRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalStateException("Print job disappeared before model image persistence"));
         job.setPlateImage(response.getBody());
         job.setPlateImageType("image/png");
 

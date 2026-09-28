@@ -53,7 +53,10 @@ skill if that environment no longer has the stated isolation.
   `WEB_ADMIN_PASSWORD`.
 - **Hub:** Maven directory `edol-hub`; port `8090`; `GET /` is the
   parameter-free read-only check. Required names: `POSTGRES_DB`,
-  `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `QR_URL`.
+  `POSTGRES_USER`, `POSTGRES_PASSWORD`, `QR_URL`, `HUB_FLYWAY_DB_USER`,
+  `HUB_FLYWAY_DB_PASSWORD`, `HUB_RUNTIME_DB_USER`,
+  `HUB_RUNTIME_DB_PASSWORD`, and
+  `EDOL_HUB_LEGACY_DEFAULT_TENANT_COMPATIBILITY_TENANT_ID`.
 - **Ams:** Maven directory `edol-ams`; port `8099`; no parameter-free safe
   endpoint; no required environment names.
 - **Notify:** Maven directory `edol-notify`; no web listener

@@ -5,6 +5,7 @@ import org.spon.edolhub.model.dto.MaintenanceStatusDto;
 import org.spon.edolhub.service.MaintenanceService;
 import org.spon.edolhub.service.PrinterStatsService;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @Controller
 @RequiredArgsConstructor
+@Transactional
 public class MaintenanceController {
 
     private final MaintenanceService maintenanceService;

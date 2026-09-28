@@ -1,5 +1,6 @@
 package org.spon.edolhub.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -7,7 +8,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.spon.edolhub.model.dto.CorePrinterDto;
 import org.spon.edolhub.model.entity.Printer;
-import org.spon.edolhub.model.entity.Tenant;
 import org.spon.edolhub.repository.PrinterRepository;
 
 import java.util.List;
@@ -23,6 +23,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -48,13 +51,28 @@ class PrinterCatalogSyncServiceTest {
     @Mock
     private PrinterCatalogStatus status;
 
+    @Mock
+    private LegacyDefaultTenantCompatibilityScope compatibilityScope;
+
+    @Mock
+    private TenantAwareTransactionalExecutor transactionalExecutor;
+
+    @Mock
+    private TenantContext.TenantScope tenantScope;
+
     @InjectMocks
     private PrinterCatalogSyncService syncService;
 
+    @BeforeEach
+    void executeTenantWorkSynchronously() {
+        lenient().doAnswer(invocation -> {
+            invocation.<Runnable>getArgument(0).run();
+            return null;
+        }).when(transactionalExecutor).executeInCurrentTenantTransaction(any(Runnable.class));
+    }
+
     @Test
     void serializesCatalogAndMqttPrinterSynchronization() throws Exception {
-        Tenant tenant = new Tenant();
-        tenant.setId(TENANT_ID);
         CorePrinterDto printer = new CorePrinterDto(PRINTER_ID, "P1", "Printer", true);
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch synchronizationsStarted = new CountDownLatch(2);
@@ -65,7 +83,8 @@ class PrinterCatalogSyncServiceTest {
 
         when(printerService.getPrinters()).thenReturn(List.of(printer));
         when(printerService.getPrinter(PRINTER_ID)).thenReturn(printer);
-        when(tenantContext.getCurrentTenant()).thenReturn(tenant);
+        when(tenantContext.getCurrentTenantId()).thenReturn(TENANT_ID);
+        when(compatibilityScope.openIfConfigured(anyString())).thenReturn(Optional.of(tenantScope));
         when(printerRepository.findAllByTenantIdOrderByDisplayId(TENANT_ID)).thenReturn(List.of());
         when(printerRepository.findById(PRINTER_ID)).thenReturn(Optional.empty());
         when(printerRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -112,12 +131,23 @@ class PrinterCatalogSyncServiceTest {
 
     @Test
     void skipsOwnershipPreflightWhenCoreCatalogIsUnavailable() {
+        when(compatibilityScope.openIfConfigured(anyString())).thenReturn(Optional.of(tenantScope));
         when(printerService.getPrinters()).thenThrow(new RuntimeException("Core unavailable"));
 
         syncService.synchronize();
 
         verify(status).coreUnavailable("EDOL Core printer catalog is unavailable");
         verifyNoInteractions(backfillService, printerRepository, tenantContext);
+    }
+
+    @Test
+    void blocksScheduledSynchronizationWhenNoLegacyMigrationTenantIsConfigured() {
+        when(compatibilityScope.openIfConfigured(anyString())).thenReturn(Optional.empty());
+
+        syncService.synchronize();
+
+        verify(status).migrationBlocked("Legacy tenant compatibility is not configured");
+        verifyNoInteractions(printerService, backfillService, printerRepository, tenantContext);
     }
 
     private void awaitAndSynchronize(

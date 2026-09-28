@@ -7,6 +7,7 @@ import org.spon.edolhub.repository.MaintenanceDefinitionRepository;
 import org.spon.edolhub.service.PrinterStatsService;
 import org.spon.edolhub.service.PrinterAccessService;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +16,7 @@ import java.util.UUID;
 @Controller
 @RequestMapping("/printers/{printerId}/maintenance/config")
 @RequiredArgsConstructor
+@Transactional
 public class MaintenanceConfigController {
 
     private static final String PRINTER_ID_ATTRIBUTE = "printerId";

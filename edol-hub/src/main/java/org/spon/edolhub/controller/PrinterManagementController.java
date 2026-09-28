@@ -37,6 +37,7 @@ public class PrinterManagementController {
     @GetMapping("/new")
     public String createForm(Model model) {
         model.addAttribute("printerForm", new PrinterForm());
+        model.addAttribute("newPrinterForm", true);
         model.addAttribute("models", new String[]{"BAMBU_A1", "BAMBU_A1_MINI", "BAMBU_P1P", "BAMBU_P1S", "BAMBU_X1", "BAMBU_X1C", "BAMBU_H2D", "UNKNOWN"});
         model.addAttribute("connectionModes", new String[]{"DIRECT", "AGENT"});
         model.addAttribute("cameraProviders", new String[]{"LEGACY", "RTSPS"});
@@ -65,7 +66,8 @@ public class PrinterManagementController {
                         printerManagementService.getConnection(printerId)
                 )
         );
-        model.addAttribute("printerId", printerId);
+        model.addAttribute("newPrinterForm", false);
+        model.addAttribute("editingPrinterId", printerId);
         model.addAttribute("models", new String[]{"BAMBU_A1", "BAMBU_A1_MINI", "BAMBU_P1P", "BAMBU_P1S", "BAMBU_X1", "BAMBU_X1C", "BAMBU_H2D", "UNKNOWN"});
         model.addAttribute("connectionModes", new String[]{"DIRECT", "AGENT"});
         model.addAttribute("cameraProviders", new String[]{"LEGACY", "RTSPS"});

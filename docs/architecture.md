@@ -21,7 +21,7 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with Po
 
 Core runtime is per printer. New printer, connection and session identifiers use UUID v7; historical UUID v4 values are retained. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints; default-printer HTTP endpoints are not supported. Hub, AMS and Notify use only explicit printer endpoints. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
 
-Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. During the tenant bootstrap phase, `TenantContext` resolves one database-marked default tenant; authentication, user membership and printer assignment remain future work. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
+Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. `TenantContext` is fail-closed; the database-marked default tenant is available only through the named legacy compatibility scope at explicitly allowlisted pre-auth ingress. Authentication, user membership and printer assignment remain future work. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 
 ## Accepted Multi-Tenant Direction
 
@@ -34,17 +34,32 @@ tenant context remain separate.
 Stage 2 adds the Hub user and membership domain, direct tenant ownership for
 allocation and usage links, tenant-safe cross-aggregate constraints, and
 nullable opaque tenant ownership on Core printers with a guarded one-time
-Hub-projection backfill. The source and local-development acceptance checks
-are complete. Production acceptance remains pending the documented one-time
-repair of Hub Flyway V2 history and the matching deployment evidence. Stage 2
-does not enable Hibernate tenancy, RLS, authentication, service transport, or
-MQTT tenant propagation.
+Hub-projection backfill. Source, local-development, and production acceptance
+are complete. On 2026-09-24, the controlled production Hub V2 history repair
+updated only the historical checksum, then the matching release applied Hub V5
+and V6 and served the read-only root request. Stage 2 does not enable Hibernate
+tenancy, RLS, authentication, service transport, or MQTT tenant propagation.
 
 Tenant persistence will use Hibernate discriminator tenancy together with
 forced PostgreSQL row-level security. Normal tenant resolution will be
 fail-closed. The current default-tenant behavior may survive only as a named,
 measured migration compatibility scope before user authentication and will be
 removed in that authentication stage.
+
+The Stage 3 source implementation adds this Hub boundary: approved direct
+tenant entities use Hibernate discriminators, tenant state is transaction-local
+on the runtime connection, and PostgreSQL policies provide the native-SQL
+boundary. It remains deployment-pending until the separate Hub schema owner,
+Flyway executor, and runtime roles are provisioned and the Stage 3 deployment
+verification is recorded. Existing pre-auth Hub ingress uses only the named,
+metered legacy compatibility scope; ordinary Hub persistence has no default
+tenant fallback.
+Spring Data repositories initialize lazily so framework bootstrap has no tenant
+context; their first actual use still requires the normal fail-closed resolver.
+A clean installation may have no migration tenant because Stage 2 removes an
+empty historical seed. In that state, compatibility background work is logged
+and metered as unavailable and does not run; HTTP and MQTT persistence remain
+fail-closed until an explicitly configured, verified migration tenant exists.
 
 Core will remain passive. Its printer records will store an opaque tenant UUID
 assigned by a one-time migration backfill or an authenticated Hub provisioning
@@ -63,7 +78,7 @@ current state until individual stages are completed and audited.
 ## Lifecycle and Persistence
 
 - On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog and validates its UUID projection and printer-owned Hub data. Hub V5 rechecks Hub ownership paths, makes the Hub job, maintenance, and statistics printer relationships mandatory, and removes the legacy integer job printer ID without inferring a mapping. Missing, orphaned, or duplicate Hub ownership blocks the migration; a Core catalog mismatch blocks runtime validation, while catalog unavailability skips that validation and reports the catalog unavailable. Hub then attempts recovery independently for every enabled projected printer.
-- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract. Core V7 adds the foreign key from `active_print_context.printer_id` to `printers.id` after failing on existing orphaned contexts; Hub V5 contracts the validated printer ownership columns. Stage 2 Core V8 adds nullable opaque printer ownership without requiring a Hub schema when Core has no printers, and uses the Hub projection only to backfill a non-empty Core catalog. Local migration, mapping, and runtime checks passed. Production Hub V2 history must be repaired once from the exact corrected release before that Hub artifact can start.
+- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract. Core V7 adds the foreign key from `active_print_context.printer_id` to `printers.id` after failing on existing orphaned contexts; Hub V5 contracts the validated printer ownership columns. Stage 2 Core V8 adds nullable opaque printer ownership without requiring a Hub schema when Core has no printers, and uses the Hub projection only to backfill a non-empty Core catalog. Local migration, mapping, and runtime checks passed. The controlled production Hub V2 history repair completed on 2026-09-24 from the exact corrected release, after which Hub V5 and V6 applied successfully; the evidence is recorded in the Stage 2 migration audit.
 - Core stores models and camera snapshots on mounted volumes. Docker Compose also mounts service logs.
 
 ## Operational Contracts

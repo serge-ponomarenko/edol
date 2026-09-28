@@ -15,10 +15,15 @@ mqttServer:
 
 spring:
 
+  data:
+    jpa:
+      repositories:
+        bootstrap-mode: lazy
+
   datasource:
     url: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
+    username: ${HUB_RUNTIME_DB_USER}
+    password: ${HUB_RUNTIME_DB_PASSWORD}
 
   flyway:
     enabled: true
@@ -26,8 +31,13 @@ spring:
       - hub
     default-schema: hub
     create-schemas: true
+    user: ${HUB_FLYWAY_DB_USER}
+    password: ${HUB_FLYWAY_DB_PASSWORD}
+    init-sqls:
+      - SET ROLE hub_schema_owner
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     show-sql: false

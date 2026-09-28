@@ -8,6 +8,7 @@ import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.service.PrintJobService;
 import org.spon.edolhub.service.PrinterCatalogSyncService;
 import org.spon.edolhub.service.PrinterService;
+import org.spon.edolhub.service.LegacyDefaultTenantCompatibilityScope;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
@@ -23,11 +24,16 @@ public class MqttEventListener {
     private final PrinterService printerService;
     private final PrinterCatalogSyncService printerCatalogSyncService;
     private final PrintJobService printJobService;
+    private final LegacyDefaultTenantCompatibilityScope compatibilityScope;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public void handle(Message<?> message) {
-        try {
+        var scope = compatibilityScope.openIfConfigured("mqtt-event-listener");
+        if (scope.isEmpty()) {
+            return;
+        }
+        try (var ignored = scope.get()) {
             String payload = message.getPayload().toString();
 
             JsonNode json = objectMapper.readTree(payload);
@@ -60,7 +66,7 @@ public class MqttEventListener {
                 case "print.failed" -> handlePrintFailed(printerId, printerState);
                 case "print.progress.changed" -> handlePrintProgress(printerId, printerState);
                 case "print.metadata.loaded" -> handlePrintMetadata(printerId, printerState);
-                case "ams.status.changed" -> handleAmsStatus(json);
+                case "ams.status.changed" -> log.debug("AMS status event received");
                 case "ams.slot.changed" -> handleAmsSlot(json);
                 default -> log.debug("Unhandled event: {}", event);
             }
@@ -92,11 +98,6 @@ public class MqttEventListener {
 
     private void handlePrintMetadata(UUID printerId, PrinterState printerState) {
         printJobService.metadataLoaded(printerId, printerState);
-    }
-
-    private void handleAmsStatus(JsonNode json) {
-        //JsonNode amsNode = json.get("ams");
-        //log.info("Ams status changed: {}", amsNode);
     }
 
     private void handleAmsSlot(JsonNode json) {
