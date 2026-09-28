@@ -54,10 +54,13 @@ owner, Flyway executor, and runtime roles and applied Hub V7 successfully on
 2026-09-28. A follow-up Stage 3 release prepares an eager serialization graph
 for the unchanged legacy spool payload, logs compatibility-counter values, and
 contains a controlled runtime-grant correction that removes access to Flyway
-history. Formal acceptance remains open until that release is deployed and
-the corrected production privileges, endpoint response, and metric log are
-recorded. Existing pre-auth Hub ingress uses only the named, metered legacy
-compatibility scope; ordinary Hub persistence has no default tenant fallback.
+history. The follow-up was deployed successfully: runtime Flyway-history
+privileges were removed, Flyway privileges were preserved, and compatibility
+logs now expose incrementing metric values. A production request matching an
+active spool returned `HTTP 200` with the complete unchanged JSON graph and no
+lazy-proxy serialization error. Stage 3 was formally accepted on 2026-09-28.
+Existing pre-auth Hub ingress uses only the named, metered legacy compatibility
+scope; ordinary Hub persistence has no default tenant fallback.
 Spring Data repositories initialize lazily so framework bootstrap has no tenant
 context; their first actual use still requires the normal fail-closed resolver.
 A clean installation may have no migration tenant because Stage 2 removes an

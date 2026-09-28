@@ -1299,51 +1299,37 @@ change record; compatibility is removed only after zero use is demonstrated.
 
 ## Recommended Next Stage
 
-Stage 2 production acceptance was recorded on 2026-09-24. Stage 3 source and
-the Hub V7 RLS migration are implemented. Local acceptance evidence on
-2026-09-28 confirms V7 remains successful; every Stage 3 policy table has
-enabled, forced RLS with one policy; the three Hub database roles have the
-intended ownership and privilege separation; and Hub starts successfully using
-the Flyway and runtime roles. Hub Testcontainers includes a single-connection
-Hikari rollback/reuse proof, and unit contracts cover the exact HTTP allowlist
-and MQTT compatibility ingress.
+Stage 2 production acceptance was recorded on 2026-09-24. Stage 3 was formally
+accepted on 2026-09-28. Local and production evidence confirms Hub V7 remains
+successful; every Stage 3 policy table has enabled, forced RLS with its
+isolation policy; the three Hub database roles have the intended ownership and
+privilege separation; and Hub starts with separate Flyway and runtime roles.
 
 The controlled production rollout of commit
-`33acc380cb3517d45eb616c1f779c967f175bae3` completed on 2026-09-28. It created
-the backup and checksum, ran `hub-stage3-database-roles.sql` exactly once,
-configured distinct Flyway/runtime credentials, and applied V7 as
-`hub_schema_owner` without Flyway repair. Production evidence confirms forced
-RLS on all 14 policy tables, unscoped fail-closed reads, scoped legacy-tenant
-visibility, compatibility ingress logs, and a `hub_runtime` connection pool.
+`33acc380cb3517d45eb616c1f779c967f175bae3` created and recorded a backup,
+ran `hub-stage3-database-roles.sql` exactly once, configured distinct
+Flyway/runtime credentials, and applied V7 as `hub_schema_owner` without
+Flyway repair. Production evidence confirms forced RLS on all 14 policy tables,
+unscoped fail-closed reads, scoped legacy-tenant visibility, compatibility
+ingress logs, and a `hub_runtime` connection pool.
 
-Do not record final Stage 3 acceptance or begin Stage 4 yet. The following
-items are explicit follow-up evidence or blockers:
+The Stage 3 follow-up commit
+`4d560263a0f01f1a01b3e9a0e1979a7bcd10e517` was deployed on the existing V7
+database. Its controlled DBA correction removed all `hub_runtime` privileges on
+`hub.flyway_schema_history` while retaining Flyway CRUD privileges; no migration
+or Flyway-history content changed. Production logs record
+`edol.hub.legacy_tenant_compatibility.uses` with incrementing metric values. A
+read-only request matching an existing active spool returned `HTTP 200` and
+serialized the complete legacy response graph without
+`HttpMessageNotWritableException` or `LazyInitializationException`.
 
-1. Deploy and evidence the prepared correction for the production
-   `GET /api/spools/find` lazy-proxy serialization failure. Its repository
-   entity graph initializes the exact associations used by the unchanged public
-   JSON payload before the transaction closes; it does not re-enable Open
-   EntityManager in View. This remains an acceptance blocker until a production
-   response is recorded.
-2. Apply the controlled DBA
-   `hub-stage3-runtime-grant-correction.sql` after Flyway, then record that
-   `hub_runtime` has no CRUD privilege on `hub.flyway_schema_history` while
-   `hub_flyway` retains it. The bootstrap now excludes the history table and
-   Testcontainers covers the corrective `REVOKE`; the deployed grant remains an
-   acceptance blocker until the negative production check is recorded.
-3. Obtain production observability evidence from the structured compatibility
-   log. The prepared release emits the metric name and current counter value on
-   every successful or unavailable compatibility ingress; record an increment
-   for at least one production ingress.
-4. Retain the backup evidence: creation, `pg_restore --list`, and checksum
-   passed; a full restore drill was not executed during this rollout.
-5. The production database has one tenant, so no artificial second tenant was
-   created only for verification. The required two-tenant RLS denial and exact
-   single-connection Hikari rollback/reuse cleanup are covered by the reviewed
-   PostgreSQL Testcontainers suite. Retain that non-production evidence rather
-   than marking production execution as passed.
+The production database has one tenant, so no artificial second tenant was
+created only for verification. The required two-tenant RLS denial and exact
+single-connection Hikari rollback/reuse cleanup are covered by the reviewed
+PostgreSQL Testcontainers suite. The Stage 3 backup was created, checksummed,
+and parsed with `pg_restore --list`; a full isolated restore remains a
+post-acceptance operational recovery drill.
 
-After the correction deployment and resulting evidence, append the production
-endpoint, privilege, and metric records to the change record, reassess the
-backup-restore drill according to the deployment policy, then record Stage 3
-acceptance before beginning Stage 4.
+Stage 4 is the recommended next implementation stage, after its Keycloak
+production hostname, TLS, mail-delivery, backup, and secret-management
+prerequisites are ready.
