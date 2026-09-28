@@ -1308,24 +1308,42 @@ the Flyway and runtime roles. Hub Testcontainers includes a single-connection
 Hikari rollback/reuse proof, and unit contracts cover the exact HTTP allowlist
 and MQTT compatibility ingress.
 
-Stage 3 remains pending controlled production acceptance. Perform this one
-release before beginning Stage 4, using
-`hub-stage3-deployment-verification.md` as the executable runbook:
+The controlled production rollout of commit
+`33acc380cb3517d45eb616c1f779c967f175bae3` completed on 2026-09-28. It created
+the backup and checksum, ran `hub-stage3-database-roles.sql` exactly once,
+configured distinct Flyway/runtime credentials, and applied V7 as
+`hub_schema_owner` without Flyway repair. Production evidence confirms forced
+RLS on all 14 policy tables, unscoped fail-closed reads, scoped legacy-tenant
+visibility, compatibility ingress logs, and a `hub_runtime` connection pool.
 
-1. Commit and build the reviewed Stage 3 Hub release. Do not change, repair, or
-   rerun accepted Flyway history.
-2. Open a production change record, take a restorable Hub backup, capture the
-   role/ownership/RLS/Flyway baseline, and stop only Hub instances.
-3. Have a production database administrator run
-   `hub-stage3-database-roles.sql` exactly once. It creates the Hub schema
-   owner, Flyway, and runtime roles; transfers Hub ownership; and never changes
-   Hub data or the Core schema.
-4. Set distinct `hub_flyway` and `hub_runtime` passwords only in the approved
-   secret store. Inject the four `HUB_FLYWAY_*` and `HUB_RUNTIME_*` variables,
-   plus the verified legacy migration-tenant UUID, into the Hub deployment.
-5. Deploy Hub only. Verify Flyway history without repair, runtime-role startup,
-   forced RLS policies, two-tenant RLS denial, pooled-connection cleanup, and
-   measured legacy compatibility ingress according to the runbook. Do not
-   publish MQTT commands or operate live devices for this verification.
-6. Retain the evidence in the change record and record Stage 3 acceptance only
-   after every runbook check passes. Stage 4 may begin after that acceptance.
+Do not record final Stage 3 acceptance or begin Stage 4 yet. The following
+items are explicit follow-up evidence or blockers:
+
+1. Deploy and evidence the prepared correction for the production
+   `GET /api/spools/find` lazy-proxy serialization failure. Its repository
+   entity graph initializes the exact associations used by the unchanged public
+   JSON payload before the transaction closes; it does not re-enable Open
+   EntityManager in View. This remains an acceptance blocker until a production
+   response is recorded.
+2. Apply the controlled DBA
+   `hub-stage3-runtime-grant-correction.sql` after Flyway, then record that
+   `hub_runtime` has no CRUD privilege on `hub.flyway_schema_history` while
+   `hub_flyway` retains it. The bootstrap now excludes the history table and
+   Testcontainers covers the corrective `REVOKE`; the deployed grant remains an
+   acceptance blocker until the negative production check is recorded.
+3. Obtain production observability evidence from the structured compatibility
+   log. The prepared release emits the metric name and current counter value on
+   every successful or unavailable compatibility ingress; record an increment
+   for at least one production ingress.
+4. Retain the backup evidence: creation, `pg_restore --list`, and checksum
+   passed; a full restore drill was not executed during this rollout.
+5. The production database has one tenant, so no artificial second tenant was
+   created only for verification. The required two-tenant RLS denial and exact
+   single-connection Hikari rollback/reuse cleanup are covered by the reviewed
+   PostgreSQL Testcontainers suite. Retain that non-production evidence rather
+   than marking production execution as passed.
+
+After the correction deployment and resulting evidence, append the production
+endpoint, privilege, and metric records to the change record, reassess the
+backup-restore drill according to the deployment policy, then record Stage 3
+acceptance before beginning Stage 4.

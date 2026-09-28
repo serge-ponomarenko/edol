@@ -19,6 +19,7 @@ $$
 DECLARE
     relation_record RECORD;
     function_record RECORD;
+    table_record RECORD;
 BEGIN
     IF EXISTS (
         SELECT 1
@@ -113,7 +114,20 @@ BEGIN
     END IF;
 
     GRANT USAGE ON SCHEMA hub TO hub_runtime;
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA hub TO hub_runtime;
+    FOR table_record IN
+        SELECT c.relname
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'hub'
+          AND c.relkind IN ('r', 'p')
+          AND c.relname <> 'flyway_schema_history'
+        ORDER BY c.relname
+    LOOP
+        EXECUTE format(
+            'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE hub.%I TO hub_runtime',
+            table_record.relname
+        );
+    END LOOP;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA hub TO hub_runtime;
     GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA hub TO hub_runtime;
 

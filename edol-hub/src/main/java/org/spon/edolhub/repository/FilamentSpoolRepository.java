@@ -1,6 +1,7 @@
 package org.spon.edolhub.repository;
 
 import org.spon.edolhub.model.entity.FilamentSpool;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -20,6 +21,14 @@ public interface FilamentSpoolRepository extends
             Long filamentId
     );
 
+    @EntityGraph(attributePaths = {
+            "filament",
+            "filament.tenant",
+            "filament.vendor",
+            "filament.vendor.tenant",
+            "filament.materialType",
+            "filament.materialType.tenant"
+    })
     Optional<FilamentSpool> findFirstByFilamentIdAndStatus(
             Long filamentId, FilamentSpool.FilamentSpoolStatus status
     );
@@ -71,8 +80,24 @@ public interface FilamentSpoolRepository extends
             @Param("statuses") List<FilamentSpool.FilamentSpoolStatus> statuses
     );
 
+    @EntityGraph(attributePaths = {
+            "filament",
+            "filament.tenant",
+            "filament.vendor",
+            "filament.vendor.tenant",
+            "filament.materialType",
+            "filament.materialType.tenant"
+    })
     List<FilamentSpool> findAllByFilamentTenantId(UUID tenantId);
 
+    @EntityGraph(attributePaths = {
+            "filament",
+            "filament.tenant",
+            "filament.vendor",
+            "filament.vendor.tenant",
+            "filament.materialType",
+            "filament.materialType.tenant"
+    })
     Optional<FilamentSpool> findByIdAndFilamentTenantId(Long id, UUID tenantId);
 
 }

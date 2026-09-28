@@ -60,6 +60,17 @@ must never be copied into the repository or a Codex configuration file.
   receives `ENABLE_SNAPSHOT_SCHEDULER`, and whether it uses a removed legacy
   camera-read route. Do not publish commands or change a live device merely to
   diagnose this; establish contract coverage before changing either side.
+- Deploy and evidence the prepared Stage 3 acceptance correction before
+  recording final Stage 3 acceptance. It fetches the public spool serialization
+  graph inside the repository transaction without re-enabling Open EntityManager
+  in View; production must prove that `GET /api/spools/find` serializes with
+  its unchanged payload. The correction also updates the role bootstrap and
+  provides `hub-stage3-runtime-grant-correction.sql` to revoke
+  `hub_runtime` access to `hub.flyway_schema_history` while retaining Flyway
+  access. Apply the DBA script under the deployment change, record the negative
+  runtime and positive Flyway privilege query, and capture a compatibility log
+  containing `metricName` and incrementing `metricValue`. Do not edit Flyway
+  history, broaden the runtime role, or re-enable Open EntityManager in View.
 - Close the Core printer ownership write gap in Stage 5. Core Flyway V8
   backfilled historical `core.printers.tenant_id` rows, but the current
   unauthenticated provisioning endpoint can create a new row with a null

@@ -1,5 +1,6 @@
 package org.spon.edolhub.migration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import com.zaxxer.hikari.HikariConfig;
@@ -15,8 +16,10 @@ import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.model.entity.PrintAllocationGroup;
 import org.spon.edolhub.model.entity.PrintAllocationItem;
+import org.spon.edolhub.repository.FilamentSpoolRepository;
 import org.spon.edolhub.service.LegacyPrinterBackfillService;
 import org.spon.edolhub.service.TenantContext;
+import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -576,6 +579,80 @@ class HubMigrationTest {
     }
 
     @Test
+    void spoolApiRepositoryQueriesLoadThePublicSerializationGraphBeforeTheEntityManagerCloses() throws IOException {
+        flyway(null).migrate();
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        UUID tenantId = ensureTenant(jdbc, "Spool API tenant");
+        long filamentId = insertFilament(jdbc, tenantId, "SPOOL_API");
+        long spoolId = insertSpool(jdbc, filamentId);
+        jdbc.sql("update hub.filament_spools set status = 'ACTIVE' where id = :spoolId")
+                .param("spoolId", spoolId)
+                .update();
+
+        FilamentSpool spoolByStatus;
+        FilamentSpool spoolById;
+        List<FilamentSpool> allSpools;
+        TenantContext tenantContext = new TenantContext();
+        try (TenantContext.TenantScope ignored = tenantContext.open(tenantId);
+             EntityManagerFactory entityManagerFactory = entityManagerFactory(tenantContext)) {
+            EntityManager entityManager = entityManagerFactory.createEntityManager();
+            try {
+                FilamentSpoolRepository repository = new JpaRepositoryFactory(entityManager)
+                        .getRepository(FilamentSpoolRepository.class);
+                spoolByStatus = repository.findFirstByFilamentIdAndStatus(
+                        filamentId,
+                        FilamentSpool.FilamentSpoolStatus.ACTIVE
+                ).orElseThrow();
+                spoolById = repository.findByIdAndFilamentTenantId(spoolId, tenantId).orElseThrow();
+                allSpools = repository.findAllByFilamentTenantId(tenantId);
+            } finally {
+                entityManager.close();
+            }
+        }
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        for (FilamentSpool spool : List.of(spoolByStatus, spoolById, allSpools.getFirst())) {
+            assertThat(spool.getFilament().getTenant().getName()).isEqualTo("Spool API tenant");
+            assertThat(spool.getFilament().getVendor().getTenant().getName()).isEqualTo("Spool API tenant");
+            assertThat(spool.getFilament().getMaterialType().getTenant().getName()).isEqualTo("Spool API tenant");
+            assertThat(objectMapper.writeValueAsString(spool)).contains("Spool API tenant");
+        }
+    }
+
+    @Test
+    void runtimeGrantCorrectionRemovesFlywayHistoryAccessWithoutChangingFlywayAccess() throws IOException {
+        JdbcClient administratorJdbc = JdbcClient.create(dataSource);
+        administratorJdbc.sql("""
+                        DO
+                        $$
+                        BEGIN
+                            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hub_runtime') THEN
+                                CREATE ROLE hub_runtime LOGIN PASSWORD 'test-runtime-password'
+                                    NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+                            END IF;
+                            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hub_flyway') THEN
+                                CREATE ROLE hub_flyway LOGIN PASSWORD 'test-flyway-password'
+                                    NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+                            END IF;
+                        END;
+                        $$
+                        """).update();
+        flyway(null).migrate();
+        administratorJdbc.sql("grant select, insert, update, delete on hub.flyway_schema_history to hub_flyway")
+                .update();
+
+        assertThat(hasAnyTablePrivilege(administratorJdbc, "hub_runtime", "hub.flyway_schema_history")).isTrue();
+        assertThat(hasAllTablePrivileges(administratorJdbc, "hub_flyway", "hub.flyway_schema_history")).isTrue();
+
+        administratorJdbc.sql(Files.readString(findProjectFile(
+                "docs/migrations/hub-stage3-runtime-grant-correction.sql"
+        ))).update();
+
+        assertThat(hasAnyTablePrivilege(administratorJdbc, "hub_runtime", "hub.flyway_schema_history")).isFalse();
+        assertThat(hasAllTablePrivileges(administratorJdbc, "hub_flyway", "hub.flyway_schema_history")).isTrue();
+    }
+
+    @Test
     void runtimeRoleRlsContainsNativeSqlAndTransactionLocalTenantState() {
         JdbcClient administratorJdbc = JdbcClient.create(dataSource);
         administratorJdbc.sql("""
@@ -980,5 +1057,37 @@ class HubMigrationTest {
         }
 
         throw new IllegalStateException("Hub Flyway migration directory is unavailable");
+    }
+
+    private Path findProjectFile(String relativePath) {
+        for (Path candidate : List.of(Path.of(relativePath), Path.of("..").resolve(relativePath))) {
+            if (Files.isRegularFile(candidate)) {
+                return candidate.toAbsolutePath();
+            }
+        }
+
+        throw new IllegalStateException("Project file is unavailable: " + relativePath);
+    }
+
+    private boolean hasAnyTablePrivilege(JdbcClient jdbc, String roleName, String tableName) {
+        return jdbc.sql("""
+                        select bool_or(has_table_privilege(:roleName, :tableName, requested.privilege))
+                        from unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE']) as requested(privilege)
+                        """)
+                .param("roleName", roleName)
+                .param("tableName", tableName)
+                .query(Boolean.class)
+                .single();
+    }
+
+    private boolean hasAllTablePrivileges(JdbcClient jdbc, String roleName, String tableName) {
+        return jdbc.sql("""
+                        select bool_and(has_table_privilege(:roleName, :tableName, requested.privilege))
+                        from unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE']) as requested(privilege)
+                        """)
+                .param("roleName", roleName)
+                .param("tableName", tableName)
+                .query(Boolean.class)
+                .single();
     }
 }

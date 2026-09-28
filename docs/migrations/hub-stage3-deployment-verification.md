@@ -17,9 +17,9 @@ strings, backups, and command output containing secrets outside the repository.
 
 | Target state | DBA bootstrap | First Hub start |
 | --- | --- | --- |
-| Clean database | Run it before Hub starts. It creates the empty `hub` schema. | Flyway applies V1 through V7. No legacy tenant exists, so background compatibility work skips and tenant endpoints fail closed until a later onboarding stage creates one. |
-| Existing database at V1-V6 | Back up first, stop Hub, then run bootstrap. It transfers existing Hub object ownership itself. | Flyway applies only V7. |
-| Existing database already at V7 | Back up first, stop Hub, then run bootstrap. It transfers existing Hub object ownership itself. | Flyway validates history only. Never rerun or repair V7. |
+| Clean database | Run it before Hub starts. It creates the empty `hub` schema. | Flyway applies V1 through V7, then the DBA applies the runtime-grant correction before normal traffic. No legacy tenant exists, so background compatibility work skips and tenant endpoints fail closed until a later onboarding stage creates one. |
+| Existing database at V1-V6 | Back up first, stop Hub, then run bootstrap. It transfers existing Hub object ownership itself. | Flyway applies only V7, then the DBA applies the runtime-grant correction before normal traffic. |
+| Existing database already at V7 | Back up first, stop Hub, then run bootstrap. It transfers existing Hub object ownership itself. | Flyway validates history only. The DBA still applies the runtime-grant correction; never rerun or repair V7. |
 
 ## One-time DBA bootstrap
 
@@ -42,11 +42,12 @@ strings, backups, and command output containing secrets outside the repository.
    `hub_flyway`, not `POSTGRES_USER`. For an existing migration tenant, set
    `edol-hub.legacy-default-tenant-compatibility.tenant-id` to that UUID. A
    clean database deliberately has no such tenant and leaves this value unset.
-4. The role script grants the runtime role access to existing Hub objects and
-   establishes matching defaults for future `hub_schema_owner` migrations. It
-   also grants `hub_flyway` only schema usage and CRUD access to Flyway history,
-   because Flyway reads that history before its init SQL assumes the owner role.
-   Do not rerun V7 to obtain these grants.
+4. The role script grants the runtime role access to Hub application tables,
+   sequences, and functions, explicitly excluding `hub.flyway_schema_history`.
+   It establishes matching defaults for future `hub_schema_owner` migrations.
+   It also grants `hub_flyway` only schema usage and CRUD access to Flyway
+   history, because Flyway reads that history before its init SQL assumes the
+   owner role. Do not rerun V7 to obtain these grants.
 5. Confirm the effective identities before starting Hub:
 
    ```sql
@@ -72,12 +73,47 @@ strings, backups, and command output containing secrets outside the repository.
 1. If V7 is not installed, start one Hub instance with the Flyway connection
    as `hub_flyway`. Its init SQL changes only the effective migration role to
    `hub_schema_owner`; retain `session_user` evidence showing `hub_flyway`.
-   If V7 is already successful, do not invoke Flyway repair or rerun V7: the
-   role script above supplies the equivalent runtime grants for existing
-   objects, and the application start only validates history.
-2. Confirm Flyway history has a new successful V7 entry and that V1–V6,
+   Keep normal traffic disabled for that first run. If V7 is already
+   successful, leave Hub stopped for the correction below; do not invoke
+   Flyway repair or rerun V7.
+2. Keep normal Hub traffic disabled, then execute
+   [`hub-stage3-runtime-grant-correction.sql`](hub-stage3-runtime-grant-correction.sql)
+   exactly once as the database deployment administrator:
+
+   ```text
+   psql -v ON_ERROR_STOP=1 -f docs/migrations/hub-stage3-runtime-grant-correction.sql
+   ```
+
+   The correction is required after the first Flyway run even on a clean
+   database: V7 historically grants runtime CRUD to every Hub table, including
+   the Flyway history table. On a database already at V7, apply it while Hub is
+   stopped before deploying the corrected artifact. It only revokes runtime
+   access to that history; it does not edit history, schema, or application
+   data. Start or restart Hub after a successful correction before returning it
+   to normal traffic.
+3. Confirm that the runtime role has no Flyway-history privilege and that the
+   Flyway role retains its required privilege:
+
+   ```sql
+   WITH requested(privilege) AS (
+       VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')
+   )
+   SELECT role_name,
+          bool_or(has_table_privilege(role_name, 'hub.flyway_schema_history', requested.privilege))
+              AS has_any_history_access,
+          bool_and(has_table_privilege(role_name, 'hub.flyway_schema_history', requested.privilege))
+              AS has_all_history_access
+   FROM (VALUES ('hub_runtime'), ('hub_flyway')) AS roles(role_name)
+   CROSS JOIN requested
+   GROUP BY role_name
+   ORDER BY role_name;
+   ```
+
+   The required result is `false` for `hub_runtime.has_any_history_access` and
+   `true` for `hub_flyway.has_all_history_access`.
+4. Confirm Flyway history has a new successful V7 entry and that V1–V6,
    including repaired V2 checksum `818545878`, are unchanged.
-3. Confirm every policy table has RLS enabled and forced:
+5. Confirm every policy table has RLS enabled and forced:
 
    ```sql
    SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity,
@@ -97,16 +133,17 @@ strings, backups, and command output containing secrets outside the repository.
    ORDER BY c.relname, p.polname;
    ```
 
-4. In two separate `hub_runtime` transactions, set a different tenant with
+6. In two separate `hub_runtime` transactions, set a different tenant with
    parameterized `set_config('edol.tenant_id', ..., true)` and prove each can
    read only its own direct and derived rows. Repeat an attempted cross-tenant
    insert/update/delete and record the RLS denial.
-5. Commit and roll back separate transactions, then on a reused runtime
+7. Commit and roll back separate transactions, then on a reused runtime
    connection run `select current_setting('edol.tenant_id', true)`. It must be
    empty or null and a tenant-table read without setting it must return no rows.
-6. Exercise each explicitly allowed legacy HTTP route, one scheduled sync,
+8. Exercise each explicitly allowed legacy HTTP route, one scheduled sync,
    startup recovery, and an MQTT event in a non-production environment. Verify
-   one structured compatibility log and one metric increment per ingress.
+   one structured compatibility log with `metricName` and incrementing
+   `metricValue` per ingress.
    Exercise a non-allowlisted path and a direct persistence call without scope;
    both must fail closed.
 

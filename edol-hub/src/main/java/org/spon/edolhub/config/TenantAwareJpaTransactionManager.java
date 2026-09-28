@@ -10,8 +10,8 @@ import javax.sql.DataSource;
 
 public class TenantAwareJpaTransactionManager extends JpaTransactionManager {
 
-    private final JdbcTemplate jdbcTemplate;
-    private final TenantContext tenantContext;
+    private final transient JdbcTemplate jdbcTemplate;
+    private final transient TenantContext tenantContext;
 
     public TenantAwareJpaTransactionManager(
             EntityManagerFactory entityManagerFactory,

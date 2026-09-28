@@ -48,7 +48,12 @@ public class LegacyDefaultTenantCompatibilityScope {
     public Optional<TenantContext.TenantScope> openIfConfigured(String entryPoint) {
         if (configuredTenantId == null || configuredTenantId.isBlank()) {
             unavailableCounter.increment();
-            log.warn("Legacy tenant compatibility scope skipped: entryPoint={}, reason=tenant-id-not-configured", entryPoint);
+            log.warn(
+                    "Legacy tenant compatibility scope skipped: entryPoint={}, reason=tenant-id-not-configured, metricName={}, metricValue={}",
+                    entryPoint,
+                    "edol.hub.legacy_tenant_compatibility.unavailable",
+                    unavailableCounter.count()
+            );
             return Optional.empty();
         }
         return Optional.of(open(entryPoint));
@@ -66,7 +71,13 @@ public class LegacyDefaultTenantCompatibilityScope {
                 throw new IllegalStateException("Configured legacy tenant is not the migration tenant");
             }
             usageCounter.increment();
-            log.info("Legacy default tenant compatibility scope opened: entryPoint={}, tenantId={}", entryPoint, tenantId);
+            log.info(
+                    "Legacy default tenant compatibility scope opened: entryPoint={}, tenantId={}, metricName={}, metricValue={}",
+                    entryPoint,
+                    tenantId,
+                    "edol.hub.legacy_tenant_compatibility.uses",
+                    usageCounter.count()
+            );
             return scope;
         } catch (RuntimeException exception) {
             scope.close();
