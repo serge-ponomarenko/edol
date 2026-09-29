@@ -4,7 +4,8 @@ services:
   secure-multi-tenant-mode-guard:
     image: quay.io/keycloak/keycloak:26.7.4
     entrypoint: ["/bin/bash", "-ec"]
-    command: test "$$EDOL_DEPLOYMENT_MODE" = secure-multi-tenant
+    command:
+      - 'test "$$EDOL_DEPLOYMENT_MODE" = "secure-multi-tenant"'
     environment:
       EDOL_DEPLOYMENT_MODE: ${EDOL_DEPLOYMENT_MODE:?EDOL_DEPLOYMENT_MODE is required}
     networks:
