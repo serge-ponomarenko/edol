@@ -82,6 +82,27 @@ See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 the target and rollout; the system map and flows above remain the implemented
 current state until individual stages are completed and audited.
 
+## Planned Deployment Profiles
+
+The accepted target includes two explicitly selected, mutually exclusive
+profiles. `home` will be a single-owner, trusted-network installation with
+Core, Hub, PostgreSQL, and MQTT only; it has one internally controlled tenant
+and does not start Keycloak, OIDC, user memberships, service OAuth, or
+multi-tenant RLS. Notify and AMS will be opt-in home add-ons. It is not
+appropriate for untrusted users, public exposure, or data isolation between
+people.
+
+`secure-multi-tenant` remains the ADR 0002 target: Keycloak, authenticated
+memberships, separate service identities, trusted tenant propagation, and
+forced RLS are required. The required `EDOL_DEPLOYMENT_MODE` /
+`edol.deployment.mode` selection will fail on an absent or unknown value, and
+mode changes will not convert an existing database; a later controlled,
+backup-first home-to-secure migration is required. Stage H source now provides
+the explicit home Compose template and fail-closed mode selection, but is not
+accepted or deployed. Until the BFF and service-authentication stages exist,
+the selected `secure-multi-tenant` mode fails startup rather than exposing the
+current pre-auth ingress.
+
 ## Lifecycle and Persistence
 
 - On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog and validates its UUID projection and printer-owned Hub data. Hub V5 rechecks Hub ownership paths, makes the Hub job, maintenance, and statistics printer relationships mandatory, and removes the legacy integer job printer ID without inferring a mapping. Missing, orphaned, or duplicate Hub ownership blocks the migration; a Core catalog mismatch blocks runtime validation, while catalog unavailability skips that validation and reports the catalog unavailable. Hub then attempts recovery independently for every enabled projected printer.

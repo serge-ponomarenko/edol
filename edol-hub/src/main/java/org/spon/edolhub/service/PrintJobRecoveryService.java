@@ -22,11 +22,11 @@ public class PrintJobRecoveryService {
     private final AllocationPreviewRuntimeSyncService allocationPreviewRuntimeSyncService;
     private final PrinterAccessService printerAccessService;
     private final PrinterCatalogSyncService printerCatalogSyncService;
-    private final LegacyDefaultTenantCompatibilityScope compatibilityScope;
+    private final TenantScopeProvider tenantScopeProvider;
 
     @EventListener(ApplicationReadyEvent.class)
     public void recover() {
-        var scope = compatibilityScope.openIfConfigured("application-ready-print-job-recovery");
+        var scope = tenantScopeProvider.openIfConfigured("application-ready-print-job-recovery");
         if (scope.isEmpty()) {
             return;
         }

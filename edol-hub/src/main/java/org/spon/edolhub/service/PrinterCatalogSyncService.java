@@ -26,7 +26,7 @@ public class PrinterCatalogSyncService {
     private final TenantContext tenantContext;
     private final LegacyPrinterBackfillService backfillService;
     private final PrinterCatalogStatus status;
-    private final LegacyDefaultTenantCompatibilityScope compatibilityScope;
+    private final TenantScopeProvider tenantScopeProvider;
     private final TenantAwareTransactionalExecutor transactionalExecutor;
     private final ReentrantLock synchronizationLock = new ReentrantLock();
 
@@ -35,7 +35,7 @@ public class PrinterCatalogSyncService {
             initialDelayString = "${edol-hub.printer-sync-interval-ms:60000}"
     )
     public void synchronize() {
-        var scope = compatibilityScope.openIfConfigured("scheduled-printer-catalog-sync");
+        var scope = tenantScopeProvider.openIfConfigured("scheduled-printer-catalog-sync");
         if (scope.isEmpty()) {
             status.migrationBlocked("Legacy tenant compatibility is not configured");
             return;

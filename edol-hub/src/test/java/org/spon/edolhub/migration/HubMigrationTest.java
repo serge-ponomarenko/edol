@@ -16,6 +16,7 @@ import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.model.entity.PrintAllocationGroup;
 import org.spon.edolhub.model.entity.PrintAllocationItem;
+import org.spon.edolhub.model.entity.Vendor;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
 import org.spon.edolhub.service.LegacyPrinterBackfillService;
 import org.spon.edolhub.service.TenantContext;
@@ -24,6 +25,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.orm.jpa.EntityManagerFactoryUtils;
+import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -85,6 +87,64 @@ class HubMigrationTest {
                 .query(Long.class).single()).isEqualTo(1L);
 
         new LegacyPrinterBackfillService(jdbc).validateOwnership(List.of());
+    }
+
+    @Test
+    void homeMigrationCreatesOneInstallationTenantAndDisablesRowLevelSecurity() {
+        homeFlyway().migrate();
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+
+        assertThat(jdbc.sql("select count(*) from hub.tenants")
+                .query(Integer.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from hub.home_installations where singleton")
+                .query(Integer.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                        select relrowsecurity
+                        from pg_class
+                        where oid = 'hub.tenants'::regclass
+                        """)
+                .query(Boolean.class).single()).isFalse();
+    }
+
+    @Test
+    void homeMigrationBlocksAmbiguousTenantOwnership() {
+        flyway(null).migrate();
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        jdbc.sql("insert into hub.tenants (id, name, is_default) values (gen_random_uuid(), 'First', true)")
+                .update();
+        jdbc.sql("insert into hub.tenants (id, name, is_default) values (gen_random_uuid(), 'Second', false)")
+                .update();
+
+        assertThatThrownBy(() -> homeFlyway().migrate())
+                .hasMessageContaining("more than one Hub tenant exists");
+    }
+
+    @Test
+    void homeInstallationTenantSupportsDiscriminatorPersistenceWithoutRlsTransactionState() {
+        homeFlyway().migrate();
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        UUID tenantId = jdbc.sql("select tenant_id from hub.home_installations where singleton")
+                .query(UUID.class)
+                .single();
+        TenantContext tenantContext = new TenantContext();
+
+        try (EntityManagerFactory entityManagerFactory = entityManagerFactory(dataSource, tenantContext);
+             TenantContext.TenantScope ignored = tenantContext.open(tenantId)) {
+            TransactionTemplate transactionTemplate = new TransactionTemplate(
+                    new JpaTransactionManager(entityManagerFactory)
+            );
+            transactionTemplate.executeWithoutResult(status -> {
+                EntityManager entityManager = EntityManagerFactoryUtils
+                        .getTransactionalEntityManager(entityManagerFactory);
+                Vendor vendor = new Vendor();
+                vendor.setName("Home vendor");
+                entityManager.persist(vendor);
+            });
+        }
+
+        assertThat(jdbc.sql("select count(*) from hub.vendors where tenant_id = :tenantId")
+                .param("tenantId", tenantId)
+                .query(Integer.class).single()).isEqualTo(1);
     }
 
     @Test
@@ -1016,6 +1076,17 @@ class HubMigrationTest {
             configuration.target(target);
         }
         return configuration.load();
+    }
+
+    private Flyway homeFlyway() {
+        return Flyway.configure()
+                .dataSource(dataSource)
+                .schemas("hub")
+                .defaultSchema("hub")
+                .locations("classpath:db/migration", "classpath:db/home-migration")
+                .initSql("select 1")
+                .cleanDisabled(false)
+                .load();
     }
 
     private Integer migrationChecksum(JdbcClient jdbc, String version) {

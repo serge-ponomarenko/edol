@@ -9,9 +9,11 @@
 
 This plan moves EDOL from its current default-tenant bootstrap architecture to
 authenticated, isolated multi-tenancy without locking out existing AMS and
-Notify consumers. Each stage is independently reviewable and deployable. A
-mandatory architecture audit follows every stage and may update the remaining
-plan, but an architectural decision change must amend or supersede ADR 0002.
+Notify consumers. It also delivers an explicitly selected `home` profile for a
+single-owner installation that does not need the secure multi-tenant service
+graph. Each stage is independently reviewable and deployable. A mandatory
+architecture audit follows every stage and may update the remaining plan, but
+an architectural decision change must amend or supersede ADR 0002.
 
 This document is a plan, not evidence that a stage has been implemented. The
 factual current system remains described in `docs/architecture.md`.
@@ -132,13 +134,40 @@ does not own the EDOL tenant model. Hibernate prevents accidental ordinary ORM
 cross-tenant access, while forced PostgreSQL RLS protects the database access
 path, including native SQL.
 
+## Deployment Profiles
+
+Every EDOL application process selects the deployment profile with the required
+`EDOL_DEPLOYMENT_MODE` environment variable, bound to
+`edol.deployment.mode`. Unknown or missing values fail before application
+startup; there is no implicit default and applications cannot run in different
+modes. The Compose entry point validates the resolved profile before it starts
+the associated infrastructure or application services.
+
+| Profile | Intended operator and boundary | Base services | Deliberately absent | Data and transition rule |
+| --- | --- | --- | --- | --- |
+| `home` | One owner on an owner-controlled host and trusted local/private network; never a public or shared server | Core, Hub, PostgreSQL, MQTT | Keycloak, OIDC, user/membership flows, OAuth service clients, tenant propagation, secure multi-tenant RLS, and default Notify/AMS containers | One internally bootstrapped installation tenant; no client-configured tenant UUID; change to secure mode only through the future controlled migration |
+| `secure-multi-tenant` | Shared or internet-reachable deployment requiring isolation and authentication | The ADR 0002 secure service graph, including Keycloak and its backing services | Home-only authentication bypasses and fixed installation-tenant behavior | User/membership tenancy, dedicated service identities, trusted tenant context, and forced RLS are mandatory; it never falls back to home |
+
+Notify and AMS remain explicit optional add-ons in home mode. Their inclusion
+must not pull in Keycloak or silently claim secure service authentication.
+Home mode does not provide data isolation between people and must be documented
+with its network-exposure limitation. It is not a configuration escape hatch
+for an incomplete secure deployment.
+
+The home database is not promoted by changing `EDOL_DEPLOYMENT_MODE`. A later
+one-way, backup-first home-to-secure migration must validate the singleton
+tenant, create the initial user and membership model, provision secure
+dependencies and credentials, and abort on any ambiguous ownership. An in-place
+secure-to-home downgrade is unsupported.
+
 ## Stage Dependencies
 
 ```mermaid
 flowchart LR
     S1[1. Legacy ownership closure] --> S2[2. Domain/schema foundation]
     S2 --> S3[3. Hub persistence isolation]
-    S3 --> S4[4. Keycloak BFF and provisioning]
+    S3 --> H[H. Home single-tenant profile]
+    H --> S4
     S4 --> S5[5. Hub-Core authenticated tenancy]
     S5 --> S6[6. MQTT tenant envelope]
     S6 --> S7[7. Notify and AMS migration]
@@ -149,6 +178,108 @@ flowchart LR
 
 No runtime stage begins until ADR 0002, this plan, and the ownership matrix are
 committed and reviewed together.
+
+## Stage H: Home Single-Tenant Profile
+
+### Objective and prerequisites
+
+Deliver the small, self-hosted installation path before introducing Keycloak
+into the normal deployment flow. Stage 3 must be accepted because it provides
+the audited ownership foundation from which the two implementations can be
+kept separate.
+
+### Scope and modules
+
+Shared deployment-mode configuration and validation, Hub tenant-context and
+security wiring, Core/Hub startup provisioning, Docker Compose composition,
+operator documentation, and profile-specific tests. Notify and AMS are
+excluded from the base home composition and may be added only as separately
+documented home add-ons.
+
+### Configuration and runtime behavior
+
+- Require `EDOL_DEPLOYMENT_MODE=home` or `secure-multi-tenant` for every EDOL
+  application process. Bind it to one typed configuration property and reject
+  mode drift, missing values, and unknown values before HTTP, MQTT, or database
+  work; have the Compose entry point validate the matching infrastructure
+  composition.
+- In `home`, use a dedicated home implementation of tenant resolution that
+  obtains exactly one installation-owned tenant from persistence. Bootstrap it
+  atomically only for a clean home database; never accept its UUID from an HTTP
+  header, request, MQTT message, or environment variable.
+- Keep home and secure Spring configuration mutually exclusive. Home must not
+  instantiate Keycloak/OIDC clients, user or membership login flows, service
+  OAuth interceptors, secure tenant-header propagation, or RLS-specific
+  assumptions. Secure mode must not instantiate the home tenant resolver or an
+  unauthenticated home route.
+- Define a base home Compose composition containing only Core, Hub, PostgreSQL,
+  and MQTT. Keycloak is part only of the secure composition; Notify and AMS use
+  explicit opt-in add-on composition. Compose validation must show that unused
+  services have no containers, ports, volumes, or required secrets.
+- Until Stage 4 and Stage 5 exist, selecting `secure-multi-tenant` must fail
+  before HTTP, MQTT, or database work rather than starting the current
+  pre-auth Hub/Core graph. It is an explicit selected-but-unavailable profile,
+  not a fallback to the legacy deployment.
+- Document the home profile as trusted-network-only. It must not advertise
+  multi-user isolation or public-internet safety, and it must not grow an
+  EDOL-managed password, token, or reduced authentication substitute for
+  Keycloak.
+
+### Data migration and profile transition
+
+- New home installations create one durable installation tenant without seeded
+  users or memberships. Existing legacy installations require a preflight that
+  proves a single unambiguous tenant before they can enter home mode.
+- Home uses a profile-owned repeatable Flyway migration location in addition to
+  the immutable common history. It disables the inherited Stage 3 RLS policies
+  only in the isolated home database and records the singleton tenant in a
+  dedicated metadata table. The migration rejects multiple tenants or any user
+  or membership; it never runs from the secure-multi-tenant locations. A later
+  controlled home-to-secure migration must restore and validate RLS before the
+  secure profile can run.
+- Do not reuse `LegacyDefaultTenantCompatibilityScope`; it remains a temporary
+  Stage 3 bridge and is removed by Stage 4.
+- Specify a later, one-way home-to-secure migration release. It creates and
+  validates the initial OIDC user and `OWNER` membership, provisions Keycloak
+  and service credentials, applies the secure database prerequisites, and
+  records a tested backup before enabling secure mode. It must fail closed and
+  never be triggered by changing only `EDOL_DEPLOYMENT_MODE`.
+- Do not support an in-place secure-to-home downgrade. Recovery uses the
+  source deployment artifact and a verified backup, not a looser mode switch.
+
+### Required tests
+
+- Configuration-binding tests for both modes, absent/unknown values, and
+  mixed-mode service configuration.
+- A home startup test that proves exactly one durable installation tenant is
+  available and that no request-supplied tenant value can change it.
+- Secure startup tests proving that home components and unauthenticated routes
+  are absent, and home startup tests proving that Keycloak/OIDC configuration,
+  clients, secrets, and containers are absent.
+- Compose configuration snapshots for base home, home add-on, and secure
+  compositions, including an assertion that each profile exposes only intended
+  ports, volumes, and required environment values.
+- Preflight tests for clean, valid legacy, ambiguous, and multi-tenant
+  databases; the latter two must block home mode. Test the planned
+  home-to-secure migration with backup/restore and failure at every ownership
+  validation boundary before implementation is accepted.
+
+### Acceptance criteria
+
+- An operator can run the documented base home installation without Keycloak,
+  OAuth client secrets, user/membership setup, Notify, or AMS.
+- The home profile has exactly one internally controlled tenant and cannot be
+  mistaken for a secure multi-user deployment.
+- Secure multi-tenant startup cannot silently degrade to home behavior, and a
+  mode change alone cannot alter a database's security or ownership semantics.
+- Operator documentation clearly states the profile boundary, supported
+  add-ons, backup-first transition path, and unsupported downgrade.
+
+### Explicitly out of scope
+
+Authentication for untrusted home users, a lightweight custom identity
+provider, public-internet home deployment, tenant billing, and changing the
+secure ADR's Keycloak, OAuth, or RLS design.
 
 ## Stage 1: Legacy Ownership Contract Closure
 
@@ -588,8 +719,9 @@ RLS, `@TenantId`, login, tenant selection, and secure service transport.
 ### Objective and prerequisites
 
 Make Hub persistence fail closed under Hibernate and PostgreSQL RLS before
-introducing Keycloak, while temporarily keeping the single-tenant deployment
-operational through a visible migration boundary. Stage 2 must be accepted.
+introducing Keycloak, while temporarily keeping the legacy one-tenant
+deployment operational through a visible migration boundary. Stage 2 must be
+accepted. This is not the permanent `home` profile.
 
 ### Scope and modules
 
@@ -673,7 +805,7 @@ Keycloak, Core RLS, and Core service authentication.
 ### Objective and prerequisites
 
 Replace the pre-auth compatibility boundary with authenticated users,
-memberships, and server-side active tenant selection. Stage 3 must be accepted,
+memberships, and server-side active tenant selection. Stage H must be accepted,
 and Keycloak production hostname, TLS, mail delivery, backup, and secret
 management must be ready.
 
@@ -1330,6 +1462,8 @@ PostgreSQL Testcontainers suite. The Stage 3 backup was created, checksummed,
 and parsed with `pg_restore --list`; a full isolated restore remains a
 post-acceptance operational recovery drill.
 
-Stage 4 is the recommended next implementation stage, after its Keycloak
-production hostname, TLS, mail-delivery, backup, and secret-management
-prerequisites are ready.
+Stage H is the recommended next implementation stage. It establishes the
+explicit home profile and prevents the secure architecture from becoming the
+only self-hosted installation path. Stage 4 follows only after Stage H and
+after its Keycloak production hostname, TLS, mail-delivery, backup, and
+secret-management prerequisites are ready.

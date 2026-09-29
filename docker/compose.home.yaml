@@ -1,0 +1,94 @@
+name: edol-home
+
+services:
+  home-mode-guard:
+    image: alpine:3.22.1
+    entrypoint: ["/bin/sh", "-ec"]
+    command: test "$$EDOL_DEPLOYMENT_MODE" = home
+    environment:
+      EDOL_DEPLOYMENT_MODE: home
+    restart: "no"
+
+  postgres:
+    image: postgres:17
+    environment:
+      TZ: Europe/Kyiv
+    env_file:
+      - ../../.env_edol_home
+    depends_on:
+      home-mode-guard:
+        condition: service_completed_successfully
+    ports:
+      - "${EDOL_HOME_POSTGRES_PORT:?EDOL_HOME_POSTGRES_PORT is required}:5432"
+    volumes:
+      - ../../edol_home_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  mqtt:
+    image: emqx/nanomq:0.25.6
+    healthcheck:
+      test: ["CMD", "nanomq", "--help"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      home-mode-guard:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  edolhub:
+    build:
+      context: ..
+      dockerfile: docker/edol-hub.Dockerfile
+    environment:
+      TZ: Europe/Kyiv
+      EDOL_DEPLOYMENT_MODE: home
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/home-migration
+      SPRING_FLYWAY_INIT_SQLS: SELECT 1
+    env_file:
+      - ../../.env_edol_home
+    depends_on:
+      home-mode-guard:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    ports:
+      - "${EDOL_HOME_HUB_PORT:?EDOL_HOME_HUB_PORT is required}:8090"
+    volumes:
+      - ../../edol_home_logs:/app/logs
+    restart: unless-stopped
+
+  edolcore:
+    build:
+      context: ..
+      dockerfile: docker/edol-core.Dockerfile
+    environment:
+      TZ: Europe/Kyiv
+      EDOL_DEPLOYMENT_MODE: home
+    env_file:
+      - ../../.env_edol_home
+    depends_on:
+      home-mode-guard:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    ports:
+      - "${EDOL_HOME_CORE_PORT:?EDOL_HOME_CORE_PORT is required}:8080"
+    volumes:
+      - ../../edol_home_models:/app/models
+      - ../../edol_home_camera_snapshots:/app/camera_snapshots
+      - ../../edol_home_logs:/app/logs
+    restart: unless-stopped
+
+networks:
+  default:
+    name: edol-home-network

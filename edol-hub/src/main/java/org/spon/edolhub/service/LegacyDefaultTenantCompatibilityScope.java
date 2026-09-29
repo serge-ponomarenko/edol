@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.UUID;
 import java.util.Optional;
@@ -17,7 +18,8 @@ import java.util.Optional;
  */
 @Service
 @Slf4j
-public class LegacyDefaultTenantCompatibilityScope {
+@ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "secure-multi-tenant")
+public class LegacyDefaultTenantCompatibilityScope implements TenantScopeProvider {
 
     private final TenantContext tenantContext;
     private final TenantRepository tenantRepository;
@@ -45,6 +47,7 @@ public class LegacyDefaultTenantCompatibilityScope {
         this.configuredTenantId = configuredTenantId;
     }
 
+    @Override
     public Optional<TenantContext.TenantScope> openIfConfigured(String entryPoint) {
         if (configuredTenantId == null || configuredTenantId.isBlank()) {
             unavailableCounter.increment();
@@ -59,6 +62,7 @@ public class LegacyDefaultTenantCompatibilityScope {
         return Optional.of(open(entryPoint));
     }
 
+    @Override
     public TenantContext.TenantScope open(String entryPoint) {
         UUID tenantId = parseConfiguredTenantId();
         TenantContext.TenantScope scope = tenantContext.open(tenantId);

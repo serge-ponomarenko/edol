@@ -8,7 +8,7 @@ import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.service.PrintJobService;
 import org.spon.edolhub.service.PrinterCatalogSyncService;
 import org.spon.edolhub.service.PrinterService;
-import org.spon.edolhub.service.LegacyDefaultTenantCompatibilityScope;
+import org.spon.edolhub.service.TenantScopeProvider;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
@@ -24,12 +24,12 @@ public class MqttEventListener {
     private final PrinterService printerService;
     private final PrinterCatalogSyncService printerCatalogSyncService;
     private final PrintJobService printJobService;
-    private final LegacyDefaultTenantCompatibilityScope compatibilityScope;
+    private final TenantScopeProvider tenantScopeProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public void handle(Message<?> message) {
-        var scope = compatibilityScope.openIfConfigured("mqtt-event-listener");
+        var scope = tenantScopeProvider.openIfConfigured("mqtt-event-listener");
         if (scope.isEmpty()) {
             return;
         }

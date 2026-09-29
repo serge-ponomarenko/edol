@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-22
+- **Amended:** 2026-09-28 (single-tenant home deployment profile)
 
 ## Context
 
@@ -40,6 +41,43 @@ does not inject tenant predicates into native SQL. PostgreSQL row-level
 security therefore remains necessary as the database isolation boundary.
 
 ## Decision
+
+### Deployment profiles
+
+EDOL supports two explicitly selected, mutually exclusive deployment profiles:
+
+- `home` is a single-owner, single-tenant installation for a trusted local or
+  private network. It runs only the required Core, Hub, PostgreSQL, and MQTT
+  services. Keycloak, OIDC, user memberships, service OAuth clients, tenant
+  propagation, and multi-tenant RLS enforcement are not started or configured.
+  Notify and AMS are separately opted-in home add-ons, not part of the base
+  installation. Home mode has one installation-owned tenant created and stored
+  internally; its UUID is never supplied by a browser, service caller, or
+  deployment environment variable.
+- `secure-multi-tenant` is the target described by the remaining sections of
+  this ADR. It requires Keycloak, authenticated users and memberships,
+  dedicated service identities, trusted tenant propagation, and forced RLS.
+  It never falls back to home semantics when any of those prerequisites is
+  absent.
+
+Every EDOL application process selects `edol.deployment.mode` through the
+required `EDOL_DEPLOYMENT_MODE` environment variable. An absent or unknown
+value fails startup; there is no default and no per-service mix of modes. The
+Compose entry point must validate the resolved profile and derive its service
+set from it rather than starting security services that the home profile does
+not use.
+
+Home mode is a convenience deployment profile, not a secure shared-server
+profile. Its documentation must require an owner-controlled host and network
+boundary and must state that it is unsuitable for untrusted users, public
+internet exposure, or data isolation between people. Removing Keycloak must
+not result in EDOL implementing a weaker replacement identity provider.
+
+A home database cannot become a secure multi-tenant installation by changing
+the environment variable. The transition is a separately versioned, backup-
+first migration that verifies ownership, creates identities and memberships,
+enables the secure deployment prerequisites, and fails closed on ambiguity.
+The reverse transition is not supported as an in-place operation.
 
 ### Domain tenancy and membership
 
@@ -392,6 +430,14 @@ general application escape from RLS.
 
 ## Alternatives
 
+- **Use the Stage 3 `LegacyDefaultTenantCompatibilityScope` as permanent home
+  mode:** rejected because it is a measured pre-auth migration bridge, not a
+  deployment boundary, and secure mode must delete it in Stage 4.
+- **Make secure multi-tenancy optional feature flags within one running service
+  graph:** rejected because a partial or inconsistent flag set could silently
+  expose unauthenticated or cross-tenant paths. A single required deployment
+  mode and profile-owned composition make the boundary auditable.
+
 - **Put `tenant_id` directly on `User`:** rejected because it encodes the
   temporary one-user/one-tenant UX and requires redesign for multiple
   memberships and roles.
@@ -425,6 +471,13 @@ general application escape from RLS.
 
 ## Consequences
 
+- The repository must keep home and secure-multi-tenant configuration,
+  dependency composition, and tests explicit and mutually exclusive. The home
+  path is intentionally smaller, while the secure path retains every security
+  invariant in this ADR.
+- Home-to-secure adoption requires a documented, controlled migration rather
+  than an environment-only switch; operators must choose the profile before
+  first deployment whenever possible.
 - Multi-tenant security is introduced through staged, independently auditable
   releases rather than one global switch.
 - Direct tenant roots and selected cross-aggregate tables gain tenant columns;
