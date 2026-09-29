@@ -18,8 +18,8 @@ Notify, or printer-facing services, and neither changes Hub/Core Flyway history,
 schemas, roles, MQTT messages, or live devices.
 
 Each instance has an independently named Compose project, PostgreSQL service,
-persistent volume, Keycloak database, database role, hostname, host port, and
-secret file. The identities are `edol_keycloak_dev` and
+persistent volume, Keycloak database, database role, hostname, private bridge
+network, reverse-proxy DNS alias, and secret file. The identities are `edol_keycloak_dev` and
 `edol_keycloak_prod`; they are distinct even though the two PostgreSQL services
 are already physically isolated. Keycloak owns its own database migrations;
 neither database is a Hub Flyway schema.
@@ -27,7 +27,7 @@ neither database is a Hub Flyway schema.
 The two files are standalone secure-profile entry points and must never be
 combined with `compose.yaml` or a future home Compose file through multiple
 `-f` arguments. They have no `home` variant, no fallback value, and no shared
-container, port, volume, database, role, or secret with home. A short-lived
+container, private network, volume, database, role, or secret with home. A short-lived
 Compose guard requires the exact value
 `EDOL_DEPLOYMENT_MODE=secure-multi-tenant` before it starts either Keycloak or
 its PostgreSQL service. A missing value fails interpolation; `home` and every
@@ -120,16 +120,17 @@ these inputs are approved:
 2. Reverse-proxy/TLS ownership and certificate-issuance approach.
 3. Resend SMTP policy, verified sender, and operator responsible for its secret.
 4. Secret-injection mechanism and operator responsible for all values.
-5. Conflict-checked, different server host ports for dev and prod.
+5. An external Docker bridge network named `edol-reverse-proxy` that is shared
+   only by the Nginx transport path and the Keycloak services.
 6. An administrative VPN or fixed source CIDR for Nginx access to `/admin/` and
    `/realms/master/`.
 
-The approved identity hostnames and loopback ports are:
+The approved identity hostnames and Docker DNS aliases are:
 
-| Instance | Public hostname | Loopback Keycloak port | Database role/database |
+| Instance | Public hostname | Reverse-proxy DNS alias | Database role/database |
 | --- | --- | --- | --- |
-| Dev | `auth.dev.edol.s-pon.dev` | `18443` | `edol_keycloak_dev` |
-| Prod | `auth.edol.s-pon.dev` | `19443` | `edol_keycloak_prod` |
+| Dev | `auth.dev.edol.s-pon.dev` | `edol-keycloak-dev:8080` | `edol_keycloak_dev` |
+| Prod | `auth.edol.s-pon.dev` | `edol-keycloak-prod:8080` | `edol_keycloak_prod` |
 
 Before starting Keycloak, the server administrator must:
 
@@ -146,10 +147,40 @@ Before starting Keycloak, the server administrator must:
    also acceptable with a Cloudflare token restricted to DNS edits for
    `s-pon.dev`. If Cloudflare proxying is later approved, configure its SSL/TLS
    mode as `Full (strict)`, never Flexible.
-4. Copy `nginx-edol-keycloak.conf.template` into the Nginx configuration,
-   replace `<ADMIN_CIDR>` with the approved administrative network, install the
-   two certificate paths, run `nginx -t`, and reload only after it passes.
-5. Create the target external env file with owner-only mode, for example
+4. Create the external transport network once, without adopting the existing
+   `nginx_default` project network:
+
+   ```bash
+   docker network inspect edol-reverse-proxy >/dev/null 2>&1 || \
+     docker network create --driver bridge edol-reverse-proxy
+   ```
+
+5. Amend `/srv/nginx/docker-compose.yml` outside this repository so only the
+   service that creates `nginx-home` joins `edol-reverse-proxy` as an external
+   network. Do not attach PostgreSQL, Hub, Core, home, or another unrelated
+   service. The required Compose fragment is:
+
+   ```yaml
+   services:
+     <nginx-service>:
+       networks:
+         - default
+         - edol-reverse-proxy
+
+   networks:
+     edol-reverse-proxy:
+       external: true
+       name: edol-reverse-proxy
+   ```
+
+6. Integrate `nginx-edol-keycloak.conf.template` into the bind-mounted
+   `/srv/nginx/nginx.conf`, replace `<ADMIN_CIDR>` with the approved
+   administrative network, and install the two certificate paths. Validate the
+   running container with `docker exec nginx-home nginx -t`; then recreate only
+   the Nginx service through the `/srv/nginx/docker-compose.yml` project in an
+   approved maintenance window. Do not use `systemctl` and do not recreate
+   unrelated services or networks.
+7. Create the target external env file with owner-only mode, for example
    `install -m 600 /dev/null ../../.env_edol_keycloak_dev`, then populate it
    through the approved secret mechanism.
 
@@ -163,12 +194,17 @@ docker compose --env-file ../../.env_edol_keycloak_dev -f compose.keycloak-dev.y
 ```
 
 Use the analogous `prod` file only in its separately approved production
-change. Each Keycloak HTTP listener binds only to `127.0.0.1`; a trusted reverse
-proxy terminates TLS and forwards to its own instance port. The proxy must
+change. Keycloak publishes no Debian-host port. It joins its instance-private
+bridge network with its dedicated PostgreSQL service and the external
+`edol-reverse-proxy` network with only its instance-specific DNS alias. The
+Nginx container terminates TLS and forwards through Docker DNS. The proxy must
 overwrite `X-Forwarded-*`, publish the approved HTTPS hostname, and deny public
 access to administration paths and the master realm. `KC_HOSTNAME` is fixed to
 the external HTTPS hostname, `KC_HOSTNAME_STRICT=true`, and
-`KC_PROXY_HEADERS=xforwarded`. PostgreSQL has no host port.
+`KC_PROXY_HEADERS=xforwarded`. PostgreSQL joins only the private network and
+has no host port. The private networks deliberately are not `internal: true`:
+Keycloak needs outbound SMTP access to Resend. Isolation is enforced by network
+attachment, not by removing all container egress.
 
 ## Email and account lifecycle verification
 
@@ -190,10 +226,17 @@ flows with a production account.
 5. A token request using `grant_type=password` is rejected because direct grant
    is disabled. A request for `scope=offline_access` is rejected because it is
    not a client scope or role mapping.
-6. The PostgreSQL negative-access queries above pass.
-7. Dev email verification, reset password, and disabled-user behavior pass with
+6. `docker network inspect edol-reverse-proxy` shows Nginx and the tested
+   Keycloak service; it does not show PostgreSQL. A separately approved
+   Keycloak instance may also share this transport network. The Keycloak and
+   PostgreSQL inspect output proves that neither service has host port
+   publications.
+7. The PostgreSQL negative-access queries above pass for a shared PostgreSQL
+   topology; the dedicated-container topology records the separate private
+   network and absence of any Hub/Core connection path instead.
+8. Dev email verification, reset password, and disabled-user behavior pass with
    a disposable identity.
-8. Create a custom-format database backup, checksum it, restore it into a new
+9. Create a custom-format database backup, checksum it, restore it into a new
    isolated Keycloak database, and verify discovery after restore. Stop all
    Keycloak nodes before a realm export; realm exports are configuration/drift
    evidence, not a complete backup.

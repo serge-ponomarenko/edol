@@ -7,6 +7,8 @@ services:
     command: test "$$EDOL_DEPLOYMENT_MODE" = secure-multi-tenant
     environment:
       EDOL_DEPLOYMENT_MODE: ${EDOL_DEPLOYMENT_MODE:?EDOL_DEPLOYMENT_MODE is required}
+    networks:
+      - keycloak-prod-private
     restart: "no"
 
   keycloak-prod-postgres:
@@ -31,6 +33,8 @@ services:
     depends_on:
       secure-multi-tenant-mode-guard:
         condition: service_completed_successfully
+    networks:
+      - keycloak-prod-private
     restart: unless-stopped
 
   keycloak-prod:
@@ -55,8 +59,11 @@ services:
         condition: service_completed_successfully
       keycloak-prod-postgres:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:${KEYCLOAK_PROD_HOST_PORT:?KEYCLOAK_PROD_HOST_PORT is required}:8080"
+    networks:
+      keycloak-prod-private: {}
+      reverse-proxy:
+        aliases:
+          - edol-keycloak-prod
     volumes:
       - ./keycloak/realm/edol-realm-realm.json:/opt/keycloak/data/import/edol-realm-realm.json:ro
     healthcheck:
@@ -68,3 +75,11 @@ services:
 
 volumes:
   keycloak-prod-postgres-data:
+
+networks:
+  keycloak-prod-private:
+    name: edol-keycloak-prod-private
+    driver: bridge
+  reverse-proxy:
+    external: true
+    name: edol-reverse-proxy
