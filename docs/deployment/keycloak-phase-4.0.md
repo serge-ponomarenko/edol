@@ -56,10 +56,22 @@ environment placeholders.
 
 The import creates one `edol` realm and one confidential `edol-hub-web`
 client. It enables only Authorization Code flow with PKCE `S256`; direct grant,
-implicit flow, device flow, service accounts, standard token exchange, and
-offline-token scope are disabled. The access-token lifetime is five minutes and
-client session idle/max are 30 minutes/eight hours. Each target has one exact
-redirect URI and web origin, supplied by its own secret-managed environment.
+implicit flow, device flow, service accounts, and offline-token scope are
+disabled. Keycloak 26.7.4 represents device authorization as the supported
+client attribute `oauth2.device.authorization.grant.enabled=false`.
+`standardTokenExchangeEnabled` is not a 26.7.4 `ClientRepresentation` field, so
+the import does not contain it or any token-exchange-enabling attribute. The
+server feature is available by default, but Keycloak requires an explicit
+client switch before a client can use standard token exchange; its absence keeps
+`edol-hub-web` unable to request it. The access-token lifetime is five minutes
+and client session idle/max are 30 minutes/eight hours. Each target has one
+exact redirect URI and web origin, supplied by its own secret-managed
+environment.
+
+Run `node docker/keycloak/realm/validate-realm-schema.mjs` before a realm
+import. It checks the complete tracked realm/client key sets against the
+reviewed Keycloak 26.7.4 representation subset and asserts the required client
+security settings without resolving or printing secrets.
 
 Keycloak skips an already imported realm, so an unchanged restart is
 idempotent. Change review is performed through the tracked realm artifact; a

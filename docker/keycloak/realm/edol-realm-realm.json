@@ -43,8 +43,6 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
-      "standardTokenExchangeEnabled": false,
-      "oauth2DeviceAuthorizationGrantEnabled": false,
       "redirectUris": [
         "${EDOL_HUB_WEB_REDIRECT_URI}"
       ],
@@ -58,6 +56,7 @@
       "optionalClientScopes": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",
+        "oauth2.device.authorization.grant.enabled": "false",
         "access.token.lifespan": "300",
         "client.session.idle.timeout": "1800",
         "client.session.max.lifespan": "28800"

@@ -110,11 +110,12 @@ EDOL_KEYCLOAK_SSL_REQUIRED=all
 Validate the composition without echoing resolved secrets:
 
 ```bash
+node keycloak/realm/validate-realm-schema.mjs
 docker compose --env-file ../../.env_edol_keycloak_dev \
   -f compose.keycloak-dev.yaml config --quiet
 ```
 
-The command must exit zero. A missing mode or any value other than
+Both commands must exit zero. A missing mode or any value other than
 `secure-multi-tenant` fails before PostgreSQL or Keycloak starts. Do not run
 plain `docker compose config` with this env file because it can print expanded
 secret values.
