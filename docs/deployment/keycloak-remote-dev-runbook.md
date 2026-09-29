@@ -21,7 +21,7 @@ Before starting, the server administrator records:
 | Keycloak Docker DNS alias | `edol-keycloak-dev:8080` |
 | Administration network | a concrete VPN or fixed source CIDR for `<ADMIN_CIDR>` |
 | TLS | Let's Encrypt certificate managed by containerized Nginx |
-| DNS | initially Cloudflare DNS-only; see proxy restriction below |
+| DNS | Cloudflare DNS-only; see LAN split-DNS and proxy restriction below |
 | Mail | verified Resend sender and administrator-managed API key |
 | Secrets | an external owner-only env file, injected with `--env-file` |
 
@@ -32,12 +32,18 @@ production Keycloak database, or a production client secret for dev.
 ## Network and Nginx preflight
 
 The supplied Nginx template allows `/admin/` and `/realms/master/` only from
-container loopback and `<ADMIN_CIDR>`. Set the Cloudflare DNS records to
-**DNS-only** for the initial deployment so the Nginx container sees the actual
-client address. A proxied Cloudflare hostname requires a separately reviewed
-trusted `real_ip` configuration and Cloudflare Access policy before it may be
-enabled; do not assume that a source-CIDR allowlist works behind an unconfigured
-proxy.
+container loopback and `<ADMIN_CIDR>`. Keep the auth hostname **DNS-only** in
+Cloudflare so the Nginx container sees the actual client address. Cloudflare
+proxying is not part of the approved topology and must not be enabled for this
+hostname; do not assume that a source-CIDR allowlist works through a proxy.
+
+For the accepted dev topology, the public DNS record resolves
+`auth.dev.edol.s-pon.dev` to the public server address, while the LAN resolver
+should use split DNS to resolve that same hostname to `192.168.0.200`. This
+preserves TLS hostname validation and avoids unreliable router hairpin NAT.
+Do not change public DNS merely to solve LAN access; a LAN browser error such as
+`ERR_SSL_VERSION_OR_CIPHER_MISMATCH` during hairpin access is a network-path
+problem, not by itself evidence of a Keycloak or certificate fault.
 
 Create the transport network once. It is independent of the existing
 `nginx_default` Compose-owned network and remains outside the lifecycle of both
@@ -107,7 +113,13 @@ EDOL_HUB_WEB_ORIGIN=http://localhost:8090
 EDOL_KEYCLOAK_SSL_REQUIRED=all
 ```
 
-Validate the composition without echoing resolved secrets:
+For realm `edol`, the tracked startup-import file must be named
+`edol-realm.json`: Keycloak applies the `<realm>-realm.json` filename rule.
+The JSON is limited to the reviewed Keycloak 26.7.4 realm/client
+representation subset. In particular, do not add the unsupported
+`standardTokenExchangeEnabled` field; standard token exchange remains
+unconfigured for this client. Validate the composition without echoing resolved
+secrets:
 
 ```bash
 node keycloak/realm/validate-realm-schema.mjs
@@ -118,7 +130,20 @@ docker compose --env-file ../../.env_edol_keycloak_dev \
 Both commands must exit zero. A missing mode or any value other than
 `secure-multi-tenant` fails before PostgreSQL or Keycloak starts. Do not run
 plain `docker compose config` with this env file because it can print expanded
-secret values.
+secret values. The Compose guard deliberately uses one scalar command argument,
+`'test "$$EDOL_DEPLOYMENT_MODE" = "secure-multi-tenant"'`, with
+`entrypoint: ["/bin/bash", "-ec"]`. Do not split the test expression into YAML
+list items: Bash accepts only the first item after `-c` as its command string.
+
+If Node is not installed on the server, run the same read-only validator in a
+disposable container; it reads only the tracked realm directory and uses no
+network:
+
+```bash
+docker run --rm --read-only --network none \
+  -v "$PWD/keycloak/realm:/work:ro" -w /work node:22-alpine \
+  node validate-realm-schema.mjs
+```
 
 ## Database bootstrap and start
 
@@ -227,15 +252,55 @@ secret-expanded Compose output to a ticket.
    `keycloak-phase-4.0.md`: Keycloak role cannot connect to EDOL or use `hub`
    or `core`, and `hub_runtime` cannot connect to Keycloak.
 
-8. Create one disposable dev identity, verify email, request a password reset,
-   disable the identity, and prove the next authorization-code login fails.
-   Delete the disposable identity after evidence is recorded.
+8. After confirming that the Resend sender domain is verified, perform the
+   disposable account lifecycle in this order: create the identity; complete
+   email verification; send and complete password update/reset; prove an
+   enabled-user Authorization Code + PKCE login; disable the identity; prove a
+   fresh private-session login is rejected; then delete the identity. Never use
+   a production identity and never retain action-token URLs or authorization
+   codes in the evidence.
 
-9. Perform a backup-and-restore drill before acceptance: create a custom
-   format `pg_dump -Fc --no-owner --no-privileges`, record its SHA-256, restore
-   it to a new isolated Keycloak database, and repeat discovery there. Stop
-   Keycloak before a realm export. Realm exports are drift evidence, not a
-   substitute for database backup.
+9. Perform the backup-and-restore drill below before acceptance. Stop Keycloak
+   before a realm export. Realm exports are drift evidence, not a substitute
+   for database backup.
+
+## Backup and isolated restore drill
+
+Create the instance-specific backup with `pg_dump -Fc --no-owner
+--no-privileges`, keep it outside Git under the approved backup policy, record
+its SHA-256, and set owner-only permissions:
+
+```bash
+chmod 600 <keycloak-backup-file>
+sha256sum <keycloak-backup-file>
+```
+
+If the host has no compatible `pg_restore`, inspect the custom archive with a
+read-only PostgreSQL 17 container instead of installing tools or exposing the
+database:
+
+```bash
+docker run --rm --read-only \
+  -v <backup-directory>:/backup:ro postgres:17 \
+  pg_restore --list /backup/<keycloak-backup-file> >/dev/null
+```
+
+For a recovery drill, use a uniquely named disposable PostgreSQL 17 container,
+private Docker network, and volume. Inject a temporary restore-only database
+credential through an external protected env file; do not put it in the
+command line or the repository. Do not attach the restore database or
+Keycloak to `edol-reverse-proxy`, and do not publish any host port. Restore
+with `pg_restore --no-owner --no-privileges --exit-on-error`, then confirm the
+expected `master`, `edol`, and `edol-hub-web` records.
+
+Start a disposable Keycloak container on that same private restore network
+against the restored database with an isolated test hostname. Do **not** pass
+`--import-realm`; this validates the restored database rather than a fresh JSON
+import. Query discovery from a disposable curl container on the restore
+network and require HTTP `200` and the isolated issuer. After recording only
+redacted evidence, explicitly inspect and remove the named temporary
+containers, network, and volume. Do not use broad Docker prune commands or
+remove any live dev resources.
 
 ## Rollback and later production
 

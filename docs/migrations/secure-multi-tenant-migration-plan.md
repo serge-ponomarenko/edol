@@ -1462,8 +1462,10 @@ PostgreSQL Testcontainers suite. The Stage 3 backup was created, checksummed,
 and parsed with `pg_restore --list`; a full isolated restore remains a
 post-acceptance operational recovery drill.
 
-Stage H is the recommended next implementation stage. It establishes the
-explicit home profile and prevents the secure architecture from becoming the
-only self-hosted installation path. Stage 4 follows only after Stage H and
-after its Keycloak production hostname, TLS, mail-delivery, backup, and
-secret-management prerequisites are ready.
+Stage H is accepted. It establishes the explicit home profile and prevents the
+secure architecture from becoming the only self-hosted installation path.
+Stage 4 follows only after Stage H and after its Keycloak production hostname,
+TLS, mail-delivery, backup, and secret-management prerequisites are ready.
+Phase 4.0 remote-dev Keycloak infrastructure acceptance is recorded in
+`docs/deployment/keycloak-phase-4.0.md`; production deployment remains a
+separately approved operation.

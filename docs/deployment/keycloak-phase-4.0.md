@@ -36,6 +36,44 @@ and the base home composition; this Phase 4.0 material does not implement it.
 The Stage 3 `LegacyDefaultTenantCompatibilityScope` remains unchanged and is
 not a home-mode mechanism.
 
+## Remote-dev acceptance record — 2026-09-29
+
+Phase 4.0 remote-dev infrastructure acceptance is complete. This is evidence
+for the `secure-multi-tenant` Keycloak deployment prerequisite only; it does
+not accept a production deployment or any Stage 4 Hub BFF, JIT provisioning,
+membership-selection, or compatibility-bridge work. Evidence below is
+redacted: it contains no credentials, action-token URLs, authorization codes,
+session identifiers, or backup contents.
+
+The exercised topology was `nginx-home` (Docker) -> external
+`edol-reverse-proxy` -> `edol-keycloak-dev:8080`; Keycloak also joined its
+instance-private `edol-keycloak-dev-private` network with its dedicated
+PostgreSQL service. Nginx terminated TLS for
+`auth.dev.edol.s-pon.dev`; Keycloak remained HTTP-only inside Docker.
+
+| Check | Result | Runtime evidence |
+| --- | --- | --- |
+| Version, guard, and clean bootstrap | PASS | Keycloak `26.7.4`; the Compose guard exited `0`; fresh Keycloak and PostgreSQL became healthy and the realm imported. |
+| Realm import compatibility | PASS | `edol-realm.json` imported successfully; the Node `22-alpine` realm validator passed. The unsupported `standardTokenExchangeEnabled` representation field was absent, while device authorization was disabled by the supported client attribute. |
+| PostgreSQL least privilege | PASS | `edol_keycloak_dev` had `superuser=false`, `createdb=false`, and `createrole=false`. |
+| Port and Docker-network isolation | PASS | Keycloak joined the private and shared reverse-proxy networks; PostgreSQL joined only the private network. Keycloak `8080`/`8443`/`9000` and PostgreSQL `5432` had no host bindings. |
+| Nginx administration boundary | PASS | The approved LAN CIDR `192.168.0.0/24` received an admin redirect; external `/admin/` and `/realms/master/` requests were denied with `403`. Nginx observed the LAN source address directly. |
+| OIDC and keys | PASS | HTTPS discovery returned `200` with issuer `https://auth.dev.edol.s-pon.dev/realms/edol`; the JWKS endpoint returned valid RSA signing/encryption keys. |
+| Client security profile | PASS | Confidential `edol-hub-web` used Authorization Code flow and PKCE S256; implicit, direct-access, service-account, and device flows were disabled; default scopes were `profile` and `email`, optional scopes were empty, and access tokens lasted 300 seconds. |
+| Negative OAuth checks | PASS | An unapproved redirect URI returned `400`; password grant returned `unauthorized_client`; `offline_access` was rejected with `invalid_scope`; missing PKCE was rejected and a valid S256 challenge reached the login page. |
+| Email and account lifecycle | PASS | After Resend sender-domain verification, email verification and password-update email delivery succeeded. A verified enabled disposable user completed Authorization Code + PKCE login; after disabling it, a fresh private-session login was rejected; the identity was deleted. |
+| Backup and structural validation | PASS | A custom `pg_dump -Fc --no-owner --no-privileges` archive was created with owner-only mode. `keycloak-dev-20260929T171752Z.dump` (outside Git) had SHA-256 `b7a0feab79997aafc2ae450f4337c5607e648d8fc1da9f416eb9b6751017451f`; PostgreSQL 17.10 parsed it as custom format with 524 TOC entries. |
+| Isolated restore recovery drill | PASS | An isolated restore database completed with `pg_restore --no-owner --no-privileges --exit-on-error`. Keycloak started against it without `--import-realm`, and isolated discovery returned `200`; the temporary containers, network, and volume were then removed. |
+
+Keycloak logged warnings that `profile` and `email` client scopes were not yet
+found during import. The final runtime client nevertheless contained both as
+default scopes. This is recorded as a non-blocking observation, not an
+established defect or an asserted import-order explanation.
+
+The Nginx 1.29.x warning for deprecated `listen 443 ssl http2` syntax was also
+observed. It is non-blocking and outside EDOL-048; this close-out does not
+change the independently managed Nginx configuration.
+
 ## Dev server for local IntelliJ Hub work
 
 `compose.keycloak-dev.yaml` runs on the server. Its realm client has the exact
@@ -148,13 +186,10 @@ The approved identity hostnames and Docker DNS aliases are:
 Before starting Keycloak, the server administrator must:
 
 1. Create Cloudflare DNS records for both hostnames to the Debian server.
-2. Initially make each identity hostname DNS-only in Cloudflare. The Nginx
-   template authorizes `/admin/` by source CIDR, which is meaningful only when
-   Nginx receives the administrator's source address directly. If a hostname
-   is later proxied through Cloudflare, do not enable the proxy until a
-   separately reviewed Nginx `real_ip` configuration trusts only Cloudflare
-   address ranges and an equivalent Cloudflare Access policy protects the
-   administration paths.
+2. Keep each identity hostname DNS-only in Cloudflare. The Nginx template
+   authorizes `/admin/` by source CIDR, which is meaningful only when Nginx
+   receives the administrator's source address directly. Cloudflare proxying is
+   outside this approved topology and must not be enabled for the auth hostname.
 3. Choose and execute a Let's Encrypt challenge procedure. HTTP-01 is
    acceptable when Nginx can serve the challenge path on port 80. DNS-01 is
    also acceptable with a Cloudflare token restricted to DNS edits for
@@ -250,9 +285,11 @@ flows with a production account.
 8. Dev email verification, reset password, and disabled-user behavior pass with
    a disposable identity.
 9. Create a custom-format database backup, checksum it, restore it into a new
-   isolated Keycloak database, and verify discovery after restore. Stop all
-   Keycloak nodes before a realm export; realm exports are configuration/drift
-   evidence, not a complete backup.
+   isolated Keycloak database, start a disposable Keycloak against the restored
+   database **without** `--import-realm`, and verify discovery after restore.
+   Remove the temporary restore containers, network, and volume after evidence
+   is recorded. Stop all Keycloak nodes before a realm export; realm exports are
+   configuration/drift evidence, not a complete backup.
 
 ## Backup, upgrade, rollback, and rotation
 

@@ -97,9 +97,9 @@ memberships, separate service identities, trusted tenant propagation, and
 forced RLS are required. The required `EDOL_DEPLOYMENT_MODE` /
 `edol.deployment.mode` selection will fail on an absent or unknown value, and
 mode changes will not convert an existing database; a later controlled,
-backup-first home-to-secure migration is required. Stage H source now provides
-the explicit home Compose template and fail-closed mode selection, but is not
-accepted or deployed. Until the BFF and service-authentication stages exist,
+backup-first home-to-secure migration is required. Stage H is accepted and
+provides the explicit home Compose template and fail-closed mode selection, but
+is not deployed. Until the BFF and service-authentication stages exist,
 the selected `secure-multi-tenant` mode fails startup rather than exposing the
 current pre-auth ingress.
 

@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { readFileSync } from "node:fs";
 
 const realmPath = new URL("./edol-realm.json", import.meta.url);
@@ -62,11 +63,18 @@ function requireKnownKeys(value, allowedKeys, description) {
 
 requireKnownKeys(realm, allowedRealmKeys, "Realm representation");
 requireCondition(realm.realm === "edol", "Expected the edol realm");
+requireCondition(
+    basename(realmPath.pathname) === `${realm.realm}-realm.json`,
+    "Realm import filename must follow Keycloak's <realm>-realm.json convention"
+);
 requireCondition(Array.isArray(realm.clients) && realm.clients.length === 1, "Expected one client");
 
 const [client] = realm.clients;
 requireKnownKeys(client, allowedClientKeys, "Client representation");
 requireCondition(client.clientId === "edol-hub-web", "Expected the edol-hub-web client");
+requireCondition(client.enabled === true, "edol-hub-web must remain enabled");
+requireCondition(client.publicClient === false, "edol-hub-web must remain confidential");
+requireCondition(client.clientAuthenticatorType === "client-secret", "edol-hub-web must use client-secret authentication");
 requireCondition(client.standardFlowEnabled === true, "Authorization Code flow must remain enabled");
 requireCondition(client.implicitFlowEnabled === false, "Implicit flow must remain disabled");
 requireCondition(client.directAccessGrantsEnabled === false, "Direct access grants must remain disabled");
@@ -87,6 +95,22 @@ requireCondition(
 requireCondition(
     client.attributes?.["oauth2.device.authorization.grant.enabled"] === "false",
     "Device Authorization Grant must remain disabled"
+);
+requireCondition(
+    JSON.stringify(client.redirectUris) === JSON.stringify(["${EDOL_HUB_WEB_REDIRECT_URI}"]),
+    "edol-hub-web must have exactly the deployment-managed redirect URI"
+);
+requireCondition(
+    JSON.stringify(client.webOrigins) === JSON.stringify(["${EDOL_HUB_WEB_ORIGIN}"]),
+    "edol-hub-web must have exactly the deployment-managed web origin"
+);
+requireCondition(
+    JSON.stringify(client.defaultClientScopes) === JSON.stringify(["profile", "email"]),
+    "edol-hub-web must have only profile and email default scopes"
+);
+requireCondition(
+    Array.isArray(client.optionalClientScopes) && client.optionalClientScopes.length === 0,
+    "edol-hub-web must not have optional client scopes"
 );
 requireCondition(
     !client.defaultClientScopes.includes("offline_access") && !client.optionalClientScopes.includes("offline_access"),
