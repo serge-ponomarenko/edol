@@ -12,6 +12,10 @@ public class TenantContext {
 
     private final ThreadLocal<ScopeState> state = new ThreadLocal<>();
 
+    public boolean hasCurrentTenant() {
+        return state.get() != null;
+    }
+
     public UUID getCurrentTenantId() {
         ScopeState current = state.get();
         if (current == null) {

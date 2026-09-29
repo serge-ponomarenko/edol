@@ -3,6 +3,7 @@ package org.spon.edolhub.config;
 import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.service.TenantContext;
+import org.spon.edolhub.service.IdentityContext;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,9 +17,10 @@ import javax.sql.DataSource;
 public class HubPersistenceConfiguration {
 
     private final TenantContext tenantContext;
+    private final IdentityContext identityContext;
 
     @Bean
     PlatformTransactionManager transactionManager(EntityManagerFactory entityManagerFactory, DataSource dataSource) {
-        return new TenantAwareJpaTransactionManager(entityManagerFactory, dataSource, tenantContext);
+        return new TenantAwareJpaTransactionManager(entityManagerFactory, dataSource, tenantContext, identityContext);
     }
 }

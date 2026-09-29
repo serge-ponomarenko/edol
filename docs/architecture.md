@@ -21,7 +21,7 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with Po
 
 Core runtime is per printer. New printer, connection and session identifiers use UUID v7; historical UUID v4 values are retained. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints; default-printer HTTP endpoints are not supported. Hub, AMS and Notify use only explicit printer endpoints. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
 
-Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. `TenantContext` is fail-closed; the database-marked default tenant is available only through the named legacy compatibility scope at explicitly allowlisted pre-auth ingress. Authentication, user membership and printer assignment remain future work. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
+Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. In `secure-multi-tenant` mode, Hub is an OIDC BFF: a validated OIDC identity discovers active memberships before a request establishes the fail-closed `TenantContext`. The historical default-tenant request bridge is removed. Until Stage 5 provides trusted Core tenant propagation, secure-mode Hub background MQTT, recovery, and scheduled catalog work are intentionally unavailable rather than inferring a tenant. AMS retains only its separately trusted three-route internal compatibility ingress. Home uses its independent installation-owned tenant scope. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 
 ## Accepted Multi-Tenant Direction
 
@@ -59,8 +59,15 @@ privileges were removed, Flyway privileges were preserved, and compatibility
 logs now expose incrementing metric values. A production request matching an
 active spool returned `HTTP 200` with the complete unchanged JSON graph and no
 lazy-proxy serialization error. Stage 3 was formally accepted on 2026-09-28.
-Existing pre-auth Hub ingress uses only the named, metered legacy compatibility
-scope; ordinary Hub persistence has no default tenant fallback.
+Stage 4 source replaces the pre-auth Hub ingress with Keycloak Authorization
+Code + PKCE BFF login, server-side servlet sessions and authorized-client
+storage, active-membership tenant selection, and idempotent JIT provisioning.
+V8 adds transaction-local OIDC identity RLS policies and a closed-by-default,
+serialized legacy first-owner claim. It deliberately does not drop
+`tenants.is_default`: that cleanup is authored only after a recorded claim.
+The source increment is not Stage 4 deployment acceptance; production
+Keycloak, trusted AMS ingress, operational bootstrap opening, and remote-dev
+end-to-end evidence remain separate prerequisites.
 Spring Data repositories initialize lazily so framework bootstrap has no tenant
 context; their first actual use still requires the normal fail-closed resolver.
 A clean installation may have no migration tenant because Stage 2 removes an
@@ -99,9 +106,8 @@ forced RLS are required. The required `EDOL_DEPLOYMENT_MODE` /
 mode changes will not convert an existing database; a later controlled,
 backup-first home-to-secure migration is required. Stage H is accepted and
 provides the explicit home Compose template and fail-closed mode selection, but
-is not deployed. Until the BFF and service-authentication stages exist,
-the selected `secure-multi-tenant` mode fails startup rather than exposing the
-current pre-auth ingress.
+is not deployed. Secure Hub now requires its BFF OIDC configuration and starts
+only with those prerequisites; it does not expose the former pre-auth ingress.
 
 ## Lifecycle and Persistence
 

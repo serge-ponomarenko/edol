@@ -852,11 +852,11 @@ membership services, browser templates, session handling, and audit events.
 - Existing data migration is the atomic first-owner claim of the already
   backfilled legacy tenant. Clean databases create a tenant during JIT; there
   is no bulk data backfill.
-- After a non-empty legacy tenant has been claimed, remove `tenants.is_default`
-  and its single-default index in the Stage 4 cleanup migration. Stage 4 is not
-  accepted while default-marker schema or normal user-runtime default semantics
-  remain. The separately named AMS compatibility adapter is tracked until
-  Stage 7 and is never consulted by `TenantContext`.
+- Do not author or apply a Flyway migration that removes `tenants.is_default`
+  before an actual non-empty legacy-tenant claim is evidenced. The claim clears
+  the marker atomically; only then may a separately reviewed cleanup artifact
+  remove the column and its index. The separately named AMS compatibility
+  adapter is tracked until Stage 7 and is never consulted by `TenantContext`.
 
 ### Mandatory compatibility removal
 

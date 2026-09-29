@@ -9,8 +9,10 @@ import org.spon.edolhub.service.spool.AllocationPreviewRuntimeSyncService;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @Service
+@ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "home")
 @RequiredArgsConstructor
 @Slf4j
 public class PrintJobRecoveryService {

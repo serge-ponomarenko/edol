@@ -7,6 +7,7 @@ import org.spon.edolhub.model.entity.Printer;
 import org.spon.edolhub.repository.PrinterRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.lang.Nullable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -26,6 +27,7 @@ public class PrinterCatalogSyncService {
     private final TenantContext tenantContext;
     private final LegacyPrinterBackfillService backfillService;
     private final PrinterCatalogStatus status;
+    @Nullable
     private final TenantScopeProvider tenantScopeProvider;
     private final TenantAwareTransactionalExecutor transactionalExecutor;
     private final ReentrantLock synchronizationLock = new ReentrantLock();
@@ -35,6 +37,10 @@ public class PrinterCatalogSyncService {
             initialDelayString = "${edol-hub.printer-sync-interval-ms:60000}"
     )
     public void synchronize() {
+        if (tenantScopeProvider == null) {
+            status.migrationBlocked("Secure Hub printer synchronization awaits Stage 5 tenant propagation");
+            return;
+        }
         var scope = tenantScopeProvider.openIfConfigured("scheduled-printer-catalog-sync");
         if (scope.isEmpty()) {
             status.migrationBlocked("Legacy tenant compatibility is not configured");

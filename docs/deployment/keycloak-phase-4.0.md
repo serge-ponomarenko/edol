@@ -33,8 +33,10 @@ Compose guard requires the exact value
 its PostgreSQL service. A missing value fails interpolation; `home` and every
 other value fail the guard. Stage H owns the application-process mode binding
 and the base home composition; this Phase 4.0 material does not implement it.
-The Stage 3 `LegacyDefaultTenantCompatibilityScope` remains unchanged and is
-not a home-mode mechanism.
+The Stage 3 `LegacyDefaultTenantCompatibilityScope` is not a home-mode
+mechanism. It is removed by the Stage 4 Hub source increment; this Phase 4.0
+record remains infrastructure evidence and does not itself reconcile a running
+realm or accept the application rollout.
 
 ## Remote-dev acceptance record — 2026-09-29
 
@@ -106,6 +108,12 @@ client switch before a client can use standard token exchange; its absence keeps
 and client session idle/max are 30 minutes/eight hours. Each target has one
 exact redirect URI and web origin, supplied by its own secret-managed
 environment.
+
+The tracked realm additionally declares one exact deployment-managed OIDC
+post-logout redirect URI through `EDOL_HUB_WEB_POST_LOGOUT_REDIRECT_URI`.
+The accepted remote-dev realm predates that tracked setting. Do not reset,
+recreate, or re-import the live dev realm to apply it; apply it only through a
+separately reviewed Keycloak reconciliation, then record the redacted result.
 
 Run `node docker/keycloak/realm/validate-realm-schema.mjs` before a realm
 import. It checks the complete tracked realm/client key sets against the

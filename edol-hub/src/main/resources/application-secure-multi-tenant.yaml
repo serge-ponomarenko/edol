@@ -1,0 +1,19 @@
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          edol-keycloak:
+            client-id: edol-hub-web
+            client-secret: ${EDOL_HUB_WEB_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: openid,profile,email
+        provider:
+          edol-keycloak:
+            issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
+
+edol-hub:
+  ams-compatibility:
+    legacy-tenant-id: ${EDOL_HUB_AMS_COMPATIBILITY_LEGACY_TENANT_ID:}
+    ingress-token: ${EDOL_HUB_AMS_COMPATIBILITY_INGRESS_TOKEN:}

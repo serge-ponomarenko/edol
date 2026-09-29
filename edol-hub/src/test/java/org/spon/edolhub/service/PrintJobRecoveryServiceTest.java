@@ -42,7 +42,7 @@ class PrintJobRecoveryServiceTest {
     private PrinterCatalogSyncService printerCatalogSyncService;
 
     @Mock
-    private LegacyDefaultTenantCompatibilityScope compatibilityScope;
+    private TenantScopeProvider compatibilityScope;
 
     @Mock
     private TenantContext.TenantScope tenantScope;

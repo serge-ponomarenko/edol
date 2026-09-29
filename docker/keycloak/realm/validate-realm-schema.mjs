@@ -97,6 +97,10 @@ requireCondition(
     "Device Authorization Grant must remain disabled"
 );
 requireCondition(
+    client.attributes?.["post.logout.redirect.uris"] === "${EDOL_HUB_WEB_POST_LOGOUT_REDIRECT_URI}",
+    "edol-hub-web must have exactly the deployment-managed post-logout redirect URI"
+);
+requireCondition(
     JSON.stringify(client.redirectUris) === JSON.stringify(["${EDOL_HUB_WEB_REDIRECT_URI}"]),
     "edol-hub-web must have exactly the deployment-managed redirect URI"
 );

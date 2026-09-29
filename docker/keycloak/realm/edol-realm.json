@@ -57,6 +57,7 @@
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "oauth2.device.authorization.grant.enabled": "false",
+        "post.logout.redirect.uris": "${EDOL_HUB_WEB_POST_LOGOUT_REDIRECT_URI}",
         "access.token.lifespan": "300",
         "client.session.idle.timeout": "1800",
         "client.session.max.lifespan": "28800"

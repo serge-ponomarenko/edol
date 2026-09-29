@@ -83,10 +83,52 @@ class HubMigrationTest {
                 .query(Integer.class).single()).isZero();
         assertThat(jdbc.sql("select count(*) from hub.tenant_memberships")
                 .query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from hub.legacy_tenant_bootstrap_state")
+                .query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from pg_proc where oid = 'hub.claim_legacy_tenant_owner(text,text,text,text)'::regprocedure")
+                .query(Integer.class).single()).isEqualTo(1);
         assertThat(jdbc.sql("select nextval('hub.print_jobs_public_id_seq')")
                 .query(Long.class).single()).isEqualTo(1L);
 
         new LegacyPrinterBackfillService(jdbc).validateOwnership(List.of());
+    }
+
+    @Test
+    void claimsTheLegacyTenantExactlyOnceAfterAnExplicitBootstrapOpen() {
+        flyway(MigrationVersion.fromVersion("7")).migrate();
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        UUID legacyTenantId = UUID.fromString("00000000-0000-0000-0000-000000000061");
+        jdbc.sql("insert into hub.tenants (id, name, is_default) values (:id, 'Legacy tenant', true)")
+                .param("id", legacyTenantId)
+                .update();
+        flyway(null).migrate();
+
+        jdbc.sql("update hub.legacy_tenant_bootstrap_state set claim_open = true where singleton")
+                .update();
+        UUID claimedTenantId = jdbc.sql("""
+                        select hub.claim_legacy_tenant_owner(
+                            'https://issuer.example/realms/edol', 'owner-subject', 'Owner', null
+                        )
+                        """)
+                .query(UUID.class)
+                .single();
+
+        assertThat(claimedTenantId).isEqualTo(legacyTenantId);
+        assertThat(jdbc.sql("select count(*) from hub.users")
+                .query(Integer.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from hub.tenant_memberships where role = 'OWNER' and status = 'ACTIVE'")
+                .query(Integer.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select is_default from hub.tenants where id = :id")
+                .param("id", legacyTenantId)
+                .query(Boolean.class).single()).isFalse();
+        assertThat(jdbc.sql("select claim_open from hub.legacy_tenant_bootstrap_state where singleton")
+                .query(Boolean.class).single()).isFalse();
+        assertThatThrownBy(() -> jdbc.sql("""
+                        select hub.claim_legacy_tenant_owner(
+                            'https://issuer.example/realms/edol', 'second-subject', 'Second', null
+                        )
+                        """).query(UUID.class).single())
+                .hasMessageContaining("bootstrap window is closed");
     }
 
     @Test

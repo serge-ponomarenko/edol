@@ -5,7 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.spon.edolhub.service.LegacyDefaultTenantCompatibilityScope;
+import org.spon.edolhub.service.TenantScopeProvider;
 import org.spon.edolhub.service.PrintJobService;
 import org.spon.edolhub.service.PrinterCatalogSyncService;
 import org.spon.edolhub.service.PrinterService;
@@ -32,7 +32,7 @@ class MqttEventListenerTest {
     private PrintJobService printJobService;
 
     @Mock
-    private LegacyDefaultTenantCompatibilityScope compatibilityScope;
+    private TenantScopeProvider compatibilityScope;
 
     @Mock
     private TenantContext.TenantScope tenantScope;

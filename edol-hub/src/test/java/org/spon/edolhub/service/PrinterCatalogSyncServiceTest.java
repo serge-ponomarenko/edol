@@ -51,7 +51,7 @@ class PrinterCatalogSyncServiceTest {
     private PrinterCatalogStatus status;
 
     @Mock
-    private LegacyDefaultTenantCompatibilityScope compatibilityScope;
+    private TenantScopeProvider compatibilityScope;
 
     @Mock
     private TenantAwareTransactionalExecutor transactionalExecutor;

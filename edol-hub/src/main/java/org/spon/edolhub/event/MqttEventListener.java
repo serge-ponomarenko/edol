@@ -12,11 +12,13 @@ import org.spon.edolhub.service.TenantScopeProvider;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.UUID;
 
 
 @Component
+@ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "home")
 @RequiredArgsConstructor
 @Slf4j
 public class MqttEventListener {
