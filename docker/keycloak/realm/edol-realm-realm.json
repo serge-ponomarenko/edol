@@ -1,0 +1,67 @@
+{
+  "realm": "edol",
+  "enabled": true,
+  "displayName": "EDOL",
+  "sslRequired": "${EDOL_KEYCLOAK_SSL_REQUIRED}",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": true,
+  "rememberMe": false,
+  "verifyEmail": true,
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "bruteForceProtected": true,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "accessTokenLifespan": 300,
+  "defaultDefaultClientScopes": [
+    "profile",
+    "email"
+  ],
+  "defaultOptionalClientScopes": [],
+  "smtpServer": {
+    "host": "${EDOL_SMTP_HOST}",
+    "port": "${EDOL_SMTP_PORT}",
+    "from": "${EDOL_SMTP_FROM}",
+    "fromDisplayName": "EDOL",
+    "auth": "${EDOL_SMTP_AUTH}",
+    "user": "${EDOL_SMTP_USER}",
+    "password": "${EDOL_SMTP_PASSWORD}",
+    "starttls": "${EDOL_SMTP_STARTTLS}"
+  },
+  "clients": [
+    {
+      "clientId": "edol-hub-web",
+      "name": "EDOL Hub web BFF",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${EDOL_HUB_WEB_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "standardTokenExchangeEnabled": false,
+      "oauth2DeviceAuthorizationGrantEnabled": false,
+      "redirectUris": [
+        "${EDOL_HUB_WEB_REDIRECT_URI}"
+      ],
+      "webOrigins": [
+        "${EDOL_HUB_WEB_ORIGIN}"
+      ],
+      "defaultClientScopes": [
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "access.token.lifespan": "300",
+        "client.session.idle.timeout": "1800",
+        "client.session.max.lifespan": "28800"
+      }
+    }
+  ]
+}

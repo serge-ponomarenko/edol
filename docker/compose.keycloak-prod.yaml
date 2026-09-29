@@ -1,0 +1,70 @@
+name: edol-secure-multi-tenant-prod
+
+services:
+  secure-multi-tenant-mode-guard:
+    image: quay.io/keycloak/keycloak:26.7.4
+    entrypoint: ["/bin/bash", "-ec"]
+    command: test "$$EDOL_DEPLOYMENT_MODE" = secure-multi-tenant
+    environment:
+      EDOL_DEPLOYMENT_MODE: ${EDOL_DEPLOYMENT_MODE:?EDOL_DEPLOYMENT_MODE is required}
+    restart: "no"
+
+  keycloak-prod-postgres:
+    image: postgres:17
+    env_file:
+      - ../../.env_edol_keycloak_prod
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_BOOTSTRAP_PASSWORD:?KEYCLOAK_POSTGRES_BOOTSTRAP_PASSWORD is required}
+      KEYCLOAK_DB_NAME: edol_keycloak_prod
+      KEYCLOAK_DB_USER: edol_keycloak_prod
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DATABASE_PASSWORD:?KEYCLOAK_DATABASE_PASSWORD is required}
+    volumes:
+      - keycloak-prod-postgres-data:/var/lib/postgresql/data
+      - ./keycloak/postgres/init/01-create-keycloak-db.sh:/docker-entrypoint-initdb.d/01-create-keycloak-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      secure-multi-tenant-mode-guard:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  keycloak-prod:
+    build:
+      context: ./keycloak
+    image: edol-keycloak:26.7.4-prod
+    env_file:
+      - ../../.env_edol_keycloak_prod
+    environment:
+      KC_DB_URL: jdbc:postgresql://keycloak-prod-postgres:5432/edol_keycloak_prod
+      KC_DB_USERNAME: edol_keycloak_prod
+      KC_DB_PASSWORD: ${KEYCLOAK_DATABASE_PASSWORD:?KEYCLOAK_DATABASE_PASSWORD is required}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:?KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME is required}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD:?KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD is required}
+      KC_HOSTNAME: https://${KEYCLOAK_PROD_HOSTNAME:?KEYCLOAK_PROD_HOSTNAME is required}
+      KC_HOSTNAME_STRICT: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+    command: start --optimized --import-realm
+    depends_on:
+      secure-multi-tenant-mode-guard:
+        condition: service_completed_successfully
+      keycloak-prod-postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${KEYCLOAK_PROD_HOST_PORT:?KEYCLOAK_PROD_HOST_PORT is required}:8080"
+    volumes:
+      - ./keycloak/realm/edol-realm-realm.json:/opt/keycloak/data/import/edol-realm-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9000; printf \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3; read -r line <&3; [[ \"$$line\" == *\"200\"* ]]'"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+    restart: unless-stopped
+
+volumes:
+  keycloak-prod-postgres-data:
