@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-const realmPath = new URL("./edol-realm-realm.json", import.meta.url);
+const realmPath = new URL("./edol-realm.json", import.meta.url);
 const realm = JSON.parse(readFileSync(realmPath, "utf8"));
 
 const allowedRealmKeys = new Set([

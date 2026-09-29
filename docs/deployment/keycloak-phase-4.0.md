@@ -49,8 +49,9 @@ its session cookie can be Secure, HttpOnly, and SameSite=Lax.
 
 ## Realm and client provisioning
 
-`edol-realm-realm.json` is mounted into Keycloak's supported startup-import
-directory. The filename follows the required `<realm>-realm.json` convention.
+`edol-realm.json` is mounted into Keycloak's supported startup-import
+directory. For realm `edol`, Keycloak requires the `<realm>-realm.json`
+convention, which produces `edol-realm.json`.
 It is tracked, contains no real secret, and obtains deployment values only from
 environment placeholders.
 
