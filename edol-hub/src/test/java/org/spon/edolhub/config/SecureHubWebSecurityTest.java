@@ -2,6 +2,8 @@ package org.spon.edolhub.config;
 
 import org.junit.jupiter.api.Test;
 import org.spon.edolhub.controller.TenantSelectionController;
+import org.spon.edolhub.model.entity.Tenant;
+import org.spon.edolhub.model.entity.TenantMembership;
 import org.spon.edolhub.service.IdentityContext;
 import org.spon.edolhub.service.JitProvisioningService;
 import org.spon.edolhub.service.PrinterAccessService;
@@ -35,6 +37,7 @@ import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Instant;
 import java.util.Map;
@@ -50,6 +53,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @WebMvcTest(
         controllers = TenantSelectionController.class,
@@ -109,6 +113,21 @@ class SecureHubWebSecurityTest {
     }
 
     @Test
+    void rendersTenantNamesForTheSelectionPage() throws Exception {
+        Tenant tenant = new Tenant();
+        tenant.setId(UUID.randomUUID());
+        tenant.setName("Personal tenant");
+        TenantMembership membership = new TenantMembership();
+        membership.setTenant(tenant);
+        when(membershipService.activeMemberships(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.List.of(membership));
+
+        mockMvc.perform(get("/tenants/select").session(authenticatedSession()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Personal tenant")));
+    }
+
+    @Test
     void storesOnlyMembershipValidatedTenantInServerSession() throws Exception {
         UUID tenantId = UUID.randomUUID();
         when(membershipService.hasActiveMembership(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(tenantId)))
@@ -129,11 +148,22 @@ class SecureHubWebSecurityTest {
 
     @Test
     void postsLogoutOnlyWithCsrfAndRedirectsAwayFromHub() throws Exception {
+        MockHttpSession session = authenticatedSession();
+
         mockMvc.perform(post("/logout")
                         .with(csrf())
-                        .session(authenticatedSession()))
+                        .session(session))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", containsString("/")));
+                .andExpect(header().string("Location", containsString("/")))
+                .andExpect(result -> org.assertj.core.api.Assertions.assertThat(
+                                UriComponentsBuilder.fromUriString(result.getResponse().getRedirectedUrl())
+                                        .build()
+                                        .getQueryParams()
+                                        .getFirst("post_logout_redirect_uri")
+                        )
+                        .isEqualTo("http://localhost/"));
+
+        org.assertj.core.api.Assertions.assertThat(session.isInvalid()).isTrue();
     }
 
     @Test
@@ -199,6 +229,7 @@ class SecureHubWebSecurityTest {
                     .jwkSetUri("https://identity.example/jwks")
                     .userInfoUri("https://identity.example/userinfo")
                     .userNameAttributeName("sub")
+                    .providerConfigurationMetadata(Map.of("end_session_endpoint", "https://identity.example/logout"))
                     .clientName("EDOL Keycloak")
                     .build();
             return new InMemoryClientRegistrationRepository(registration);

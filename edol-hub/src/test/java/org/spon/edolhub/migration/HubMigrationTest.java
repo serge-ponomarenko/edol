@@ -16,9 +16,18 @@ import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.model.entity.PrintAllocationGroup;
 import org.spon.edolhub.model.entity.PrintAllocationItem;
+import org.spon.edolhub.model.entity.Tenant;
+import org.spon.edolhub.model.entity.TenantMembership;
+import org.spon.edolhub.model.entity.TenantMembershipStatus;
+import org.spon.edolhub.model.entity.User;
 import org.spon.edolhub.model.entity.Vendor;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
+import org.spon.edolhub.repository.TenantMembershipRepository;
+import org.spon.edolhub.repository.TenantRepository;
+import org.spon.edolhub.repository.UserRepository;
+import org.spon.edolhub.service.IdentityContext;
 import org.spon.edolhub.service.LegacyPrinterBackfillService;
+import org.spon.edolhub.service.MissingTenantContextException;
 import org.spon.edolhub.service.TenantContext;
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -998,6 +1007,100 @@ class HubMigrationTest {
                 .single()).isZero();
     }
 
+    @Test
+    void identityScopedPreTenantJpaQueriesLoadOnlyTheAuthenticatedUsersMemberships() {
+        JdbcClient administratorJdbc = JdbcClient.create(dataSource);
+        administratorJdbc.sql("""
+                        DO
+                        $$
+                        BEGIN
+                            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hub_runtime') THEN
+                                CREATE ROLE hub_runtime LOGIN PASSWORD 'test-runtime-password'
+                                    NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+                            END IF;
+                        END;
+                        $$
+                        """).update();
+        flyway(null).migrate();
+
+        String issuer = "https://issuer.example/realms/edol";
+        String subject = "pre-tenant-subject";
+        UUID tenantId = UUID.fromString("00000000-0000-0000-0000-000000000551");
+        DataSource runtimeDataSource = new DriverManagerDataSource(
+                POSTGRES.getJdbcUrl(),
+                "hub_runtime",
+                "test-runtime-password"
+        );
+        JdbcClient runtimeJdbc = JdbcClient.create(runtimeDataSource);
+        TenantContext tenantContext = new TenantContext();
+        IdentityContext identityContext = new IdentityContext();
+
+        try (EntityManagerFactory runtimeEntityManagerFactory = entityManagerFactory(
+                runtimeDataSource,
+                tenantContext,
+                identityContext
+        )) {
+            TransactionTemplate transactionTemplate = new TransactionTemplate(
+                    new TenantAwareJpaTransactionManager(
+                            runtimeEntityManagerFactory,
+                            runtimeDataSource,
+                            tenantContext,
+                            identityContext
+                    )
+            );
+
+            assertThatThrownBy(() -> transactionTemplate.execute(status -> null))
+                    .isInstanceOf(MissingTenantContextException.class);
+
+            try (IdentityContext.IdentityScope identityScope = identityContext.open(issuer, subject);
+                 TenantContext.TenantScope tenantScope = tenantContext.open(tenantId)) {
+                transactionTemplate.executeWithoutResult(status -> {
+                    var entityManager = EntityManagerFactoryUtils
+                            .getTransactionalEntityManager(runtimeEntityManagerFactory);
+                    JpaRepositoryFactory repositoryFactory = new JpaRepositoryFactory(entityManager);
+                    User user = new User();
+                    user.setIssuer(issuer);
+                    user.setSubject(subject);
+                    user.setDisplayName("Pre-tenant user");
+                    User persistedUser = repositoryFactory.getRepository(UserRepository.class).save(user);
+                    Tenant tenant = new Tenant();
+                    tenant.setId(tenantId);
+                    tenant.setName("Pre-tenant");
+                    tenant.setDefaultTenant(false);
+                    Tenant persistedTenant = repositoryFactory.getRepository(TenantRepository.class).save(tenant);
+                    TenantMembership membership = new TenantMembership();
+                    membership.setTenant(persistedTenant);
+                    membership.setUser(persistedUser);
+                    membership.setRole(org.spon.edolhub.model.entity.TenantMembershipRole.OWNER);
+                    membership.setStatus(TenantMembershipStatus.ACTIVE);
+                    repositoryFactory.getRepository(TenantMembershipRepository.class).save(membership);
+                });
+            }
+
+            try (IdentityContext.IdentityScope ignored = identityContext.open(issuer, subject)) {
+                TenantMembership resolvedMembership = transactionTemplate.execute(status -> {
+                    assertThat(runtimeJdbc.sql("select coalesce(current_setting('edol.tenant_id', true), '')")
+                            .query(String.class)
+                            .single()).isEmpty();
+                    var entityManager = EntityManagerFactoryUtils
+                            .getTransactionalEntityManager(runtimeEntityManagerFactory);
+                    JpaRepositoryFactory repositoryFactory = new JpaRepositoryFactory(entityManager);
+                    User user = repositoryFactory.getRepository(UserRepository.class)
+                            .findByIssuerAndSubject(issuer, subject)
+                            .orElseThrow();
+                    List<TenantMembership> memberships = repositoryFactory.getRepository(TenantMembershipRepository.class)
+                            .findAllByUserIdAndStatusOrderByCreatedAt(user.getId(), TenantMembershipStatus.ACTIVE);
+
+                    assertThat(memberships).hasSize(1);
+                    return memberships.getFirst();
+                });
+
+                assertThat(resolvedMembership.getTenant().getId()).isEqualTo(tenantId);
+                assertThat(resolvedMembership.getTenant().getName()).isEqualTo("Pre-tenant");
+            }
+        }
+    }
+
     private void insertProjection(JdbcClient jdbc, UUID printerId) {
         UUID tenantId = ensureTenant(jdbc, "Tenant");
         insertProjection(jdbc, printerId, tenantId);
@@ -1082,6 +1185,14 @@ class HubMigrationTest {
     }
 
     private EntityManagerFactory entityManagerFactory(DataSource entityManagerDataSource, TenantContext tenantContext) {
+        return entityManagerFactory(entityManagerDataSource, tenantContext, new IdentityContext());
+    }
+
+    private EntityManagerFactory entityManagerFactory(
+            DataSource entityManagerDataSource,
+            TenantContext tenantContext,
+            IdentityContext identityContext
+    ) {
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(entityManagerDataSource);
         factory.setPackagesToScan("org.spon.edolhub.model.entity");
@@ -1091,7 +1202,7 @@ class HubMigrationTest {
         factory.setJpaPropertyMap(Map.of(
                 "hibernate.default_schema", "hub",
                 "hibernate.hbm2ddl.auto", "validate",
-                "hibernate.tenant_identifier_resolver", new HubTenantIdentifierResolver(tenantContext),
+                "hibernate.tenant_identifier_resolver", new HubTenantIdentifierResolver(tenantContext, identityContext),
                 "hibernate.physical_naming_strategy",
                 "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy"
         ));

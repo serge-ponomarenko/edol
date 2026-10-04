@@ -71,10 +71,10 @@ class JitProvisioningTransactionService {
         tenant.setId(tenantId);
         tenant.setName("Personal tenant");
         tenant.setDefaultTenant(false);
-        tenantRepository.save(tenant);
+        Tenant persistedTenant = tenantRepository.save(tenant);
 
         TenantMembership membership = new TenantMembership();
-        membership.setTenant(tenant);
+        membership.setTenant(persistedTenant);
         membership.setUser(user);
         membership.setRole(TenantMembershipRole.OWNER);
         membership.setStatus(TenantMembershipStatus.ACTIVE);

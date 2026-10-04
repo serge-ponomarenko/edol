@@ -46,7 +46,7 @@ public class SecurityConfig {
     ) throws Exception {
         OidcClientInitiatedLogoutSuccessHandler logoutHandler =
                 new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
-        logoutHandler.setPostLogoutRedirectUri("{baseUrl}");
+        logoutHandler.setPostLogoutRedirectUri("{baseUrl}/");
         AmsCompatibilityIngressFilter amsIngress = amsCompatibilityIngressFilter.getObject();
 
         http.csrf(csrf -> csrf.ignoringRequestMatchers(amsIngress))
