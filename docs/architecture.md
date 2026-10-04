@@ -25,11 +25,13 @@ Hub projects Core printers with the same UUID and assigns the projection to a Hu
 
 ## Accepted Multi-Tenant Direction
 
-The secure multi-tenant target is accepted but not yet implemented. Hub will
-own EDOL users, tenants, memberships and roles while Keycloak provides OIDC
-identity and credential lifecycle. Hub will operate as a BFF, and services will
-use separate OAuth client identities. Authentication identity and trusted
-tenant context remain separate.
+The secure multi-tenant target is accepted. The Stage 4 Hub BFF is implemented
+and accepted for remote development; production acceptance and the later
+service-authentication stages remain outstanding. Hub owns EDOL users,
+tenants, memberships and roles while Keycloak provides OIDC identity and
+credential lifecycle. Hub operates as a BFF, and services will use separate
+OAuth client identities. Authentication identity and trusted tenant context
+remain separate.
 
 Stage 2 adds the Hub user and membership domain, direct tenant ownership for
 allocation and usage links, tenant-safe cross-aggregate constraints, and
@@ -65,9 +67,18 @@ storage, active-membership tenant selection, and idempotent JIT provisioning.
 V8 adds transaction-local OIDC identity RLS policies and a closed-by-default,
 serialized legacy first-owner claim. It deliberately does not drop
 `tenants.is_default`: that cleanup is authored only after a recorded claim.
-The source increment is not Stage 4 deployment acceptance; production
-Keycloak, trusted AMS ingress, operational bootstrap opening, and remote-dev
-end-to-end evidence remain separate prerequisites.
+Remote-dev and source-development acceptance completed on 2026-10-04 from the
+immutable rollout commit `b849831fbf17d39db33c735883af63ca1b5ab6b2`. Empty and
+data-bearing clone smoke tests passed, followed by a backup-first V8 rollout
+and one guarded persistent-owner OIDC claim on the source development
+database. The source result retained legacy data counts and integrity, created
+one active `OWNER` membership, and cleared the claimed tenant's
+`is_default` marker. Browser OIDC, CSRF, session-expiry, and logout behavior
+passed using the same Hub-only secure profile during the acceptance smokes.
+Core, MQTT, AMS, Notify, printer-facing services, and secure-mode background
+work did not start. This is development evidence only: production Keycloak,
+production Hub deployment, trusted production AMS ingress, and Stage 5
+authenticated Hub-to-Core tenancy remain unaccepted.
 Spring Data repositories initialize lazily so framework bootstrap has no tenant
 context; their first actual use still requires the normal fail-closed resolver.
 A clean installation may have no migration tenant because Stage 2 removes an

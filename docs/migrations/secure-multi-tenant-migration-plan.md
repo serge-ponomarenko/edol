@@ -916,6 +916,33 @@ Stage 4 artifact must never silently recreate default fallback behavior.
 - No default-tenant compatibility component remains in Stage 4 code or
   configuration.
 
+### Remote-dev and source-development acceptance evidence (2026-10-04)
+
+The Stage 4 Hub-only remote-dev acceptance completed from immutable commit
+`b849831fbf17d39db33c735883af63ca1b5ab6b2`. An empty disposable database and a
+data-bearing disposable clone both completed the normal Hub Flyway path and
+the browser BFF flow. The acceptance covered Authorization Code + PKCE login,
+JIT provisioning, tenant selection, valid and rejected CSRF submissions,
+session expiry, and OIDC logout. No Core, MQTT, AMS, Notify, printer-facing
+service, or secure-mode background worker was started.
+
+The source development database then completed a fresh preflight, a
+backup-first V8-only rollout, and a separately authorized guarded legacy
+first-owner claim. The claim used one persistent OIDC identity through the
+normal BFF flow; it did not manually create a Hub user, membership, or tenant
+binding. The bootstrap window closed automatically, the claimed timestamp was
+recorded, exactly one active `OWNER` membership existed, and the legacy
+tenant's `is_default` marker was cleared. Legacy row counts, tenant ownership,
+orphan checks, and cross-tenant integrity checks remained valid.
+
+This evidence accepts the Hub BFF path for remote development only. It does
+not authorize production Keycloak or Hub deployment, replace the required
+trusted production AMS ingress, or accept Stage 5 authenticated Hub-to-Core
+tenancy, Core startup, MQTT tenant propagation, or secure-mode background
+work. Retain the source backup, checksum, rollout record, and first-owner
+approval evidence as the recovery and audit record; V8 has no ordinary Flyway
+rollback and the first-owner claim has no authorized manual inverse.
+
 ### Explicitly out of scope
 
 Additional tenant roles, invitations, delegated Core user tokens, and Core
