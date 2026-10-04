@@ -2,6 +2,7 @@ package org.spon.edolhub.config;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.channel.DirectChannel;
@@ -15,6 +16,7 @@ import org.springframework.messaging.MessageChannel;
 
 @Configuration
 @EnableIntegration
+@ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "home")
 public class MqttConfig {
 
     @Value("${mqttServer.url}")

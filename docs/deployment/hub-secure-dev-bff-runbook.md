@@ -52,6 +52,13 @@ headers, terminate TLS for the approved Hub hostname, and avoid public plain
 HTTP access to Hub. A direct HTTP Hub endpoint cannot satisfy the secure-cookie
 acceptance condition.
 
+Hub also enforces an eight-hour maximum authenticated-session age through
+`edol-hub.session.maximum-age`. The configured production-equivalent value is
+`8h`. A disposable smoke run may set a short positive duration through the
+corresponding approved runtime configuration solely to observe expiry; record
+that override in redacted evidence and remove it when the disposable process
+stops. Do not apply a short value to production or a persistent environment.
+
 The public callback and post-logout values are not set in this runbook. They
 must be calculated from the approved Hub hostname and reconciled through the
 separate Keycloak checklist before a browser flow is attempted.
@@ -81,6 +88,40 @@ blocked until Stage 5 service authentication is accepted. Do not start or
 connect to MQTT, AMS, Notify, printer-facing services, or background work that
 would infer a tenant. Hub secure-mode catalog, recovery, and MQTT background
 paths must remain unavailable and fail closed.
+
+The secure Hub process must not create `MqttPahoClientFactory`,
+`mqttInputChannel`, or the `edolcore/#` inbound adapter. Verify this before the
+browser flow from the Hub startup evidence or an equivalent runtime bean check;
+the disposable service set must not include an MQTT broker.
+
+## Hub-only disposable smoke sequence
+
+After separate approval for the runtime start, use only the trusted HTTPS Hub
+hostname and an existing authorized disposable development account. The
+operator enters account credentials directly in the browser; do not provide
+them to an assistant or put them in a script.
+
+1. Start only Hub and its new disposable PostgreSQL database with the approved
+   secure-mode environment. Confirm that no Core, MQTT, AMS, Notify, or
+   printer-facing process is running for this smoke.
+2. Visit the Hub authorization endpoint and complete the Keycloak login. Record
+   only redacted redirects and the successful HTTPS callback.
+3. Confirm in the disposable Hub database that JIT provisioning created one
+   user, one personal tenant, and one active `OWNER` membership. Do not copy
+   personal identity values into the evidence.
+4. Open `/tenants/select`. Submit the personal tenant once with its rendered
+   CSRF token, then submit a deliberately missing or invalid token and confirm
+   `403`; do not retain the token in evidence.
+5. With the disposable short maximum-session-age override, wait only for that
+   configured interval and confirm that the next protected request restarts the
+   OIDC authorization flow. A Keycloak SSO session can complete that flow
+   without another password prompt.
+6. Sign in again if necessary, submit logout with the rendered CSRF token, and
+   confirm the local Hub session is removed and the browser returns only to the
+   approved post-logout HTTPS URI.
+7. Stop Hub. Dispose of the database only when its separately approved cleanup
+   is performed. Retain redacted evidence that the excluded processes never
+   started.
 
 ## Evidence for a later, separately approved smoke test
 

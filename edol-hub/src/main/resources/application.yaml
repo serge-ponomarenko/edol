@@ -17,6 +17,8 @@ edol-core:
   url: http://edolcore:8080
 
 edol-hub:
+  session:
+    maximum-age: 8h
   qr-url: ${QR_URL}
   registration:
     self-service-enabled: ${EDOL_HUB_SELF_SERVICE_REGISTRATION_ENABLED:false}

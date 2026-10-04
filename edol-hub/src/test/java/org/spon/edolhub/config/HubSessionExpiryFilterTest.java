@@ -16,7 +16,7 @@ import static org.mockito.Mockito.never;
 
 class HubSessionExpiryFilterTest {
 
-    private final HubSessionExpiryFilter filter = new HubSessionExpiryFilter();
+    private final HubSessionExpiryFilter filter = new HubSessionExpiryFilter(Duration.ofHours(8));
 
     @Test
     void expiresAnOverEightHourSessionAndRestartsLogin() throws Exception {
@@ -48,5 +48,22 @@ class HubSessionExpiryFilterTest {
 
         assertThat(session.isInvalid()).isFalse();
         verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void expiresAConfiguredShortSmokeSession() throws Exception {
+        HubSessionExpiryFilter smokeFilter = new HubSessionExpiryFilter(Duration.ofSeconds(1));
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(HubSessionAttributes.AUTHENTICATED_AT, Instant.now().minusSeconds(2).toEpochMilli());
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+        request.setSession(session);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        smokeFilter.doFilter(request, response, chain);
+
+        assertThat(session.isInvalid()).isTrue();
+        assertThat(response.getRedirectedUrl()).isEqualTo("/oauth2/authorization/edol-keycloak");
+        verify(chain, never()).doFilter(request, response);
     }
 }
