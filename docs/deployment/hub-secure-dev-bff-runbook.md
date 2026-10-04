@@ -54,6 +54,12 @@ does not enable Keycloak self-registration. Never activate `dev` for this
 smoke: it targets the ordinary local development database and legacy Core/MQTT
 endpoints.
 
+For a development database that already contains Hub data, do not reuse this
+empty-database profile. First run the read-only
+[Hub Secure-Dev Data Clone Preflight](hub-secure-dev-data-clone-preflight.md).
+It classifies whether a separately restored clone may later exercise the
+controlled legacy first-owner claim.
+
 `application.yaml` already specifies a 30-minute servlet-session idle timeout,
 an `EDOL_SESSION` cookie with `Secure`, `HttpOnly`, and `SameSite=Lax`, and
 framework handling of forwarded headers. The reverse proxy must be the only
