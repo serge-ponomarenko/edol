@@ -20,7 +20,7 @@ approval record without placing secret values in Git:
 | Input | Required value or property |
 | --- | --- |
 | Deployment mode | `EDOL_DEPLOYMENT_MODE=secure-multi-tenant` |
-| Spring profile | `secure-multi-tenant` |
+| Spring profiles | `secure-multi-tenant,dev-smoke` |
 | Hub public hostname | An explicitly approved HTTPS hostname; it is not inferred from the Keycloak hostname. |
 | Hub database | A new, isolated, disposable PostgreSQL database with the existing Hub schema-owner, Flyway, and runtime-role separation. |
 | OIDC issuer | The approved remote-dev Keycloak issuer, injected through `EDOL_KEYCLOAK_ISSUER_URI`. |
@@ -39,10 +39,20 @@ approved deployment environment or secret store:
 
 ```text
 EDOL_DEPLOYMENT_MODE=secure-multi-tenant
-SPRING_PROFILES_ACTIVE=secure-multi-tenant
+SPRING_PROFILES_ACTIVE=secure-multi-tenant,dev-smoke
 EDOL_KEYCLOAK_ISSUER_URI=https://<approved-keycloak-host>/realms/edol
 EDOL_HUB_WEB_CLIENT_SECRET=<secret-injection-reference>
+EDOL_HUB_SMOKE_DB_JDBC_URL=jdbc:postgresql://<disposable-private-host>:5432/<disposable-db>
 ```
+
+`dev-smoke` is an additional profile, not the existing `dev` profile. It
+requires `EDOL_HUB_SMOKE_DB_JDBC_URL` with no fallback, disables Flyway clean,
+points Core and MQTT endpoints to loopback port 1, and sets a 60-second maximum
+authenticated-session age. It enables Hub self-service JIT only so the
+disposable test identity receives a personal tenant and `OWNER` membership; it
+does not enable Keycloak self-registration. Never activate `dev` for this
+smoke: it targets the ordinary local development database and legacy Core/MQTT
+endpoints.
 
 `application.yaml` already specifies a 30-minute servlet-session idle timeout,
 an `EDOL_SESSION` cookie with `Secure`, `HttpOnly`, and `SameSite=Lax`, and
@@ -52,12 +62,10 @@ headers, terminate TLS for the approved Hub hostname, and avoid public plain
 HTTP access to Hub. A direct HTTP Hub endpoint cannot satisfy the secure-cookie
 acceptance condition.
 
-Hub also enforces an eight-hour maximum authenticated-session age through
-`edol-hub.session.maximum-age`. The configured production-equivalent value is
-`8h`. A disposable smoke run may set a short positive duration through the
-corresponding approved runtime configuration solely to observe expiry; record
-that override in redacted evidence and remove it when the disposable process
-stops. Do not apply a short value to production or a persistent environment.
+Hub normally enforces an eight-hour maximum authenticated-session age through
+`edol-hub.session.maximum-age`. The `dev-smoke` profile overrides it to 60
+seconds solely to observe expiry. Record that profile in redacted evidence and
+never activate it in production or a persistent environment.
 
 The public callback and post-logout values are not set in this runbook. They
 must be calculated from the approved Hub hostname and reconciled through the
