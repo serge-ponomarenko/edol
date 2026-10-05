@@ -3,6 +3,8 @@ spring:
     jpa:
       repositories:
         bootstrap-mode: lazy
+  jpa:
+    open-in-view: false
   datasource:
     username: ${CORE_RUNTIME_DB_USER}
     password: ${CORE_RUNTIME_DB_PASSWORD}

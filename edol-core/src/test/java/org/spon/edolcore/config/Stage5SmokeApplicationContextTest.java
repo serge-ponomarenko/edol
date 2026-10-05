@@ -28,7 +28,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -44,7 +49,9 @@ class Stage5SmokeApplicationContextTest {
     private static final String HUB_FLYWAY = "hub_flyway";
     private static final String HUB_RUNTIME = "hub_runtime";
     private static final String ROLE_PASSWORD = "stage5-smoke-test-password";
+    private static final String TRUSTED_SERVICE_TOKEN = "trusted-service-token";
     private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     @Container
     private static final PostgreSQLContainer<?> POSTGRES =
@@ -86,7 +93,7 @@ class Stage5SmokeApplicationContextTest {
     }
 
     @Test
-    void startsWithoutTenantButRequiresOneForPersistence() {
+    void startsWithoutTenantButRequiresOneForPersistence() throws Exception {
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(EdolCoreApplication.class)
                 .sources(SmokeJwtDecoderConfiguration.class)
                 .profiles("secure-multi-tenant", "stage5-smoke")
@@ -101,6 +108,17 @@ class Stage5SmokeApplicationContextTest {
 
             assertThat(context.isActive()).isTrue();
             assertThat(tenantContext.hasCurrentTenant()).isFalse();
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/actuator/health"))
+                    .GET()
+                    .build())).isEqualTo(200);
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
+                    .GET()
+                    .build())).isEqualTo(401);
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
+                    .header("Authorization", "Bearer " + TRUSTED_SERVICE_TOKEN)
+                    .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
+                    .GET()
+                    .build())).isEqualTo(200);
             assertThat(JdbcClient.create(administratorDataSource)
                     .sql("select has_table_privilege(:roleName, 'core.printers', 'select')")
                     .param("roleName", CORE_RUNTIME)
@@ -168,13 +186,38 @@ class Stage5SmokeApplicationContextTest {
         return environment;
     }
 
+    private URI endpoint(ConfigurableApplicationContext context, String path) {
+        Integer port = context.getEnvironment().getRequiredProperty("local.server.port", Integer.class);
+        return URI.create("http://127.0.0.1:" + port + path);
+    }
+
+    private int requestStatus(HttpRequest request)
+            throws java.io.IOException, InterruptedException {
+        return HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     static class SmokeJwtDecoderConfiguration {
 
         @Bean("jwtDecoder")
         JwtDecoder jwtDecoder() {
             return token -> {
-                throw new BadJwtException("JWT decoding is outside this persistence bootstrap test");
+                if (!TRUSTED_SERVICE_TOKEN.equals(token)) {
+                    throw new BadJwtException("JWT decoding is outside this persistence bootstrap test");
+                }
+                Instant now = Instant.now();
+                return new org.springframework.security.oauth2.jwt.Jwt(
+                        token,
+                        now,
+                        now.plusSeconds(60),
+                        Map.of("alg", "none"),
+                        Map.of(
+                                "iss", "https://issuer.invalid/realms/edol",
+                                "aud", List.of("edol-core-api"),
+                                "azp", "edol-hub-service",
+                                "scope", "tenant.context core.printer.read"
+                        )
+                );
             };
         }
     }

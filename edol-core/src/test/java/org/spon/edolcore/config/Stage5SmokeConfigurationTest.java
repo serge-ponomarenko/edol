@@ -26,6 +26,7 @@ class Stage5SmokeConfigurationTest {
                 .containsEntry("spring.flyway.user", "${EDOL_CORE_STAGE5_SMOKE_FLYWAY_DB_USER}")
                 .containsEntry("edol-core.catalog-datasource.username", "${EDOL_CORE_STAGE5_SMOKE_CATALOG_DB_USER}")
                 .containsEntry("spring.data.jpa.repositories.bootstrap-mode", "lazy")
+                .containsEntry("spring.jpa.open-in-view", false)
                 .containsEntry("spring.flyway.clean-disabled", true)
                 .containsEntry("mqttServer.url", "tcp://127.0.0.1:1")
                 .containsEntry("edol-core.runtime.mqtt-enabled", false)
