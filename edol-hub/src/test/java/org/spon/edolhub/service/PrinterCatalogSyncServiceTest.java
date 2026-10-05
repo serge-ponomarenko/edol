@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,6 +41,9 @@ class PrinterCatalogSyncServiceTest {
 
     @Mock
     private PrinterRepository printerRepository;
+
+    @Mock
+    private PrinterStatsService printerStatsService;
 
     @Mock
     private TenantContext tenantContext;
@@ -126,6 +130,7 @@ class PrinterCatalogSyncServiceTest {
         }
 
         assertThat(maximumConcurrentSaves.get()).isEqualTo(1);
+        verify(printerStatsService, times(2)).initializeStats(any(Printer.class));
     }
 
     @Test

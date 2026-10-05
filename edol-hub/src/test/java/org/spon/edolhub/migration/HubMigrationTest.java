@@ -11,23 +11,33 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.spon.edolhub.config.HubTenantIdentifierResolver;
 import org.spon.edolhub.config.TenantAwareJpaTransactionManager;
+import org.spon.edolhub.controller.PrinterStateController;
 import org.spon.edolhub.model.dto.CorePrinterDto;
 import org.spon.edolhub.model.entity.Filament;
 import org.spon.edolhub.model.entity.FilamentSpool;
 import org.spon.edolhub.model.entity.PrintAllocationGroup;
 import org.spon.edolhub.model.entity.PrintAllocationItem;
+import org.spon.edolhub.model.entity.Printer;
+import org.spon.edolhub.model.entity.PrinterStats;
 import org.spon.edolhub.model.entity.Tenant;
 import org.spon.edolhub.model.entity.TenantMembership;
 import org.spon.edolhub.model.entity.TenantMembershipStatus;
 import org.spon.edolhub.model.entity.User;
 import org.spon.edolhub.model.entity.Vendor;
 import org.spon.edolhub.repository.FilamentSpoolRepository;
+import org.spon.edolhub.repository.MaintenanceDefinitionRepository;
+import org.spon.edolhub.repository.MaintenanceExecutionRepository;
+import org.spon.edolhub.repository.PrinterRepository;
+import org.spon.edolhub.repository.PrinterStatsRepository;
 import org.spon.edolhub.repository.TenantMembershipRepository;
 import org.spon.edolhub.repository.TenantRepository;
 import org.spon.edolhub.repository.UserRepository;
 import org.spon.edolhub.service.IdentityContext;
 import org.spon.edolhub.service.LegacyPrinterBackfillService;
+import org.spon.edolhub.service.MaintenanceService;
 import org.spon.edolhub.service.MissingTenantContextException;
+import org.spon.edolhub.service.PrinterAccessService;
+import org.spon.edolhub.service.PrinterStatsService;
 import org.spon.edolhub.service.TenantContext;
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -1008,6 +1018,101 @@ class HubMigrationTest {
     }
 
     @Test
+    void printerStatsReadsAreReadOnlyAndTenantScopedWhileWritePathsCreateStats() {
+        JdbcClient administratorJdbc = JdbcClient.create(dataSource);
+        administratorJdbc.sql("""
+                        DO
+                        $$
+                        BEGIN
+                            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hub_runtime') THEN
+                                CREATE ROLE hub_runtime LOGIN PASSWORD 'test-runtime-password'
+                                    NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+                            END IF;
+                        END;
+                        $$
+                        """).update();
+        flyway(null).migrate();
+
+        UUID firstTenantId = UUID.fromString("00000000-0000-0000-0000-000000000601");
+        UUID secondTenantId = UUID.fromString("00000000-0000-0000-0000-000000000602");
+        UUID firstPrinterId = UUID.fromString("00000000-0000-0000-0000-000000000611");
+        UUID secondPrinterId = UUID.fromString("00000000-0000-0000-0000-000000000612");
+        administratorJdbc.sql("insert into hub.tenants (id, name) values (:id, 'First')")
+                .param("id", firstTenantId)
+                .update();
+        administratorJdbc.sql("insert into hub.tenants (id, name) values (:id, 'Second')")
+                .param("id", secondTenantId)
+                .update();
+        insertProjection(administratorJdbc, firstPrinterId, firstTenantId);
+        insertProjection(administratorJdbc, secondPrinterId, secondTenantId);
+
+        DataSource runtimeDataSource = new DriverManagerDataSource(
+                POSTGRES.getJdbcUrl(),
+                "hub_runtime",
+                "test-runtime-password"
+        );
+        TenantContext tenantContext = new TenantContext();
+        try (EntityManagerFactory runtimeEntityManagerFactory = entityManagerFactory(runtimeDataSource, tenantContext)) {
+            TenantAwareJpaTransactionManager transactionManager = new TenantAwareJpaTransactionManager(
+                    runtimeEntityManagerFactory,
+                    runtimeDataSource,
+                    tenantContext
+            );
+            TransactionTemplate writeTransaction = new TransactionTemplate(transactionManager);
+            TransactionTemplate readOnlyTransaction = new TransactionTemplate(transactionManager);
+            readOnlyTransaction.setReadOnly(true);
+
+            try (TenantContext.TenantScope ignored = tenantContext.open(firstTenantId)) {
+                List<?> alerts = readOnlyTransaction.execute(status -> {
+                    PrinterStatsService statsService = printerStatsService(runtimeEntityManagerFactory, tenantContext);
+                    MaintenanceService maintenanceService = maintenanceService(runtimeEntityManagerFactory, statsService);
+                    return new PrinterStateController(statsService, maintenanceService, null, null)
+                            .getMaintenanceAlerts(firstPrinterId);
+                });
+
+                assertThat(alerts).isEmpty();
+            }
+
+            assertThat(administratorJdbc.sql("select count(*) from hub.printer_stats")
+                    .query(Integer.class)
+                    .single()).isZero();
+
+            try (TenantContext.TenantScope ignored = tenantContext.open(firstTenantId)) {
+                writeTransaction.executeWithoutResult(status -> {
+                    PrinterStatsService statsService = printerStatsService(runtimeEntityManagerFactory, tenantContext);
+                    Printer printer = printerRepository(runtimeEntityManagerFactory).findById(firstPrinterId).orElseThrow();
+                    statsService.addPrintJob(printer, 120L, 15L);
+                    PrinterStats updated = new PrinterStats();
+                    updated.setTotalPrintHours(2L);
+                    updated.setTotalJobs(4L);
+                    updated.setTotalFilamentUsedGrams(25L);
+                    statsService.updateStats(firstPrinterId, updated);
+                });
+            }
+
+            assertThat(administratorJdbc.sql("""
+                            select total_print_seconds
+                            from hub.printer_stats
+                            where printer_id = :printerId
+                            """)
+                    .param("printerId", firstPrinterId)
+                    .query(Long.class)
+                    .single()).isEqualTo(7200L);
+
+            try (TenantContext.TenantScope ignored = tenantContext.open(secondTenantId)) {
+                assertThatThrownBy(() -> writeTransaction.executeWithoutResult(status ->
+                        printerStatsService(runtimeEntityManagerFactory, tenantContext).getStats(firstPrinterId)
+                )).isInstanceOf(IllegalArgumentException.class);
+            }
+        }
+
+        assertThat(administratorJdbc.sql("select count(*) from hub.printer_stats where printer_id = :printerId")
+                .param("printerId", secondPrinterId)
+                .query(Integer.class)
+                .single()).isZero();
+    }
+
+    @Test
     void identityScopedPreTenantJpaQueriesLoadOnlyTheAuthenticatedUsersMemberships() {
         JdbcClient administratorJdbc = JdbcClient.create(dataSource);
         administratorJdbc.sql("""
@@ -1099,6 +1204,37 @@ class HubMigrationTest {
                 assertThat(resolvedMembership.getTenant().getName()).isEqualTo("Pre-tenant");
             }
         }
+    }
+
+    private PrinterStatsService printerStatsService(
+            EntityManagerFactory entityManagerFactory,
+            TenantContext tenantContext
+    ) {
+        JpaRepositoryFactory repositoryFactory = repositoryFactory(entityManagerFactory);
+        return new PrinterStatsService(
+                repositoryFactory.getRepository(PrinterStatsRepository.class),
+                new PrinterAccessService(repositoryFactory.getRepository(PrinterRepository.class), tenantContext)
+        );
+    }
+
+    private MaintenanceService maintenanceService(
+            EntityManagerFactory entityManagerFactory,
+            PrinterStatsService printerStatsService
+    ) {
+        JpaRepositoryFactory repositoryFactory = repositoryFactory(entityManagerFactory);
+        return new MaintenanceService(
+                repositoryFactory.getRepository(MaintenanceDefinitionRepository.class),
+                repositoryFactory.getRepository(MaintenanceExecutionRepository.class),
+                printerStatsService
+        );
+    }
+
+    private PrinterRepository printerRepository(EntityManagerFactory entityManagerFactory) {
+        return repositoryFactory(entityManagerFactory).getRepository(PrinterRepository.class);
+    }
+
+    private JpaRepositoryFactory repositoryFactory(EntityManagerFactory entityManagerFactory) {
+        return new JpaRepositoryFactory(EntityManagerFactoryUtils.getTransactionalEntityManager(entityManagerFactory));
     }
 
     private void insertProjection(JdbcClient jdbc, UUID printerId) {

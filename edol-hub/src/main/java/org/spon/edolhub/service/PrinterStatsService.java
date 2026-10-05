@@ -18,25 +18,42 @@ public class PrinterStatsService {
     private final PrinterStatsRepository repository;
     private final PrinterAccessService printerAccessService;
 
+    @Transactional(readOnly = true)
     public PrinterStats getStats(UUID printerId) {
         Printer printer = printerAccessService.getPrinter(printerId);
         PrinterStats stats = repository.findByPrinterId(printerId)
-                .orElseGet(() -> createStats(printer));
+                .orElseGet(() -> zeroStats(printer));
 
         stats.setTotalPrintHours(stats.getTotalPrintSeconds() / 3600);
         return stats;
     }
 
+    @Transactional(readOnly = true)
     public PrinterStats getStats() {
         return getStats(printerAccessService.getDefaultPrinter().getId());
     }
 
-    private PrinterStats createStats(Printer printer) {
+    public void initializeStats(Printer printer) {
+        repository.findByPrinterId(printer.getId())
+                .orElseGet(() -> repository.save(newPersistedStats(printer)));
+    }
+
+    private PrinterStats getOrCreateStats(UUID printerId) {
+        Printer printer = printerAccessService.getPrinter(printerId);
+        return repository.findByPrinterId(printerId)
+                .orElseGet(() -> repository.save(newPersistedStats(printer)));
+    }
+
+    private PrinterStats zeroStats(Printer printer) {
         PrinterStats stats = new PrinterStats();
         stats.setPrinter(printer);
-        stats.setUpdatedAt(LocalDateTime.now());
+        return stats;
+    }
 
-        return repository.save(stats);
+    private PrinterStats newPersistedStats(Printer printer) {
+        PrinterStats stats = zeroStats(printer);
+        stats.setUpdatedAt(LocalDateTime.now());
+        return stats;
     }
 
     public int getTotalPrinterHours(UUID printerId) {
@@ -46,7 +63,7 @@ public class PrinterStatsService {
     }
 
     public void addPrintJob(Printer printer, long jobSeconds, long filamentGrams) {
-        PrinterStats stats = getStats(printer.getId());
+        PrinterStats stats = getOrCreateStats(printer.getId());
 
         stats.setTotalPrintSeconds(
                 stats.getTotalPrintSeconds() + jobSeconds
@@ -67,7 +84,7 @@ public class PrinterStatsService {
 
     @Transactional
     public void updateStats(UUID printerId, PrinterStats updated) {
-        PrinterStats stats = getStats(printerId);
+        PrinterStats stats = getOrCreateStats(printerId);
 
         if (updated.getTotalPrintHours() != null) {
 

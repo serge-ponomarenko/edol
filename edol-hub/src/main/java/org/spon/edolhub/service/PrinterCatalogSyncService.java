@@ -24,6 +24,7 @@ public class PrinterCatalogSyncService {
 
     private final PrinterService printerService;
     private final PrinterRepository printerRepository;
+    private final PrinterStatsService printerStatsService;
     private final TenantContext tenantContext;
     private final LegacyPrinterBackfillService backfillService;
     private final PrinterCatalogStatus status;
@@ -113,6 +114,8 @@ public class PrinterCatalogSyncService {
         printer.setEnabled(dto.enabled());
         printer.setAvailableInCore(true);
         printer.setLastSyncedAt(Instant.now());
-        return printerRepository.save(printer);
+        Printer savedPrinter = printerRepository.save(printer);
+        printerStatsService.initializeStats(savedPrinter);
+        return savedPrinter;
     }
 }
