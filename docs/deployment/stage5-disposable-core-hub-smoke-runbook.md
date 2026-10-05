@@ -19,7 +19,9 @@ specific execution window.
   must not share a cluster with source development or production databases.
 - Run [Stage 5 disposable PostgreSQL bootstrap](stage5-disposable-postgres-bootstrap.sql)
   exactly once before Flyway. The script must report the exact disposable
-  database match and must not find pre-existing target roles.
+  database match and must not find pre-existing target roles. It provisions the
+  `pgcrypto` database extension as the administrator before restricted Hub
+  Flyway runs; do not grant database `CREATE` to `hub_flyway` or `hub_runtime`.
 - Generate distinct passwords for `core_flyway`, `core_runtime`,
   `edol_core_catalog_runtime`, `hub_flyway`, and `hub_runtime` in the approved
   ephemeral secret mechanism. Never record their values in this repository,

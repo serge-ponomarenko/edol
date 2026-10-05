@@ -24,6 +24,11 @@ SELECT current_database() = :'stage5_smoke_database' AS stage5_smoke_database_ma
 
 BEGIN;
 
+-- Hub V2 is immutable Flyway history and requires pgcrypto. Extensions are
+-- database infrastructure, so the administrator provisions this prerequisite
+-- before restricted Flyway credentials are used.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 DO
 $$
 BEGIN
@@ -56,6 +61,7 @@ $$;
 
 GRANT core_schema_owner TO core_flyway;
 GRANT hub_schema_owner TO hub_flyway;
+REVOKE CREATE ON DATABASE :"stage5_smoke_database" FROM PUBLIC;
 GRANT CONNECT ON DATABASE :"stage5_smoke_database" TO
     core_flyway,
     core_runtime,
