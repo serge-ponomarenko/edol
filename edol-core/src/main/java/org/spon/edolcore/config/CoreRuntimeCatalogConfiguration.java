@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
 
@@ -15,6 +16,22 @@ import javax.sql.DataSource;
 @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "secure-multi-tenant")
 @EnableConfigurationProperties(CoreLegacyCompatibilityProperties.class)
 class CoreRuntimeCatalogConfiguration {
+
+    @Bean
+    @Primary
+    @ConfigurationProperties("spring.datasource")
+    DataSourceProperties coreRuntimeDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean
+    @Primary
+    @ConfigurationProperties("spring.datasource.hikari")
+    HikariDataSource coreRuntimeDataSource(
+            @Qualifier("coreRuntimeDataSourceProperties") DataSourceProperties properties
+    ) {
+        return properties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+    }
 
     @Bean
     @ConfigurationProperties("edol-core.catalog-datasource")

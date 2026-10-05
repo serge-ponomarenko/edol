@@ -8,6 +8,10 @@ spring:
     user: ${EDOL_HUB_STAGE5_SMOKE_FLYWAY_DB_USER}
     password: ${EDOL_HUB_STAGE5_SMOKE_FLYWAY_DB_PASSWORD}
 
+logging:
+  file:
+    name: ${java.io.tmpdir}/edol-stage5-smoke-hub.log
+
 edol-core:
   url: ${EDOL_CORE_STAGE5_SMOKE_URL}
 

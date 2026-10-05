@@ -1,6 +1,10 @@
 server:
   port: ${EDOL_CORE_STAGE5_SMOKE_PORT:8080}
 
+logging:
+  file:
+    name: ${java.io.tmpdir}/edol-stage5-smoke-core.log
+
 spring:
   datasource:
     url: ${EDOL_CORE_STAGE5_SMOKE_DB_JDBC_URL}
