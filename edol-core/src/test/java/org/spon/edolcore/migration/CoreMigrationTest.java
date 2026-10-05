@@ -13,6 +13,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -173,6 +176,34 @@ class CoreMigrationTest {
                 .hasMessageContaining("Hub projection tenant is missing");
     }
 
+    @Test
+    void secureMigrationRejectsNullOwnershipAndEnablesCoreRowSecurity() {
+        flyway(null).migrate();
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        ensureCoreRuntimeRole(jdbc);
+        insertPrinter(jdbc);
+
+        assertThatThrownBy(() -> secureFlyway().migrate())
+                .hasMessageContaining("printer tenant_id is missing");
+
+        jdbc.sql("update core.printers set tenant_id = :tenantId")
+                .param("tenantId", UUID.fromString("00000000-0000-0000-0000-000000000001"))
+                .update();
+
+        secureFlyway().migrate();
+
+        assertThat(jdbc.sql("""
+                        select relforcerowsecurity
+                        from pg_class
+                        where oid = 'core.printers'::regclass
+                        """)
+                .query(Boolean.class)
+                .single()).isTrue();
+        assertThat(runtimePrinterCount(null)).isZero();
+        assertThat(runtimePrinterCount(UUID.fromString("00000000-0000-0000-0000-000000000001"))).isEqualTo(1);
+        assertThat(runtimePrinterCount(UUID.fromString("00000000-0000-0000-0000-000000000002"))).isZero();
+    }
+
     private void insertPrinter(JdbcClient jdbc) {
         jdbc.sql("""
                         insert into core.printers (
@@ -234,6 +265,51 @@ class CoreMigrationTest {
                 .locations("filesystem:" + migrationPath.toString().replace('\\', '/'))
                 .cleanDisabled(false)
                 .load();
+    }
+
+    private Flyway secureFlyway() {
+        return Flyway.configure()
+                .dataSource(dataSource)
+                .schemas("core")
+                .defaultSchema("core")
+                .locations("classpath:db/migration", "classpath:db/secure-migration")
+                .cleanDisabled(false)
+                .load();
+    }
+
+    private void ensureCoreRuntimeRole(JdbcClient jdbc) {
+        jdbc.sql("""
+                        DO
+                        $$
+                        BEGIN
+                            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'core_runtime') THEN
+                                CREATE ROLE core_runtime NOLOGIN;
+                            END IF;
+                        END;
+                        $$
+                        """).update();
+    }
+
+    private int runtimePrinterCount(UUID tenantId) {
+        try (Connection connection = dataSource.getConnection()) {
+            try (PreparedStatement statement = connection.prepareStatement("set role core_runtime")) {
+                statement.execute();
+            }
+            if (tenantId != null) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "select set_config('edol.tenant_id', ?, false)")) {
+                    statement.setString(1, tenantId.toString());
+                    statement.execute();
+                }
+            }
+            try (PreparedStatement statement = connection.prepareStatement("select count(*) from core.printers");
+                 ResultSet result = statement.executeQuery()) {
+                result.next();
+                return result.getInt(1);
+            }
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to verify Core runtime row-level security", exception);
+        }
     }
 
     private Path findHubMigrationPath() {

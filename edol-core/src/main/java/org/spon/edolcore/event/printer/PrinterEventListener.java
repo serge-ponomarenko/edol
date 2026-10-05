@@ -19,6 +19,7 @@ import org.spon.edolcore.service.print.SpoolFingerprintBuilder;
 import org.spon.edolcore.service.print.recovery.RecoveryStartupCoordinator;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.spon.edolcore.service.printer.runtime.PrinterStateRuntime;
+import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
 import org.spon.edolcore.service.timelapse.TimelapseService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -58,6 +59,7 @@ public class PrinterEventListener {
     private final LogContextFactory logContextFactory;
     private final ExecutorService timelapseExecutor;
     private final ExecutorService virtualThreadExecutor;
+    private final CoreRuntimeTenantExecutor runtimeTenantExecutor;
 
     private PrinterStateRuntime runtime(UUID printerId) {
         return runtimeQueryService
@@ -68,6 +70,10 @@ public class PrinterEventListener {
 
     @EventListener
     public void handlePrinterEvent(PrinterEvent event) {
+        runtimeTenantExecutor.execute(event.getPrinterId(), () -> handlePrinterEventInTenant(event));
+    }
+
+    private void handlePrinterEventInTenant(PrinterEvent event) {
         UUID printerId = event.getPrinterId();
         PrinterState printerState = printerStateService.getState(printerId);
 
@@ -205,7 +211,7 @@ public class PrinterEventListener {
                         )
                 ));
 
-        virtualThreadExecutor.submit(() -> {
+        virtualThreadExecutor.submit(() -> runtimeTenantExecutor.execute(printerId, () -> {
             try {
                 // Small delay before model acquisition.
                 // Some printers may reject FTPS access immediately after PRINT_STARTED.
@@ -236,7 +242,7 @@ public class PrinterEventListener {
                         );
             }
 
-        });
+        }));
     }
 
     private void handlePrintRunning(UUID printerId) {
@@ -426,7 +432,7 @@ public class PrinterEventListener {
     private void generateTimelapse(UUID printerId, String sessionId) {
         cameraSnapshotStore.setCurrentSessionId(printerId, "default");
 
-        timelapseExecutor.submit(() -> {
+        timelapseExecutor.submit(() -> runtimeTenantExecutor.execute(printerId, () -> {
             try {
                 File video = timelapseService.generate(printerId, sessionId);
                 if (video != null) {
@@ -450,7 +456,7 @@ public class PrinterEventListener {
                                 "Timelapse generation failed", e
                         );
             }
-        });
+        }));
     }
 
     private boolean isProgressLogMilestone(UUID printerId, int progress) {

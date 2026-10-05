@@ -2,6 +2,7 @@ package org.spon.edolcore.persistence.printer;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.TenantId;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -46,7 +47,8 @@ public class Printer {
     @Column(nullable = false)
     private boolean enabled;
 
-    @Column(name = "tenant_id")
+    @TenantId
+    @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
     @Column(nullable = false)

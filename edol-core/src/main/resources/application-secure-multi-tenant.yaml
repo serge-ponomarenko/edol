@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    username: ${CORE_RUNTIME_DB_USER}
+    password: ${CORE_RUNTIME_DB_PASSWORD}
+  flyway:
+    locations: classpath:db/migration,classpath:db/secure-migration
+    user: ${CORE_FLYWAY_DB_USER}
+    password: ${CORE_FLYWAY_DB_PASSWORD}
+    init-sqls:
+      - SET ROLE core_schema_owner
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
+
+edol-core:
+  catalog-datasource:
+    url: ${CORE_CATALOG_DB_URL}
+    username: ${CORE_CATALOG_DB_USER}
+    password: ${CORE_CATALOG_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
+  security:
+    required-audience: ${EDOL_CORE_REQUIRED_AUDIENCE:edol-core-api}
+    trusted-hub-client-id: ${EDOL_CORE_TRUSTED_HUB_CLIENT_ID:edol-hub-service}
+  legacy-compatibility:
+    enabled: ${EDOL_CORE_LEGACY_COMPATIBILITY_ENABLED:false}
+    legacy-tenant-id: ${EDOL_CORE_LEGACY_TENANT_ID:}
+    allowed-cidrs: ${EDOL_CORE_LEGACY_ALLOWED_CIDRS:}

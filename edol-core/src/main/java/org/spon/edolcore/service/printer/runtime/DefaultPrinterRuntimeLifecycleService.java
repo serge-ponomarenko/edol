@@ -5,6 +5,7 @@ import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.persistence.printer.PrinterRepository;
 import org.spon.edolcore.service.model.metadata.MetadataRuntimeCoordinator;
 import org.spon.edolcore.service.printer.telemetry.DefaultPrinterTelemetryProvider;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -19,10 +20,12 @@ public class DefaultPrinterRuntimeLifecycleService
     private final DefaultPrinterTelemetryProvider telemetryProvider;
     private final PrinterRepository printerRepository;
     private final PrinterRuntimeQueryService runtimeQueryService;
+    private final ObjectProvider<CoreRuntimeTenantRegistry> runtimeTenantRegistry;
 
     @Override
     public void createRuntime(UUID printerId) {
         runtimeRegistry.create(printerId);
+        runtimeTenantRegistry.ifAvailable(registry -> registry.bindCurrentTenant(printerId));
     }
 
     @Override
@@ -39,6 +42,7 @@ public class DefaultPrinterRuntimeLifecycleService
     @Override
     public void destroyRuntime(UUID printerId) {
         runtimeRegistry.remove(printerId);
+        runtimeTenantRegistry.ifAvailable(registry -> registry.remove(printerId));
     }
 
     @Override

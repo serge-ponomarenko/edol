@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SecureMultiTenantUnavailableConfigurationTest {
 
     @Test
-    void failsBeforeSecureServiceAuthenticationExists() {
+    void noLongerBlocksSecureModeAfterStageFiveAuthenticationExists() {
         new ApplicationContextRunner()
                 .withUserConfiguration(
                         DeploymentModeConfiguration.class,
@@ -16,8 +16,7 @@ class SecureMultiTenantUnavailableConfigurationTest {
                 )
                 .withPropertyValues("edol.deployment.mode=secure-multi-tenant")
                 .run(context ->
-                        assertThat(context.getStartupFailure())
-                                .hasMessageContaining("accepted Stage 5 service authentication")
+                        assertThat(context.getStartupFailure()).isNull()
                 );
     }
 }

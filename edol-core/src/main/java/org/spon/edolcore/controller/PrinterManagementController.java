@@ -7,7 +7,9 @@ import org.spon.edolcore.service.printer.management.PrinterDecommissionService;
 import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.spon.edolcore.service.printer.management.PrinterProvisioningService;
 import org.spon.edolcore.service.printer.management.PrinterUpdateService;
+import org.spon.edolcore.service.tenant.CoreTenantContext;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +26,7 @@ public class PrinterManagementController {
     private final PrinterProvisioningService printerProvisioningService;
     private final PrinterUpdateService printerUpdateService;
     private final PrinterDecommissionService printerDecommissionService;
+    private final CoreTenantContext tenantContext;
 
     @GetMapping
     public List<PrinterDto> getPrinters() {
@@ -43,9 +46,13 @@ public class PrinterManagementController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PrinterDto createPrinter(
-            @RequestBody CreatePrinterRequest request) {
+            @RequestBody CreatePrinterRequest request,
+            @RequestHeader(value = "X-EDOL-Idempotency-Key", required = false) UUID idempotencyKey) {
+        if (tenantContext.hasCurrentTenant() && idempotencyKey == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency key is required");
+        }
         return printerMapper.toDto(
-                printerProvisioningService.createPrinter(request)
+                printerProvisioningService.createPrinter(request, idempotencyKey)
         );
     }
 

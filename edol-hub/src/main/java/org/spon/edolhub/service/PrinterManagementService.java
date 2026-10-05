@@ -5,6 +5,7 @@ import org.spon.edolhub.model.dto.CorePrinterConnectionDto;
 import org.spon.edolhub.model.dto.CorePrinterDto;
 import org.spon.edolhub.model.dto.PrinterForm;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import java.util.UUID;
@@ -32,8 +33,18 @@ public class PrinterManagementService {
     }
 
     public CorePrinterDto createPrinter(PrinterForm form) {
+        UUID idempotencyKey = UUID.randomUUID();
+        try {
+            return createPrinter(form, idempotencyKey);
+        } catch (ResourceAccessException exception) {
+            return createPrinter(form, idempotencyKey);
+        }
+    }
+
+    private CorePrinterDto createPrinter(PrinterForm form, UUID idempotencyKey) {
         return edolCoreClient.post()
                 .uri("/api/printers")
+                .header("X-EDOL-Idempotency-Key", idempotencyKey.toString())
                 .body(new PrinterRequest(form))
                 .retrieve()
                 .body(CorePrinterDto.class);

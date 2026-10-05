@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
+import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
 import org.spon.edolcore.service.printer.telemetry.DefaultPrinterTelemetryProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,7 @@ public class PrinterTelemetryReconnectScheduler {
     private final PrinterRuntimeQueryService runtimeQueryService;
     private final LogContextFactory logContextFactory;
     private final ExecutorService virtualThreadExecutor;
+    private final CoreRuntimeTenantExecutor runtimeTenantExecutor;
 
     @Scheduled(fixedDelay = 30000)
     public void reconnect() {
@@ -28,20 +30,20 @@ public class PrinterTelemetryReconnectScheduler {
             if (!telemetryProvider.isConnected(
                     printerId
             )) {
-                virtualThreadExecutor.submit(() -> {
-                    logContextFactory
-                            .printer(
-                                    log.atInfo(),
-                                    printerId
-                            )
-                            .log(
-                                    "Attempting to connect printer"
-                            );
+                virtualThreadExecutor.submit(() ->
+                    runtimeTenantExecutor.execute(printerId, () -> {
+                        logContextFactory
+                                .printer(
+                                        log.atInfo(),
+                                        printerId
+                                )
+                                .log(
+                                        "Attempting to connect printer"
+                                );
 
-                    telemetryProvider.connect(
-                            printerId
-                    );
-                });
+                        telemetryProvider.connect(printerId);
+                    })
+                );
             }
         }
     }

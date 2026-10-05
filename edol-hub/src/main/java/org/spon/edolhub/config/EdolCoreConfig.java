@@ -12,16 +12,25 @@ public class EdolCoreConfig {
     @Value("${edol-core.url}")
     private String edolCoreUrl;
 
+    private final CoreTenantPropagationInterceptor coreTenantPropagationInterceptor;
+
+    public EdolCoreConfig(CoreTenantPropagationInterceptor coreTenantPropagationInterceptor) {
+        this.coreTenantPropagationInterceptor = coreTenantPropagationInterceptor;
+    }
+
     @Bean
     public RestClient edloCoreRestClient() {
         return RestClient.builder()
                 .baseUrl(edolCoreUrl)
+                .requestInterceptor(coreTenantPropagationInterceptor)
                 .build();
     }
 
     @Bean
     public RestTemplate restTemplate() {
-        return new RestTemplate();
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.getInterceptors().add(coreTenantPropagationInterceptor);
+        return restTemplate;
     }
 
 }
