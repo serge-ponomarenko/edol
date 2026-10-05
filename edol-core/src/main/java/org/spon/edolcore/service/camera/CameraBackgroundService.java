@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.printer.runtime.CoreRuntimeCatalogEnumerator;
 import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,11 @@ import java.util.concurrent.ExecutorService;
 @Service
 @Slf4j
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+        name = "edol-core.runtime.printer-runtime-enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class CameraBackgroundService {
 
     private final CameraSnapshotStore store;

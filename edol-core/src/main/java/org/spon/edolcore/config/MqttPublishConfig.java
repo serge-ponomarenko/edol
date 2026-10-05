@@ -2,6 +2,7 @@ package org.spon.edolcore.config;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.ServiceActivator;
@@ -21,6 +22,11 @@ public class MqttPublishConfig {
     private String mqttServerUrl;
 
     @Bean
+    @ConditionalOnProperty(
+            name = "edol-core.runtime.mqtt-enabled",
+            havingValue = "true",
+            matchIfMissing = true
+    )
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
@@ -36,6 +42,11 @@ public class MqttPublishConfig {
 
     @Bean
     @ServiceActivator(inputChannel = "mqttOutboundChannel")
+    @ConditionalOnProperty(
+            name = "edol-core.runtime.mqtt-enabled",
+            havingValue = "true",
+            matchIfMissing = true
+    )
     public MessageHandler mqttOutbound() {
         MqttPahoMessageHandler handler =
                 new MqttPahoMessageHandler("edolcore-publisher", mqttClientFactory());

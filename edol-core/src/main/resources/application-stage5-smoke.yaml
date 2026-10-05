@@ -1,0 +1,31 @@
+server:
+  port: ${EDOL_CORE_STAGE5_SMOKE_PORT:8080}
+
+spring:
+  datasource:
+    url: ${EDOL_CORE_STAGE5_SMOKE_DB_JDBC_URL}
+    username: ${EDOL_CORE_STAGE5_SMOKE_RUNTIME_DB_USER}
+    password: ${EDOL_CORE_STAGE5_SMOKE_RUNTIME_DB_PASSWORD}
+  flyway:
+    clean-disabled: true
+    user: ${EDOL_CORE_STAGE5_SMOKE_FLYWAY_DB_USER}
+    password: ${EDOL_CORE_STAGE5_SMOKE_FLYWAY_DB_PASSWORD}
+
+edol-core:
+  catalog-datasource:
+    url: ${EDOL_CORE_STAGE5_SMOKE_CATALOG_DB_JDBC_URL}
+    username: ${EDOL_CORE_STAGE5_SMOKE_CATALOG_DB_USER}
+    password: ${EDOL_CORE_STAGE5_SMOKE_CATALOG_DB_PASSWORD}
+  runtime:
+    mqtt-enabled: false
+    printer-runtime-enabled: false
+
+mqttServer:
+  url: tcp://127.0.0.1:1
+
+bot:
+  webAdminName: stage5-smoke-disabled
+  webAdminPassword: stage5-smoke-disabled
+
+camera:
+  store-snapshots: false

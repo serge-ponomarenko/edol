@@ -6,6 +6,7 @@ import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityStateSe
 import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.spon.edolcore.service.printer.runtime.CoreRuntimeCatalogEnumerator;
 import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,11 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+        name = "edol-core.runtime.printer-runtime-enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class AgentHeartbeatMonitor {
 
     private final AgentStateService agentStateService;
@@ -30,13 +36,12 @@ public class AgentHeartbeatMonitor {
 
     private void monitor(UUID printerId) {
         var printer = printerManagementService.getPrinter(printerId);
-            if (printer.getConnectionMode() == PrinterConnectionMode.AGENT) {
-                if (!agentStateService.isOfflineSuppressed(printerId)) {
-                    if (agentStateService.isOnline(printerId)) {
-                        connectivityStateService.setConnected(printerId);
-                    } else {
-                        connectivityStateService.setDisconnected(printerId);
-                    }
+            if (printer.getConnectionMode() == PrinterConnectionMode.AGENT
+                    && !agentStateService.isOfflineSuppressed(printerId)) {
+                if (agentStateService.isOnline(printerId)) {
+                    connectivityStateService.setConnected(printerId);
+                } else {
+                    connectivityStateService.setDisconnected(printerId);
                 }
             }
     }

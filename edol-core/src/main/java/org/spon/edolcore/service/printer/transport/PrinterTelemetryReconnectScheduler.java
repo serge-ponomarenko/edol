@@ -6,6 +6,7 @@ import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
 import org.spon.edolcore.service.printer.telemetry.DefaultPrinterTelemetryProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,11 @@ import java.util.concurrent.ExecutorService;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(
+        name = "edol-core.runtime.printer-runtime-enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class PrinterTelemetryReconnectScheduler {
 
     private final DefaultPrinterTelemetryProvider telemetryProvider;

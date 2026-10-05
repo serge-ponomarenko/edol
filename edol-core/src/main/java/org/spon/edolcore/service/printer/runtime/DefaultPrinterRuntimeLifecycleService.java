@@ -6,12 +6,18 @@ import org.spon.edolcore.persistence.printer.PrinterRepository;
 import org.spon.edolcore.service.model.metadata.MetadataRuntimeCoordinator;
 import org.spon.edolcore.service.printer.telemetry.DefaultPrinterTelemetryProvider;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+        name = "edol-core.runtime.printer-runtime-enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class DefaultPrinterRuntimeLifecycleService
         implements PrinterRuntimeLifecycleService {
 

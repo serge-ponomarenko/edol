@@ -2,6 +2,7 @@ package org.spon.edolcore.config;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.channel.DirectChannel;
@@ -21,6 +22,11 @@ public class MqttSubscribeConfig {
     private String mqttServerUrl;
 
     @Bean
+    @ConditionalOnProperty(
+            name = "edol-core.runtime.mqtt-enabled",
+            havingValue = "true",
+            matchIfMissing = true
+    )
     public MqttPahoClientFactory mqttInboundClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
 
@@ -38,6 +44,11 @@ public class MqttSubscribeConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(
+            name = "edol-core.runtime.mqtt-enabled",
+            havingValue = "true",
+            matchIfMissing = true
+    )
     public MqttPahoMessageDrivenChannelAdapter mqttInbound() {
 
         MqttPahoMessageDrivenChannelAdapter adapter =
