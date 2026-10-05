@@ -2,16 +2,17 @@
 
 ## Purpose and boundary
 
-This is the only approved shape for a future Stage 5 Core and Hub runtime
+This is the only approved shape for a Stage 5 Core and Hub runtime
 smoke. It uses a fresh disposable PostgreSQL cluster, local Core and Hub
 processes, and the accepted remote-development Keycloak issuer. It never uses
 the source development database, production, an MQTT broker, AMS, Notify, or a
 printer or agent device.
 
-This runbook is a source-level preparation artifact. It does not authorize a
-runtime start, database creation, role bootstrap, browser login, Keycloak
-change, or deletion of disposable resources. Obtain a separate approval for a
-specific execution window.
+The final fresh disposable acceptance completed on 2026-10-05 from commit
+`7e5f66a295675d8b365a667ead3d5a997d71e2b0`. This runbook remains an execution
+control, not standing authorization for a new runtime start, database creation,
+role bootstrap, browser login, Keycloak change, or deletion of disposable
+resources. Obtain a separate approval for each execution window.
 
 ## Preconditions
 

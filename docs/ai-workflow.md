@@ -66,15 +66,6 @@ must never be copied into the repository or a Codex configuration file.
   is an operational recovery exercise following Stage 3 acceptance, not
   authorization to alter the production database or reopen accepted Flyway
   history.
-- Close the Core printer ownership write gap in Stage 5. Core Flyway V8
-  backfilled historical `core.printers.tenant_id` rows, but the current
-  unauthenticated provisioning endpoint can create a new row with a null
-  tenant (observed in local development on 2026-09-26). Do not repair this by
-  accepting a client-controlled tenant field or by adding a runtime
-  cross-schema lookup. After Stage 4, propagate the verified Hub service
-  tenant context, repair any pre-existing null rows through a controlled
-  preflight, then enforce `NOT NULL`, Core RLS, and non-bypass runtime roles.
-
 ## Subagent Status
 
 Project-scoped Codex roles are configured under `.codex/agents`. They are

@@ -1068,6 +1068,28 @@ changes. Do not broaden the legacy allowlist as a rollback shortcut.
 
 Notify/AMS client migration, terminal pairing, and legacy allowlist removal.
 
+### Final disposable acceptance evidence (2026-10-05)
+
+Stage 5 completed cleanly from immutable commit
+`7e5f66a295675d8b365a667ead3d5a997d71e2b0`. A fresh disposable PostgreSQL
+17.10 cluster with restricted schema-owner, Flyway, runtime, and catalog roles
+was bootstrapped exactly once; required `pgcrypto` infrastructure was supplied
+by the database administrator. Core V1-V9 and Hub V1-V8 applied successfully.
+
+Core and Hub started with `secure-multi-tenant,stage5-smoke`; Core health,
+browser BFF login, authenticated Hub provisioning, printer projection, zeroed
+printer stats initialization, Core and Hub RLS, and catalog-role isolation all
+passed. The acceptance confirmed HTTP 400 for missing or malformed tenant
+headers, HTTP 403 for a wrong client or missing scope, and HTTP 401 for a wrong
+audience. The Hub stats API returned its scalar DTO without lazy-proxy
+serialization or read-only transaction writes.
+
+The smoke used only a fresh disposable database and the accepted
+remote-development Keycloak issuer. It did not start MQTT, printer or agent
+connectivity, AMS, Notify, a development database, or production resources.
+This records Stage 5 source/disposable acceptance only; it is not a development
+database or production rollout.
+
 ## Stage 6: MQTT Tenant Envelope
 
 ### Objective and prerequisites

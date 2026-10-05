@@ -21,13 +21,14 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with Po
 
 Core runtime is per printer. New printer, connection and session identifiers use UUID v7; historical UUID v4 values are retained. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints; default-printer HTTP endpoints are not supported. Hub, AMS and Notify use only explicit printer endpoints. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
 
-Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. In `secure-multi-tenant` mode, Hub is an OIDC BFF: a validated OIDC identity discovers active memberships before a request establishes the fail-closed `TenantContext`. The historical default-tenant request bridge is removed. Until Stage 5 provides trusted Core tenant propagation, secure-mode Hub background MQTT, recovery, and scheduled catalog work are intentionally unavailable rather than inferring a tenant. AMS retains only its separately trusted three-route internal compatibility ingress. Home uses its independent installation-owned tenant scope. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
+Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. In `secure-multi-tenant` mode, Hub is an OIDC BFF: a validated OIDC identity discovers active memberships before a request establishes the fail-closed `TenantContext`. The historical default-tenant request bridge is removed. Stage 5 establishes authenticated Hub-to-Core tenant propagation. The `stage5-smoke` profile deliberately keeps Core printer runtime, Hub MQTT, catalog, recovery, AMS, and Notify disabled; later MQTT and consumer stages must not infer a tenant. AMS retains only its separately trusted three-route internal compatibility ingress. Home uses its independent installation-owned tenant scope. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 
 ## Accepted Multi-Tenant Direction
 
-The secure multi-tenant target is accepted. The Stage 4 Hub BFF is implemented
-and accepted for remote development; production acceptance and the later
-service-authentication stages remain outstanding. Hub owns EDOL users,
+The secure multi-tenant target is accepted. The Stage 4 Hub BFF and Stage 5
+authenticated Hub-to-Core foundation are implemented and accepted for their
+source and disposable remote-development scopes; production acceptance and the
+later MQTT and consumer-migration stages remain outstanding. Hub owns EDOL users,
 tenants, memberships and roles while Keycloak provides OIDC identity and
 credential lifecycle. Hub operates as a BFF, and services will use separate
 OAuth client identities. Authentication identity and trusted tenant context
@@ -77,8 +78,18 @@ one active `OWNER` membership, and cleared the claimed tenant's
 passed using the same Hub-only secure profile during the acceptance smokes.
 Core, MQTT, AMS, Notify, printer-facing services, and secure-mode background
 work did not start. This is development evidence only: production Keycloak,
-production Hub deployment, trusted production AMS ingress, and Stage 5
-authenticated Hub-to-Core tenancy remain unaccepted.
+production Hub deployment, and trusted production AMS ingress remain
+unaccepted.
+Stage 5 source and final fresh disposable acceptance completed on 2026-10-05
+from immutable commit `7e5f66a295675d8b365a667ead3d5a997d71e2b0`. A fresh
+restricted-role PostgreSQL cluster applied Core V1-V9 and Hub V1-V8; Core and
+Hub started under `secure-multi-tenant,stage5-smoke`; BFF login, authenticated
+Hub provisioning, Core/Hub projection, RLS, and catalog-role isolation passed.
+The acceptance also confirmed fail-closed tenant-header and service-token
+responses and the scalar Hub printer-stats response. It used the accepted
+remote-development Keycloak issuer only, with no MQTT broker, live printer or
+agent, AMS, Notify, development database, or production resource. It is not a
+development-database or production rollout.
 Spring Data repositories initialize lazily so framework bootstrap has no tenant
 context; their first actual use still requires the normal fail-closed resolver.
 A clean installation may have no migration tenant because Stage 2 removes an

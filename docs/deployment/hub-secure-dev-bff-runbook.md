@@ -97,11 +97,12 @@ the intended service set contains Hub, its disposable PostgreSQL database, the
 trusted HTTPS reverse-proxy path, and the already accepted remote-dev Keycloak
 identity provider only.
 
-Do not start Core in `secure-multi-tenant`: its startup remains deliberately
-blocked until Stage 5 service authentication is accepted. Do not start or
-connect to MQTT, AMS, Notify, printer-facing services, or background work that
-would infer a tenant. Hub secure-mode catalog, recovery, and MQTT background
-paths must remain unavailable and fail closed.
+Do not start Core as part of this Hub-only Stage 4 procedure. The procedure
+predates the accepted Stage 5 service-authentication foundation; use the Stage
+5 disposable Core and Hub smoke runbook for that separate scope. Do not start
+or connect to MQTT, AMS, Notify, printer-facing services, or background work
+that would infer a tenant. Hub secure-mode catalog, recovery, and MQTT
+background paths must remain unavailable and fail closed.
 
 The secure Hub process must not create `MqttPahoClientFactory`,
 `mqttInputChannel`, or the `edolcore/#` inbound adapter. Verify this before the
