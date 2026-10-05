@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.model.dto.MaintenanceStatusDto;
 import org.spon.edolhub.model.dto.PrintAllocationPreviewDto;
-import org.spon.edolhub.model.entity.PrinterStats;
+import org.spon.edolhub.model.dto.PrinterStatsDto;
 import org.spon.edolhub.service.MaintenanceService;
 import org.spon.edolhub.service.PrinterDashboardStateService;
 import org.spon.edolhub.service.PrinterAccessService;
@@ -40,8 +40,8 @@ public class PrinterStateController {
     }
 
     @GetMapping("/printers/{printerId}/stats")
-    public PrinterStats getStats(@PathVariable UUID printerId) {
-        return printerStatsService.getStats(printerId);
+    public PrinterStatsDto getStats(@PathVariable UUID printerId) {
+        return PrinterStatsDto.from(printerStatsService.getStats(printerId));
     }
 
     @GetMapping("/printers/{printerId}/alerts")

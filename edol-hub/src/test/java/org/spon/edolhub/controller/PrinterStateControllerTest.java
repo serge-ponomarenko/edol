@@ -8,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.spon.edolhub.model.dto.MaintenanceStatusDto;
+import org.spon.edolhub.model.dto.PrinterStatsDto;
 import org.spon.edolhub.model.entity.PrinterStats;
 import org.spon.edolhub.service.MaintenanceService;
 import org.spon.edolhub.service.PrinterDashboardStateService;
@@ -61,14 +62,21 @@ class PrinterStateControllerTest {
     class GetStats {
 
         @Test
-        @DisplayName("returns printer stats")
+        @DisplayName("returns scalar stats without the JPA printer association")
         void returnsStats() {
             PrinterStats stats = new PrinterStats();
+            stats.setId(42L);
+            stats.setTotalPrintSeconds(7200L);
+            stats.setTotalJobs(3L);
+            stats.setTotalFilamentUsedGrams(125L);
             when(printerStatsService.getStats(PRINTER_ID)).thenReturn(stats);
 
-            PrinterStats result = controller.getStats(PRINTER_ID);
+            PrinterStatsDto result = controller.getStats(PRINTER_ID);
 
-            assertThat(result).isSameAs(stats);
+            assertThat(result.id()).isEqualTo(42L);
+            assertThat(result.totalPrintSeconds()).isEqualTo(7200L);
+            assertThat(result.totalJobs()).isEqualTo(3L);
+            assertThat(result.totalFilamentUsedGrams()).isEqualTo(125L);
         }
     }
 

@@ -24,17 +24,20 @@ class CoreJwtConfiguration {
             @Value("${edol-core.security.required-audience:edol-core-api}") String audience
     ) {
         NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
-        OAuth2TokenValidator<Jwt> audienceValidator = token -> token.getAudience().contains(audience)
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(issuer),
+                audienceValidator(audience)
+        ));
+        return decoder;
+    }
+
+    static OAuth2TokenValidator<Jwt> audienceValidator(String audience) {
+        return token -> token.getAudience().contains(audience)
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(new OAuth2Error(
                         OAuth2ErrorCodes.INVALID_TOKEN,
                         "The token audience is not accepted by EDOL Core",
                         null
                 ));
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(issuer),
-                audienceValidator
-        ));
-        return decoder;
     }
 }

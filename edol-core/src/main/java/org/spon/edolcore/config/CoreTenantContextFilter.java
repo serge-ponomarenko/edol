@@ -56,7 +56,7 @@ public class CoreTenantContextFilter extends OncePerRequestFilter {
 
         List<String> tenantHeaders = java.util.Collections.list(request.getHeaders(TENANT_HEADER));
         if (tenantHeaders.size() != 1) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Exactly one tenant context header is required");
+            badRequest(response, "Exactly one tenant context header is required");
             return;
         }
 
@@ -64,12 +64,18 @@ public class CoreTenantContextFilter extends OncePerRequestFilter {
         try {
             tenantId = UUID.fromString(tenantHeaders.getFirst());
         } catch (IllegalArgumentException exception) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Tenant context header is invalid");
+            badRequest(response, "Tenant context header is invalid");
             return;
         }
 
         try (CoreTenantContext.TenantScope ignored = tenantContext.open(tenantId)) {
             filterChain.doFilter(request, response);
         }
+    }
+
+    private void badRequest(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        response.setContentType("text/plain");
+        response.getWriter().write(message);
     }
 }

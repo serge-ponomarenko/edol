@@ -50,6 +50,9 @@ class Stage5SmokeApplicationContextTest {
     private static final String HUB_RUNTIME = "hub_runtime";
     private static final String ROLE_PASSWORD = "stage5-smoke-test-password";
     private static final String TRUSTED_SERVICE_TOKEN = "trusted-service-token";
+    private static final String WRONG_CLIENT_TOKEN = "wrong-client-token";
+    private static final String WRONG_AUDIENCE_TOKEN = "wrong-audience-token";
+    private static final String MISSING_SCOPE_TOKEN = "missing-scope-token";
     private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
@@ -114,6 +117,30 @@ class Stage5SmokeApplicationContextTest {
             assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
                     .GET()
                     .build())).isEqualTo(401);
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
+                    .header("Authorization", "Bearer " + TRUSTED_SERVICE_TOKEN)
+                    .GET()
+                    .build())).isEqualTo(400);
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
+                    .header("Authorization", "Bearer " + TRUSTED_SERVICE_TOKEN)
+                    .header("X-EDOL-Tenant-Id", "not-a-uuid")
+                    .GET()
+                    .build())).isEqualTo(400);
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
+                    .header("Authorization", "Bearer " + WRONG_CLIENT_TOKEN)
+                    .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
+                    .GET()
+                    .build())).isEqualTo(403);
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
+                    .header("Authorization", "Bearer " + WRONG_AUDIENCE_TOKEN)
+                    .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
+                    .GET()
+                    .build())).isEqualTo(401);
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
+                    .header("Authorization", "Bearer " + MISSING_SCOPE_TOKEN)
+                    .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
+                    .GET()
+                    .build())).isEqualTo(403);
             assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/printers"))
                     .header("Authorization", "Bearer " + TRUSTED_SERVICE_TOKEN)
                     .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
@@ -201,24 +228,49 @@ class Stage5SmokeApplicationContextTest {
 
         @Bean("jwtDecoder")
         JwtDecoder jwtDecoder() {
-            return token -> {
-                if (!TRUSTED_SERVICE_TOKEN.equals(token)) {
-                    throw new BadJwtException("JWT decoding is outside this persistence bootstrap test");
-                }
-                Instant now = Instant.now();
-                return new org.springframework.security.oauth2.jwt.Jwt(
-                        token,
-                        now,
-                        now.plusSeconds(60),
-                        Map.of("alg", "none"),
-                        Map.of(
-                                "iss", "https://issuer.invalid/realms/edol",
-                                "aud", List.of("edol-core-api"),
-                                "azp", "edol-hub-service",
-                                "scope", "tenant.context core.printer.read"
-                        )
+            return this::decode;
+        }
+
+        private org.springframework.security.oauth2.jwt.Jwt decode(String token) {
+            Instant now = Instant.now();
+            Map<String, Object> claims = switch (token) {
+                case TRUSTED_SERVICE_TOKEN -> Map.of(
+                        "iss", "https://issuer.invalid/realms/edol",
+                        "aud", List.of("edol-core-api"),
+                        "azp", "edol-hub-service",
+                        "scope", "tenant.context core.printer.read"
                 );
+                case WRONG_CLIENT_TOKEN -> Map.of(
+                        "iss", "https://issuer.invalid/realms/edol",
+                        "aud", List.of("edol-core-api"),
+                        "azp", "untrusted-client",
+                        "scope", "tenant.context core.printer.read"
+                );
+                case WRONG_AUDIENCE_TOKEN -> Map.of(
+                        "iss", "https://issuer.invalid/realms/edol",
+                        "aud", List.of("other-api"),
+                        "azp", "edol-hub-service",
+                        "scope", "tenant.context core.printer.read"
+                );
+                case MISSING_SCOPE_TOKEN -> Map.of(
+                        "iss", "https://issuer.invalid/realms/edol",
+                        "aud", List.of("edol-core-api"),
+                        "azp", "edol-hub-service",
+                        "scope", "tenant.context"
+                );
+                default -> throw new BadJwtException("JWT decoding is outside this persistence bootstrap test");
             };
+            org.springframework.security.oauth2.jwt.Jwt decodedToken = new org.springframework.security.oauth2.jwt.Jwt(
+                    token,
+                    now,
+                    now.plusSeconds(60),
+                    Map.of("alg", "none"),
+                    claims
+            );
+            if (CoreJwtConfiguration.audienceValidator("edol-core-api").validate(decodedToken).hasErrors()) {
+                throw new BadJwtException("The token audience is not accepted by EDOL Core");
+            }
+            return decodedToken;
         }
     }
 
