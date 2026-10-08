@@ -38,9 +38,9 @@ accept Stage 6.
   screenshots, or evidence.
 - Create an external NanoMQ password file that is readable only by the local
   operator and contains exactly the two identities `edolcore-events` and
-  `edolhub-secure`, in the password-file format supported by the pinned
-  NanoMQ image. Its path is supplied through `EDOL_STAGE6_NANOMQ_PASSWORD_FILE`.
-  Do not add this file to the repository.
+  `edolhub-secure`, using the NanoMQ 0.25.6 HOCON format described below. Its
+  path is supplied through `EDOL_STAGE6_NANOMQ_PASSWORD_FILE`. Do not add this
+  file to the repository.
 - Select unused loopback ports for PostgreSQL, MQTT, Core, and Hub. Confirm
   that no selected port maps to a non-loopback address and do not stop an
   occupied process.
@@ -51,6 +51,37 @@ accept Stage 6.
 - Stage 6 smoke uses plain local MQTT only to prove the limited disposable
   ACL. It is not TLS evidence. Do not reinterpret this harness as deployment
   configuration or as the Stage 7 per-service TLS identity design.
+
+## NanoMQ password file
+
+NanoMQ 0.25.6 reads the mounted password include as HOCON. The external file
+must contain exactly this quoted mapping shape, with the generated values in
+place of the placeholders:
+
+```hocon
+"edolcore-events": "<generated-core-password>"
+"edolhub-secure": "<generated-hub-password>"
+```
+
+Do not use a colon-separated `username:password` file; NanoMQ rejects that
+format when it parses the HOCON include.
+
+On the isolated Debian broker host, an operator can create two 32-byte
+hexadecimal values and write the file without printing either password:
+
+```bash
+umask 077
+core_password="$(openssl rand -hex 32)"
+hub_password="$(openssl rand -hex 32)"
+printf '"edolcore-events": "%s"\n"edolhub-secure": "%s"\n' \
+  "$core_password" "$hub_password" > "$EDOL_STAGE6_NANOMQ_PASSWORD_FILE"
+chmod 600 "$EDOL_STAGE6_NANOMQ_PASSWORD_FILE"
+unset core_password hub_password
+```
+
+Set the same two values only through the approved external Core/Hub secret
+inputs. Do not echo them, paste them into command history, commit the file, or
+include them in logs or smoke evidence.
 
 ## Disposable configuration contract
 
