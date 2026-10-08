@@ -1118,9 +1118,13 @@ tests. Notify and AMS retain legacy field support in this stage.
 
 ### Schema and data migration impact
 
-No domain schema or backfill is required. Consumer-side idempotency storage may
-be added only where an existing persisted mutation cannot be made naturally
-idempotent; its retention and cleanup are part of that consumer's stage diff.
+No domain schema or backfill is required. Hub source adds `V9` as a
+tenant-RLS-protected receipt ledger keyed by `event_id`; its composite
+tenant/printer foreign key proves that a receipt cannot reference a projection
+row from another tenant. The receipt insert and Hub mutation share one
+transaction, so a duplicate event ID is a no-op and a failed mutation leaves no
+receipt. Retention and cleanup require a separately reviewed operational policy
+before any deletion job is introduced.
 
 ### Security invariants introduced
 
@@ -1149,7 +1153,33 @@ subscribe ACLs become mandatory when Notify and AMS migrate.
 ### Rollback
 
 Keep consumers capable of reading legacy fields throughout the stage. Rollback
-removes envelope production only before any consumer declares it mandatory.
+first disables the secure Hub subscriber, then reverts the Core v2 publisher
+source only before any consumer declares the envelope mandatory. It does not
+require deleting receipt history or rolling back `V9`.
+
+### Source implementation status (2026-10-08)
+
+The source implementation is additive and is not Stage 6 acceptance. Core
+creates one QoS 1 event per existing integration topic, preserving `event` and
+all top-level legacy fields while adding the v2 envelope. Core resolves the
+tenant through its persisted printer catalog and uses a dedicated integration
+publisher client configuration. Secure Hub is opt-in through
+`EDOL_HUB_MQTT_ENABLED`; it manually acknowledges QoS 1 only after a valid
+message has either completed its receipt transaction or has been explicitly
+rejected. It uses current Core state and idempotent print-job operations to
+handle a start/progress/terminal trigger received out of order.
+
+The reviewed source also includes a disposable-only `stage6-smoke` harness:
+the Core profile enables only its dedicated integration publisher (not generic
+agent MQTT or printer runtime), the Hub profile enables the secure subscriber,
+and `docker/compose.stage6-smoke.yaml` binds a NanoMQ ACL broker only to
+loopback. It contains no password, TLS material, deployment configuration, or
+live broker interaction. Execute it only under the separate controls in
+`docs/deployment/stage6-disposable-mqtt-smoke-runbook.md`; its outcome remains
+disposable smoke evidence, not Stage 6 acceptance. Notify and AMS retain their
+legacy compatibility behavior and identities; their migration is Stage 7. AMS
+terminal enrollment is Stage 8. Legacy-field removal and mandatory broker
+lockdown are Stage 9.
 
 ### Acceptance criteria
 

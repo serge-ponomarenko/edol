@@ -1,0 +1,41 @@
+server:
+  address: 127.0.0.1
+  port: ${EDOL_CORE_STAGE6_SMOKE_PORT}
+
+logging:
+  file:
+    name: ${java.io.tmpdir}/edol-stage6-smoke-core.log
+
+spring:
+  datasource:
+    url: ${EDOL_CORE_STAGE6_SMOKE_DB_JDBC_URL}
+    username: ${EDOL_CORE_STAGE6_SMOKE_RUNTIME_DB_USER}
+    password: ${EDOL_CORE_STAGE6_SMOKE_RUNTIME_DB_PASSWORD}
+  flyway:
+    clean-disabled: true
+    user: ${EDOL_CORE_STAGE6_SMOKE_FLYWAY_DB_USER}
+    password: ${EDOL_CORE_STAGE6_SMOKE_FLYWAY_DB_PASSWORD}
+
+edol-core:
+  catalog-datasource:
+    url: ${EDOL_CORE_STAGE6_SMOKE_CATALOG_DB_JDBC_URL}
+    username: ${EDOL_CORE_STAGE6_SMOKE_CATALOG_DB_USER}
+    password: ${EDOL_CORE_STAGE6_SMOKE_CATALOG_DB_PASSWORD}
+  runtime:
+    mqtt-enabled: false
+    integration-mqtt-enabled: true
+    printer-runtime-enabled: false
+  mqtt:
+    integration:
+      username: ${EDOL_CORE_STAGE6_MQTT_USERNAME}
+      password: ${EDOL_CORE_STAGE6_MQTT_PASSWORD}
+
+mqttServer:
+  url: ${EDOL_STAGE6_SMOKE_MQTT_URL}
+
+bot:
+  webAdminName: stage6-smoke-disabled
+  webAdminPassword: stage6-smoke-disabled
+
+camera:
+  store-snapshots: false

@@ -20,6 +20,11 @@ spring:
             issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
 
 edol-hub:
+  runtime:
+    mqtt-enabled: ${EDOL_HUB_MQTT_ENABLED:false}
+  mqtt:
+    username: ${EDOL_HUB_MQTT_USERNAME:}
+    password: ${EDOL_HUB_MQTT_PASSWORD:}
   ams-compatibility:
     legacy-tenant-id: ${EDOL_HUB_AMS_COMPATIBILITY_LEGACY_TENANT_ID:}
     ingress-token: ${EDOL_HUB_AMS_COMPATIBILITY_INGRESS_TOKEN:}

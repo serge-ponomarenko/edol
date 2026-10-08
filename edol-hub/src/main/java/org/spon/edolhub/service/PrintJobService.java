@@ -64,6 +64,15 @@ public class PrintJobService {
     public void start(UUID printerId, PrinterState printerState) {
         Printer printer = printerRepository.findById(printerId)
                 .orElseThrow(() -> new IllegalStateException("Unknown printer: " + printerId));
+        PrintJob existing = printJobRepository
+                .findByPrinterIdAndSessionId(printerId, printerState.getSessionId())
+                .orElse(null);
+        if (existing != null) {
+            if (!isTerminalStatus(existing)) {
+                runtimeStateService.setCurrentJob(printerId, existing);
+            }
+            return;
+        }
         PrintJob job = PrintJob.builder()
                 .printer(printer)
                 .sessionId(printerState.getSessionId())
@@ -92,6 +101,9 @@ public class PrintJobService {
             UUID printerId,
             PrinterState printerState
     ) {
+        if (hasTerminalJob(printerId, printerState)) {
+            return;
+        }
         PrintJob job = getCurrentJob(printerId);
 
         if (previewRepository.existsByPrintJobId(
@@ -121,7 +133,14 @@ public class PrintJobService {
 
     @Transactional
     public void finish(UUID printerId, PrinterState printerState) {
+        if (hasTerminalJob(printerId, printerState)) {
+            runtimeStateService.setCurrentJob(printerId, null);
+            return;
+        }
         PrintJob job = getCurrentJob(printerId, printerState);
+        if (isTerminalStatus(job)) {
+            return;
+        }
 
         job.setStatus(PrintJobStatus.FINISHED);
         printAllocationFinalizeService.finalizeAllocation(job);
@@ -147,6 +166,10 @@ public class PrintJobService {
 
     @Transactional
     public void cancel(UUID printerId, PrinterState printerState) {
+        if (hasTerminalJob(printerId, printerState)) {
+            runtimeStateService.setCurrentJob(printerId, null);
+            return;
+        }
         PrintJob job = getCurrentJob(printerId, printerState);
 
         if (isTerminalStatus(job))
@@ -221,6 +244,9 @@ public class PrintJobService {
 
     @Transactional
     public void updateProgress(UUID printerId, PrinterState printerState) {
+        if (hasTerminalJob(printerId, printerState)) {
+            return;
+        }
         PrintJob job = getCurrentJob(printerId, printerState);
 
         if (job.getStatus() != PrintJobStatus.FINISHED
@@ -276,6 +302,12 @@ public class PrintJobService {
         }
 
         return job;
+    }
+
+    private boolean hasTerminalJob(UUID printerId, PrinterState printerState) {
+        return printJobRepository.findByPrinterIdAndSessionId(printerId, printerState.getSessionId())
+                .map(this::isTerminalStatus)
+                .orElse(false);
     }
 
     private PrintJob getCurrentJob(UUID printerId, PrinterState printerState) {

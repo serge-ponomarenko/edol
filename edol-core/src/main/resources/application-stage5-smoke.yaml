@@ -22,6 +22,7 @@ edol-core:
     password: ${EDOL_CORE_STAGE5_SMOKE_CATALOG_DB_PASSWORD}
   runtime:
     mqtt-enabled: false
+    integration-mqtt-enabled: false
     printer-runtime-enabled: false
 
 mqttServer:

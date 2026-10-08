@@ -19,8 +19,28 @@ class CoreRuntimeIsolationConfigurationTest {
                     assertThat(context).doesNotHaveBean("mqttInboundClientFactory");
                     assertThat(context).doesNotHaveBean("mqttInbound");
                     assertThat(context).doesNotHaveBean("mqttOutbound");
+                    assertThat(context).doesNotHaveBean("coreEventsOutbound");
                     assertThat(context).hasBean("mqttInboundChannel");
                     assertThat(context).hasBean("mqttOutboundChannel");
+                    assertThat(context).hasBean("coreEventsOutboundChannel");
+                });
+    }
+
+    @Test
+    void enablesOnlyTheIntegrationPublisherForTheStage6SmokeBoundary() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(MqttSubscribeConfig.class, MqttPublishConfig.class)
+                .withPropertyValues(
+                        "mqttServer.url=tcp://127.0.0.1:1883",
+                        "edol-core.runtime.mqtt-enabled=false",
+                        "edol-core.runtime.integration-mqtt-enabled=true"
+                )
+                .run(context -> {
+                    assertThat(context).doesNotHaveBean("mqttClientFactory");
+                    assertThat(context).doesNotHaveBean("mqttInboundClientFactory");
+                    assertThat(context).doesNotHaveBean("mqttInbound");
+                    assertThat(context).doesNotHaveBean("mqttOutbound");
+                    assertThat(context).hasBean("coreEventsOutbound");
                 });
     }
 

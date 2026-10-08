@@ -7,7 +7,7 @@ import org.spon.edol.model.ErrorCodes;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.event.PrinterEvent;
 import org.spon.edolcore.service.LogContextFactory;
-import org.spon.edolcore.service.MqttMessagePublisher;
+import org.spon.edolcore.service.mqtt.CoreIntegrationEventPublisher;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.agent.command.AgentCommandGateway;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
@@ -49,7 +49,7 @@ public class PrinterEventListener {
     private final PrinterStateService printerStateService;
     private final CameraSnapshotStore cameraSnapshotStore;
     private final TimelapseService timelapseService;
-    private final MqttMessagePublisher mqttMessagePublisher;
+    private final CoreIntegrationEventPublisher mqttMessagePublisher;
     private final AgentCommandGateway agentCommandGateway;
     private final ActivePrintContextService activePrintContextService;
     private final SpoolFingerprintBuilder spoolFingerprintBuilder;

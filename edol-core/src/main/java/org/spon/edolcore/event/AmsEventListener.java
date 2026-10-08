@@ -3,7 +3,7 @@ package org.spon.edolcore.event;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edolcore.service.LogContextFactory;
-import org.spon.edolcore.service.MqttMessagePublisher;
+import org.spon.edolcore.service.mqtt.CoreIntegrationEventPublisher;
 import org.spon.edolcore.service.PrinterStateService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,7 @@ import java.util.concurrent.CompletableFuture;
 public class AmsEventListener {
 
     private final PrinterStateService printerStateService;
-    private final MqttMessagePublisher mqttMessagePublisher;
+    private final CoreIntegrationEventPublisher mqttMessagePublisher;
     private final LogContextFactory logContextFactory;
 
     @EventListener

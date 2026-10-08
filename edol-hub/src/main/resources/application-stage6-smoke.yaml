@@ -1,0 +1,35 @@
+server:
+  address: 127.0.0.1
+  port: ${EDOL_HUB_STAGE6_SMOKE_PORT}
+
+logging:
+  file:
+    name: ${java.io.tmpdir}/edol-stage6-smoke-hub.log
+
+spring:
+  datasource:
+    url: ${EDOL_HUB_STAGE6_SMOKE_DB_JDBC_URL}
+    username: ${EDOL_HUB_STAGE6_SMOKE_RUNTIME_DB_USER}
+    password: ${EDOL_HUB_STAGE6_SMOKE_RUNTIME_DB_PASSWORD}
+  flyway:
+    clean-disabled: true
+    user: ${EDOL_HUB_STAGE6_SMOKE_FLYWAY_DB_USER}
+    password: ${EDOL_HUB_STAGE6_SMOKE_FLYWAY_DB_PASSWORD}
+
+edol-core:
+  url: ${EDOL_CORE_STAGE6_SMOKE_URL}
+
+edol-hub:
+  runtime:
+    mqtt-enabled: true
+  mqtt:
+    username: ${EDOL_HUB_STAGE6_MQTT_USERNAME}
+    password: ${EDOL_HUB_STAGE6_MQTT_PASSWORD}
+  qr-url: http://127.0.0.1:1/qr
+  registration:
+    self-service-enabled: true
+  session:
+    maximum-age: PT60S
+
+mqttServer:
+  url: ${EDOL_STAGE6_SMOKE_MQTT_URL}

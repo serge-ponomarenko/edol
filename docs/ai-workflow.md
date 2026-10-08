@@ -66,6 +66,11 @@ must never be copied into the repository or a Codex configuration file.
   is an operational recovery exercise following Stage 3 acceptance, not
   authorization to alter the production database or reopen accepted Flyway
   history.
+- Before accepting Stage 6, approve an operational retention policy for Hub's
+  `core_mqtt_event_receipts` idempotency ledger and validate it in a fresh
+  disposable MQTT/PostgreSQL environment. Do not add a cleanup job, alter a
+  live broker, use production credentials, or remove receipt history without a
+  separate reviewed change.
 ## Subagent Status
 
 Project-scoped Codex roles are configured under `.codex/agents`. They are

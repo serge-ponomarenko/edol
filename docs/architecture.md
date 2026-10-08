@@ -101,8 +101,19 @@ Core will remain passive. Its printer records will store an opaque tenant UUID
 assigned by a one-time migration backfill or an authenticated Hub provisioning
 request; Core will never call Hub to infer ownership. Core background runtime
 discovery will use a narrow read-only catalog identity, not a universal RLS
-bypass. MQTT events will gain an additive tenant-aware envelope before legacy
-fields are retired. AMS will own future terminal enrollment and per-device
+bypass. Stage 6 source publishes each tenant-owned Core integration event as
+one additive v2 message: its trusted envelope has a schema version, event ID,
+event type, tenant and printer IDs, RFC 3339 timestamp, and nested payload,
+while the legacy `event` and top-level fields remain in that same message. Core
+derives the tenant only from persisted printer ownership. Secure Hub MQTT
+ingress is disabled by default and uses tenant/printer validation plus a
+tenant-RLS receipt ledger before it mutates its projection. The
+`stage6-smoke` profiles and `docker/compose.stage6-smoke.yaml` provide a
+local-loopback, disposable ACL harness only: generic agent MQTT and printer
+runtime remain disabled, while the dedicated Core publisher and Hub subscriber
+are enabled. This is not deployment configuration or Stage 6 acceptance; it
+does not supply TLS, production broker identities, retention operations, or
+live-device evidence. AMS will own future terminal enrollment and per-device
 credentials.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,

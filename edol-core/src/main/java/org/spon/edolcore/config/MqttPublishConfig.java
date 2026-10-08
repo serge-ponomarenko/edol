@@ -2,6 +2,7 @@ package org.spon.edolcore.config;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,15 @@ public class MqttPublishConfig {
 
     @Value("${mqttServer.url}")
     private String mqttServerUrl;
+
+    @Value("${edol-core.mqtt.integration.username:}")
+    private String integrationUsername;
+
+    @Value("${edol-core.mqtt.integration.password:}")
+    private String integrationPassword;
+
+    @Value("${edol-core.mqtt.integration.client-id:edolcore-events-publisher}")
+    private String integrationClientId;
 
     @Bean
     @ConditionalOnProperty(
@@ -41,6 +51,11 @@ public class MqttPublishConfig {
     }
 
     @Bean
+    public MessageChannel coreEventsOutboundChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean
     @ServiceActivator(inputChannel = "mqttOutboundChannel")
     @ConditionalOnProperty(
             name = "edol-core.runtime.mqtt-enabled",
@@ -55,6 +70,30 @@ public class MqttPublishConfig {
         handler.setDefaultTopic("edolcore/events");
 
         return handler;
+    }
+
+    @Bean
+    @ServiceActivator(inputChannel = "coreEventsOutboundChannel")
+    @ConditionalOnExpression("${edol-core.runtime.mqtt-enabled:true} || ${edol-core.runtime.integration-mqtt-enabled:false}")
+    public MessageHandler coreEventsOutbound() {
+        MqttPahoMessageHandler handler =
+                new MqttPahoMessageHandler(integrationClientId, coreEventsClientFactory());
+        handler.setAsync(true);
+        handler.setDefaultTopic("edolcore/events");
+        handler.setDefaultQos(1);
+        return handler;
+    }
+
+    private MqttPahoClientFactory coreEventsClientFactory() {
+        DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
+        MqttConnectOptions options = new MqttConnectOptions();
+        options.setServerURIs(new String[]{mqttServerUrl});
+        if (!integrationUsername.isBlank()) {
+            options.setUserName(integrationUsername);
+            options.setPassword(integrationPassword.toCharArray());
+        }
+        factory.setConnectionOptions(options);
+        return factory;
     }
 
 }

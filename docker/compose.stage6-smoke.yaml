@@ -1,0 +1,22 @@
+name: edol-stage6-smoke
+
+services:
+  mqtt:
+    image: emqx/nanomq:0.25.6
+    command: ["nanomq", "start", "--conf", "/etc/nanomq.conf"]
+    ports:
+      - "127.0.0.1:${EDOL_STAGE6_SMOKE_MQTT_PORT:?EDOL_STAGE6_SMOKE_MQTT_PORT is required}:1883"
+    volumes:
+      - ./nanomq/stage6-smoke.conf:/etc/nanomq.conf:ro
+      - ./nanomq/stage6-smoke.acl.conf:/etc/nanomq_acl.conf:ro
+      - ${EDOL_STAGE6_NANOMQ_PASSWORD_FILE:?EDOL_STAGE6_NANOMQ_PASSWORD_FILE is required}:/etc/nanomq_pwd.conf:ro
+    healthcheck:
+      test: ["CMD", "nanomq", "--help"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: "no"
+
+networks:
+  default:
+    name: edol-stage6-smoke-network
