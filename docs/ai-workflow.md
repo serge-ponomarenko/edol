@@ -72,9 +72,9 @@ must never be copied into the repository or a Codex configuration file.
   live broker, use production credentials, or remove receipt history without a
   separate reviewed change.
 - Before upgrading to a Spring Boot release that removes Jackson 2 support,
-  migrate Core's `com.fasterxml.jackson.databind` usages and Stage 6 MQTT
+  migrate Core and Hub `com.fasterxml.jackson.databind` usages and Stage 6 MQTT
   serialization to Jackson 3. Until then, retain the explicitly tested
-  `spring-boot-jackson2` bridge; do not replace it with an ad hoc mapper bean.
+  `spring-boot-jackson2` bridges; do not replace them with ad hoc mapper beans.
 ## Subagent Status
 
 Project-scoped Codex roles are configured under `.codex/agents`. They are
