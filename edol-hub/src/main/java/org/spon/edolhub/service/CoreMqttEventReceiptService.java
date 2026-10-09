@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
 
 @Service
 @RequiredArgsConstructor
@@ -35,7 +36,7 @@ public class CoreMqttEventReceiptService {
                 .param("tenantId", envelope.tenantId())
                 .param("printerId", envelope.printerId())
                 .param("eventType", envelope.eventType())
-                .param("occurredAt", Instant.parse(envelope.timestamp()))
+                .param("occurredAt", Instant.parse(envelope.timestamp()).atOffset(ZoneOffset.UTC))
                 .update();
         if (inserted == 0) {
             return false;
