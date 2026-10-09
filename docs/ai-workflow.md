@@ -66,11 +66,18 @@ must never be copied into the repository or a Codex configuration file.
   is an operational recovery exercise following Stage 3 acceptance, not
   authorization to alter the production database or reopen accepted Flyway
   history.
-- Before accepting Stage 6, approve an operational retention policy for Hub's
-  `core_mqtt_event_receipts` idempotency ledger and validate it in a fresh
-  disposable MQTT/PostgreSQL environment. Do not add a cleanup job, alter a
-  live broker, use production credentials, or remove receipt history without a
-  separate reviewed change.
+- Before introducing an operational retention policy or deletion job for Hub's
+  `core_mqtt_event_receipts` idempotency ledger, approve the policy and
+  validate it in a fresh disposable MQTT/PostgreSQL environment. Stage 6
+  source/disposable acceptance does not authorize receipt deletion, a cleanup
+  job, a live-broker change, production credentials, or removal of receipt
+  history without a separate reviewed change.
+- Diagnose the Hub-to-Core media proxy `403` responses observed during Stage 6
+  disposable acceptance as a separate application-integration task. Establish
+  whether the cause is service authorization, tenant propagation, or the
+  intentionally disabled synthetic printer before changing proxy handling,
+  credentials, or runtime configuration. Do not use production resources or
+  broaden authorization as a diagnostic shortcut.
 - Before upgrading to a Spring Boot release that removes Jackson 2 support,
   migrate Core and Hub `com.fasterxml.jackson.databind` usages and Stage 6 MQTT
   serialization to Jackson 3. Until then, retain the explicitly tested

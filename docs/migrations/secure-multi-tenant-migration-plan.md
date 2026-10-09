@@ -1176,16 +1176,46 @@ and `docker/compose.stage6-smoke.yaml` binds a NanoMQ ACL broker only to
 loopback. It contains no password, TLS material, deployment configuration, or
 live broker interaction. Execute it only under the separate controls in
 `docs/deployment/stage6-disposable-mqtt-smoke-runbook.md`; its outcome remains
-disposable smoke evidence, not Stage 6 acceptance. Notify and AMS retain their
-legacy compatibility behavior and identities; their migration is Stage 7. AMS
-terminal enrollment is Stage 8. Legacy-field removal and mandatory broker
-lockdown are Stage 9.
+disposable smoke evidence until reviewed against the Stage 6 acceptance
+criteria. Notify and AMS retain their legacy compatibility behavior and
+identities; their migration is Stage 7. AMS terminal enrollment is Stage 8.
+Legacy-field removal and mandatory broker lockdown are Stage 9.
+
+### Disposable acceptance record (2026-10-09)
+
+Stage 6 acceptance passed on `EDOL-048` from the reviewed source sequence
+`aa97e922a493b38c3fb868c2c4c5387c826e084e`,
+`6e65d61754f02d1e54624de55736ea5b827b2c84`,
+`10c0760e5ac7d87403b1490cce55c5af9bce37c1`, and
+`12bd3d641420558a9540b0514eb7616dfc030e89`. A fresh disposable PostgreSQL
+cluster applied Core V1-V9 and Hub V1-V9 under restricted roles. Core and Hub
+ran only with `secure-multi-tenant,stage6-smoke` against a disposable NanoMQ
+0.25.6 broker.
+
+The acceptance verified Core publish and Hub subscribe authorization, default
+deny, unauthorized publish/subscribe rejection, one valid v2 receipt,
+duplicate `eventId` idempotency, three distinct valid receipts including
+reverse timestamp order, runtime-role RLS isolation, and rejection without a
+receipt for malformed, unknown-printer, and cross-tenant fixtures. The
+reverse-order evidence proves receipt persistence and no unexpected synthetic
+print-job mutation; it is not a general proof of domain-state ordering
+semantics. A temporarily approved Hub browser-ingress deviation was reverted
+during cleanup. No production or development database, production Keycloak,
+production broker, live printer, agent, AMS, or Notify service was used.
+
+This is a Stage 6 source/disposable acceptance only. It does not accept a
+deployment, TLS, production service identities, receipt-retention deletion,
+Notify/AMS migration, terminal enrollment, legacy-field removal, or final
+broker lockdown. Hub-to-Core media proxy `403` responses observed for the
+disabled synthetic printer remain a separate unresolved follow-up.
 
 ### Acceptance criteria
 
 - Every tenant-owned event contains trusted tenant and printer identities,
   version, timestamp, and event ID.
 - Existing Notify and AMS continue to operate during the compatibility window.
+- The disposable acceptance record verifies the secure Core-to-Hub MQTT path;
+  it does not replace the later Stage 7-9 acceptance gates.
 
 ### Explicitly out of scope
 

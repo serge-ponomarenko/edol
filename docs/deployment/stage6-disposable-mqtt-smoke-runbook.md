@@ -19,7 +19,29 @@ database, start Docker or an application, log in to Keycloak, change a broker,
 or delete disposable resources. Obtain an execution-window approval before
 starting it. A successful run is disposable smoke evidence only; it is neither
 a development-database nor production rollout, and it does not by itself
-accept Stage 6.
+accept Stage 6. Acceptance requires an explicit review of the recorded
+evidence against the Stage 6 criteria.
+
+## Completed acceptance record
+
+On 2026-10-09, the reviewed disposable execution passed the Stage 6 MQTT
+integration/security acceptance. It used synthetic data, a fresh disposable
+PostgreSQL cluster, a dedicated NanoMQ 0.25.6 composition, and the existing
+remote-development Keycloak issuer only for the already accepted Hub BFF path.
+It verified v2 receipt persistence and QoS 1 idempotency, timestamp receipt
+storage, tenant RLS, MQTT authentication and publish/subscribe ACLs, and the
+documented malformed, unknown-printer, and cross-tenant negative fixtures.
+
+The execution had one approved temporary deviation: Hub browser ingress was
+opened only to the existing development reverse-proxy host through a
+source-restricted Windows firewall rule. The original reverse-proxy upstream
+and firewall state were restored during cleanup. PostgreSQL and the disposable
+broker remained loopback-bound. This deviation is not part of the runbook's
+default topology and must not be reused without a new review.
+
+The result is source/disposable acceptance only. It is not a production,
+development-database, TLS, live-device, AMS, Notify, or Stage 7-9 acceptance.
+The retained evidence must remain redacted and external to the repository.
 
 ## Preconditions
 

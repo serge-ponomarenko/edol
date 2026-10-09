@@ -111,9 +111,16 @@ tenant-RLS receipt ledger before it mutates its projection. The
 `stage6-smoke` profiles and `docker/compose.stage6-smoke.yaml` provide a
 local-loopback, disposable ACL harness only: generic agent MQTT and printer
 runtime remain disabled, while the dedicated Core publisher and Hub subscriber
-are enabled. This is not deployment configuration or Stage 6 acceptance; it
-does not supply TLS, production broker identities, retention operations, or
-live-device evidence. AMS will own future terminal enrollment and per-device
+are enabled. On 2026-10-09, the Stage 6 disposable MQTT integration/security
+acceptance passed with a fresh PostgreSQL cluster and NanoMQ 0.25.6 harness.
+It verified authenticated Core publish and Hub subscribe ACLs, additive v2
+delivery, tenant-RLS receipt persistence, QoS 1 duplicate idempotency,
+reverse-timestamp receipt persistence, and malformed, unknown-printer, and
+cross-tenant rejection. A temporarily approved Hub browser ingress deviation
+was reverted during cleanup. This is not deployment configuration, TLS,
+production broker-identity, retention-operation, live-device, development
+database, or production evidence. Notify and AMS retain legacy compatibility
+until Stage 7; AMS will own future terminal enrollment and per-device
 credentials.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
