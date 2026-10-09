@@ -1235,6 +1235,8 @@ configuration, and end-to-end contract tests.
 
 ### Changes
 
+- Source contract implemented on 2026-10-09; it is not a Keycloak, broker,
+  deployment, database, terminal, or production acceptance.
 - Create `edol-notify-service` with five-minute tokens and
   `tenant.context`, `core.printer.read`, `core.state.read`,
   `core.command.execute`, and `core.media.read` scopes.
@@ -1248,6 +1250,43 @@ configuration, and end-to-end contract tests.
 - Derive AMS tenant from authenticated terminal, event, or persisted
   configuration context. Authenticate AMS-to-Core and AMS-to-Hub separately.
 - Propagate a tenant header only after establishing it from trusted local state.
+
+### Implemented source contract and pending external configuration
+
+- `edol-notify` uses the `edol-notify-service` client-credentials registration
+  for Core and emits `X-EDOL-Tenant-Id` only while a configured recipient or
+  validated v2 event has opened its tenant scope. Secure mode requires complete,
+  unique `edol-notify.recipients.mappings` entries; an unknown Telegram chat or
+  event tenant is rejected. Notifications are sent only to the active tenant's
+  mapped chats, callbacks and commands share the same gate, and `/log` is
+  disabled in secure mode because its file source is not tenant-scoped.
+- `edol-ams` uses `edol-ams-service` for both Core and Hub calls. Secure mode
+  requires complete, unique `edol-ams.printer-tenants.mappings`; an AMS HTTP
+  request first resolves its printer through that mapping, and an MQTT event
+  must match both that mapping and its validated envelope tenant. An unmapped
+  printer fails closed. The terminal does not supply a tenant header.
+- Core accepts tenant context from an allowlist of service client IDs. The
+  deployed allowlist must include the separate Hub, Notify, and AMS clients
+  before those services are started in secure mode.
+- Hub validates AMS service JWT audience `edol-hub-api`, `azp`,
+  `tenant.context`, and exactly one tenant header on only `GET
+  /api/spools/find`, `GET /api/spools/find-by-id`, and `POST
+  /s/{printerId}/{spoolId}/{slot}`. The required service scopes are
+  `hub.spool.read` for the reads and `hub.spool.change` for the mutation.
+  The earlier reverse-proxy compatibility ingress remains an explicitly
+  temporary alternative for those routes.
+- Notify's secure MQTT ACL must grant subscribe only to
+  `edolcore/printer/online`, `edolcore/printer/offline`, and the declared
+  `edolcore/print/{started,running,paused,finished,failed,error,progress,metadata,timelapse}`
+  topics. AMS's secure MQTT ACL must grant subscribe only to
+  `edolcore/ams` and `edolcore/print/ams`. Both client connections have
+  independent IDs and credentials supplied outside versioned configuration.
+- Keycloak client creation, token lifetime/audience mapper configuration,
+  secret creation, Core allowlist values, recipient/printer mappings, broker
+  users/ACLs/TLS, Compose/environment wiring, and any runtime rollout remain
+  separate approved operations. No credentials or mappings are versioned here.
+  Execute the controlled disposable verification only through
+  [the Stage 7 runbook](../deployment/stage7-disposable-notify-ams-smoke-runbook.md).
 
 ### Schema, API, event, and migration impact
 
@@ -1276,6 +1315,30 @@ allowlist, the AMS-only Hub allowlist, and MQTT legacy fields until both
 services have zero observed legacy usage. Do not remove compatibility in the
 same deployment that introduces the new clients.
 
+The secure service code is fail-closed when its deployment-managed mapping is
+missing, duplicate, incomplete, or inconsistent with a v2 event. Home remains
+deliberately simple: it has no service OAuth, tenant mappings, terminal
+credential, or secure broker prerequisite, and retains the existing trusted
+network request and `printerId` contract. The future home deployment smoke is
+a separate acceptance activity and does not weaken secure-mode checks.
+
+### Observable migration metrics and rollback boundaries
+
+- Before enabling a service client, record Core legacy-allowlist requests by
+  caller/path, Hub AMS compatibility-ingress requests, MQTT connect/subscribe
+  successes and ACL denials per identity/topic, accepted/rejected v2 envelope
+  counts by reason, and rejected recipient/printer mapping counts. Do not log
+  bearer tokens, passwords, pairing codes, or terminal secrets.
+- A service can move from its compatibility path only after its own authenticated
+  HTTP success/error rates, expected topic delivery, and zero legacy-path use
+  meet the agreed observation window. Notify and AMS are independent rollout
+  units.
+- Rollback is bounded to disabling that service's new deployment identity and
+  returning it to its exact pre-existing compatibility route while the legacy
+  route is still explicitly enabled. Do not remove the new code, reintroduce a
+  shared credential, or disable the other service's secure path. Stage 9 alone
+  authorizes compatibility removal after evidence for both consumers.
+
 ### Required tests
 
 - Wrong/revoked/rotated service secret, audience, scope, and tenant.
@@ -1299,7 +1362,8 @@ paths remain available. Do not reintroduce a shared global credential.
 
 ### Explicitly out of scope
 
-AMS Terminal pairing and removal of compatibility contracts.
+AMS Terminal pairing, terminal firmware changes, persisted terminal or pairing
+records, and removal of compatibility contracts.
 
 ## Stage 8: AMS Terminal Enrollment
 

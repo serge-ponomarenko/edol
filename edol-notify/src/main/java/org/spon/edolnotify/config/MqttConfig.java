@@ -20,11 +20,24 @@ public class MqttConfig {
     @Value("${mqttServer.url}")
     private String mqttServerUrl;
 
+    @Value("${edol-notify.mqtt.client-id:edolnotify-subscriber}")
+    private String clientId;
+
+    @Value("${edol-notify.mqtt.username:}")
+    private String username;
+
+    @Value("${edol-notify.mqtt.password:}")
+    private String password;
+
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
         mqttConnectOptions.setServerURIs(new String[]{mqttServerUrl});
+        if (!username.isBlank()) {
+            mqttConnectOptions.setUserName(username);
+            mqttConnectOptions.setPassword(password.toCharArray());
+        }
         factory.setConnectionOptions(mqttConnectOptions);
         return factory;
     }
@@ -38,9 +51,19 @@ public class MqttConfig {
     public MessageProducer inbound() {
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(
-                        "edolnotify-subscriber",
+                        clientId,
                         mqttClientFactory(),
-                        "edolcore/#"
+                        "edolcore/printer/online",
+                        "edolcore/printer/offline",
+                        "edolcore/print/started",
+                        "edolcore/print/running",
+                        "edolcore/print/paused",
+                        "edolcore/print/finished",
+                        "edolcore/print/failed",
+                        "edolcore/print/error",
+                        "edolcore/print/progress",
+                        "edolcore/print/metadata",
+                        "edolcore/print/timelapse"
                 );
 
         adapter.setCompletionTimeout(5000);

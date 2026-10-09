@@ -11,10 +11,17 @@ public class EdolCoreConfig {
     @Value("${edol-core.url}")
     private String edolCoreUrl;
 
+    private final NotifyTenantPropagationInterceptor tenantPropagationInterceptor;
+
+    public EdolCoreConfig(NotifyTenantPropagationInterceptor tenantPropagationInterceptor) {
+        this.tenantPropagationInterceptor = tenantPropagationInterceptor;
+    }
+
     @Bean
     public RestClient edolCoreClient() {
         return RestClient.builder()
                 .baseUrl(edolCoreUrl)
+                .requestInterceptor(tenantPropagationInterceptor)
                 .build();
     }
 

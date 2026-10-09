@@ -7,6 +7,7 @@ import org.spon.edol.model.ExtTray;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolams.model.AmsStatus;
 import org.spon.edolams.model.FilamentSpool;
+import org.spon.edolams.service.AmsPrinterTenantResolver;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,17 +27,24 @@ public class AmsStatusController {
 
     private final RestClient edolCoreClient;
     private final RestClient edolHubClient;
+    private final AmsPrinterTenantResolver tenantResolver;
 
     public AmsStatusController(
             @Qualifier("edolCoreRestClient") RestClient edolCoreClient,
-            @Qualifier("edolHubRestClient") RestClient edolHubClient
+            @Qualifier("edolHubRestClient") RestClient edolHubClient,
+            AmsPrinterTenantResolver tenantResolver
     ) {
         this.edolCoreClient = edolCoreClient;
         this.edolHubClient = edolHubClient;
+        this.tenantResolver = tenantResolver;
     }
 
     @GetMapping("/state")
     public AmsStatus getState(@org.springframework.web.bind.annotation.RequestParam UUID printerId) {
+        return tenantResolver.withPrinter(printerId, () -> getStateForTrustedPrinter(printerId));
+    }
+
+    private AmsStatus getStateForTrustedPrinter(UUID printerId) {
         try {
             PrinterState printerState = edolCoreClient.get()
                     .uri("/api/printers/{printerId}/state", printerId)

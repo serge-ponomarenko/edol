@@ -1,10 +1,10 @@
-package org.spon.edolcore.config;
+package org.spon.edolhub.config;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.spon.edolcore.service.tenant.CoreTenantContext;
+import org.spon.edolhub.service.TenantContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.Authentication;
@@ -15,25 +15,32 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
-/** Establishes Core tenant context from a validated allowlisted service request. */
+/** Establishes Hub tenant context for the exact AMS service ingress routes. */
 @Component
 @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "secure-multi-tenant")
-public class CoreTenantContextFilter extends OncePerRequestFilter {
+public class HubServiceTenantContextFilter extends OncePerRequestFilter {
 
     private static final String TENANT_HEADER = "X-EDOL-Tenant-Id";
 
-    private final CoreTenantContext tenantContext;
-    private final Set<String> trustedServiceClientIds;
+    private final TenantContext tenantContext;
+    private final String trustedAmsClientId;
 
-    public CoreTenantContextFilter(
-            CoreTenantContext tenantContext,
-            @Value("${edol-core.security.trusted-service-client-ids:edol-hub-service}") List<String> trustedServiceClientIds
+    public HubServiceTenantContextFilter(
+            TenantContext tenantContext,
+            @Value("${edol-hub.security.trusted-ams-client-id:edol-ams-service}") String trustedAmsClientId
     ) {
         this.tenantContext = tenantContext;
-        this.trustedServiceClientIds = Set.copyOf(trustedServiceClientIds);
+        this.trustedAmsClientId = trustedAmsClientId;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return !("GET".equals(request.getMethod())
+                && ("/api/spools/find-by-id".equals(path) || "/api/spools/find".equals(path)))
+                && !("POST".equals(request.getMethod()) && path.matches("/s/[^/]+/[^/]+/[^/]+"));
     }
 
     @Override
@@ -48,10 +55,10 @@ public class CoreTenantContextFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!trustedServiceClientIds.contains(jwtAuthentication.getToken().getClaimAsString("azp"))
-                || !authentication.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("SCOPE_tenant.context"))) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Hub tenant context is not authorized");
+        if (!trustedAmsClientId.equals(jwtAuthentication.getToken().getClaimAsString("azp"))
+                || authentication.getAuthorities().stream()
+                .noneMatch(authority -> authority.getAuthority().equals("SCOPE_tenant.context"))) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "AMS tenant context is not authorized");
             return;
         }
 
@@ -69,7 +76,7 @@ public class CoreTenantContextFilter extends OncePerRequestFilter {
             return;
         }
 
-        try (CoreTenantContext.TenantScope ignored = tenantContext.open(tenantId)) {
+        try (TenantContext.TenantScope ignored = tenantContext.open(tenantId)) {
             filterChain.doFilter(request, response);
         }
     }

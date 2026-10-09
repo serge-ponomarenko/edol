@@ -17,6 +17,8 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @RequiredArgsConstructor
@@ -25,6 +27,7 @@ public class SecurityConfig {
     private final OidcLoginSuccessHandler oidcLoginSuccessHandler;
     private final HubSessionExpiryFilter hubSessionExpiryFilter;
     private final ActiveTenantContextFilter activeTenantContextFilter;
+    private final HubServiceTenantContextFilter hubServiceTenantContextFilter;
     private final ObjectProvider<AmsCompatibilityIngressFilter> amsCompatibilityIngressFilter;
 
     @Bean
@@ -55,6 +58,10 @@ public class SecurityConfig {
                         .requestMatchers("/", "/favicon.svg", "/favicon_*.svg", "/img/**", "/css/**", "/js/**", "/error").permitAll()
                         .requestMatchers("/oauth2/**", "/login/**").permitAll()
                         .requestMatchers("/tenants/select").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/spools/find", "/api/spools/find-by-id")
+                        .hasAnyAuthority("SCOPE_hub.spool.read", "ROLE_AMS_COMPATIBILITY")
+                        .requestMatchers(HttpMethod.POST, "/s/*/*/*")
+                        .hasAnyAuthority("SCOPE_hub.spool.change", "ROLE_AMS_COMPATIBILITY")
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
@@ -62,10 +69,12 @@ public class SecurityConfig {
                         .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(authorizationRequestResolver))
                         .successHandler(oidcLoginSuccessHandler)
                 )
+                .oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> { }))
                 .logout(logout -> logout.logoutSuccessHandler(logoutHandler))
                 .sessionManagement(session -> session.sessionFixation(fixation -> fixation.changeSessionId()))
                 .addFilterAfter(hubSessionExpiryFilter, SecurityContextHolderFilter.class)
                 .addFilterAfter(amsIngress, SecurityContextHolderFilter.class)
+                .addFilterAfter(hubServiceTenantContextFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(activeTenantContextFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(DeploymentModeProperties.class)
+@EnableConfigurationProperties({DeploymentModeProperties.class, NotifyRecipientProperties.class})
 public class DeploymentModeConfiguration {
 
     @Bean

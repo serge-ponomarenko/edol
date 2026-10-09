@@ -4,8 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.spon.edol.deployment.DeploymentMode;
 import org.spon.edol.model.PrinterState;
+import org.spon.edol.mqtt.CoreMqttEventEnvelope;
 import org.spon.edolnotify.service.MessageService;
+import org.spon.edolnotify.service.NotifyRecipientResolver;
+import org.spon.edolnotify.service.NotifyTenantContext;
 import org.spon.edolnotify.service.PrinterService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.integration.annotation.ServiceActivator;
@@ -13,6 +17,7 @@ import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +30,8 @@ public class MqttEventListener {
     private final PrinterService printerService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final MessageService messageService;
+    private final DeploymentMode deploymentMode;
+    private final NotifyRecipientResolver recipientResolver;
 
     @Value("${telegram.progress-message-step}")
     private int telegramProgressMessageStep;
@@ -37,14 +44,28 @@ public class MqttEventListener {
             String payload = message.getPayload().toString();
 
             JsonNode json = objectMapper.readTree(payload);
-            String event = json.get("event").asText();
-            UUID printerId = UUID.fromString(json.required("printerId").asText());
+            String event;
+            UUID printerId;
+            JsonNode eventPayload;
+            NotifyTenantContext.Scope tenantScope = null;
+            if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
+                CoreMqttEventEnvelope envelope = objectMapper.treeToValue(json, CoreMqttEventEnvelope.class);
+                validateEnvelope(json, envelope);
+                tenantScope = recipientResolver.openForEvent(envelope.tenantId());
+                event = envelope.eventType();
+                printerId = envelope.printerId();
+                eventPayload = json.required("payload");
+            } else {
+                event = json.required("event").asText();
+                printerId = UUID.fromString(json.required("printerId").asText());
+                eventPayload = json;
+            }
 
-            log.info("EdolCore MQTT EVENT: {}", event);
+            try {
+                log.info("EdolCore MQTT EVENT: {}", event);
+                PrinterState printerState = printerService.getState(printerId);
 
-            PrinterState printerState = printerService.getState(printerId);
-
-            switch (event) {
+                switch (event) {
 
                 case "printer.online" -> handlePrinterOnline(printerId);
 
@@ -66,13 +87,35 @@ public class MqttEventListener {
 
                 case "print.metadata.loaded" -> handlePrintMetadata(printerId);
 
-                case "print.timelapse" -> handlePrintTimelapse(printerId, json);
+                    case "print.timelapse" -> handlePrintTimelapse(printerId, eventPayload);
 
-                default -> log.debug("Unhandled event: {}", event);
+                    default -> log.debug("Unhandled event: {}", event);
+                }
+            } finally {
+                if (tenantScope != null) {
+                    tenantScope.close();
+                }
             }
 
         } catch (Exception e) {
             log.error("Failed to process MQTT message", e);
+        }
+    }
+
+    private void validateEnvelope(JsonNode json, CoreMqttEventEnvelope envelope) {
+        if (envelope.schemaVersion() != 2
+                || envelope.eventId() == null
+                || envelope.eventType() == null
+                || envelope.tenantId() == null
+                || envelope.printerId() == null
+                || envelope.timestamp() == null
+                || envelope.payload() == null) {
+            throw new IllegalArgumentException("Incomplete Core MQTT v2 envelope");
+        }
+        Instant.parse(envelope.timestamp());
+        if (!envelope.eventType().equals(json.required("event").asText())
+                || !envelope.printerId().equals(UUID.fromString(json.required("printerId").asText()))) {
+            throw new IllegalArgumentException("Core MQTT legacy and envelope identities disagree");
         }
     }
 

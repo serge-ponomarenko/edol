@@ -7,9 +7,9 @@ import io.github.natanimn.telebof.types.keyboard.InlineKeyboardMarkup;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolnotify.model.PrinterSummary;
+import org.spon.edolnotify.service.NotifyRecipientResolver;
 import org.spon.edolnotify.service.PrinterService;
 import org.spon.edolnotify.service.TelegramMessageFormatterService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -31,17 +31,17 @@ public class TelegramMessageController {
     private final TelegramMessageFormatterService formatter;
     private final PrinterService printerService;
     private final TelegramBotService telegramBotService;
+    private final NotifyRecipientResolver recipientResolver;
 
     public TelegramMessageController(TelegramMessageFormatterService formatter,
                                      PrinterService printerService,
-                                     @Lazy TelegramBotService telegramBotService) {
+                                     @Lazy TelegramBotService telegramBotService,
+                                     NotifyRecipientResolver recipientResolver) {
         this.formatter = formatter;
         this.printerService = printerService;
         this.telegramBotService = telegramBotService;
+        this.recipientResolver = recipientResolver;
     }
-
-    @Value("${telegram.admin-id}")
-    private Long adminChatId;
 
     public void sendPrinterSelection(BotContext context, long chatId, String action, String title) {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
@@ -64,7 +64,7 @@ public class TelegramMessageController {
         }
         BotContext context = getBotContext();
         if (context != null) {
-            sendStatusMessage(context, adminChatId, printerId);
+            recipientResolver.currentRecipients().forEach(chatId -> sendStatusMessage(context, chatId, printerId));
         }
     }
 
@@ -113,11 +113,11 @@ public class TelegramMessageController {
     public void sendVideo(UUID printerId, File video) {
         BotContext context = getBotContext();
         if (context != null) {
-            context.sendVideo(adminChatId, video)
+            recipientResolver.currentRecipients().forEach(chatId -> context.sendVideo(chatId, video)
                     .caption("🖨 <b>" + getPrinter(printerId).name() + ": "
                             + printerService.getState(printerId).getCurrentTask() + "</b>")
                     .parseMode(ParseMode.HTML)
-                    .exec();
+                    .exec());
         }
     }
 
@@ -162,10 +162,11 @@ public class TelegramMessageController {
         }
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         keyboard.addKeyboard(new InlineKeyboardButton(STATUS_BUTTON_LABEL, callback(STATUS_ACTION, printerId)));
-        context.sendMessage(adminChatId, "<b>" + getPrinter(printerId).name() + "</b>\n" + message)
+        recipientResolver.currentRecipients().forEach(chatId -> context.sendMessage(chatId,
+                        "<b>" + getPrinter(printerId).name() + "</b>\n" + message)
                 .parseMode(ParseMode.HTML)
                 .replyMarkup(keyboard)
-                .exec();
+                .exec());
     }
 
     private PrinterSummary getPrinter(UUID printerId) {

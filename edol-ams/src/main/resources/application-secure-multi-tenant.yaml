@@ -1,0 +1,20 @@
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          edol-ams-service:
+            client-id: ${EDOL_AMS_SERVICE_CLIENT_ID:edol-ams-service}
+            client-secret: ${EDOL_AMS_SERVICE_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+            provider: edol-keycloak
+            scope: tenant.context,core.state.read,hub.spool.read,hub.spool.change
+        provider:
+          edol-keycloak:
+            issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
+
+edol-ams:
+  mqtt:
+    client-id: ${EDOL_AMS_MQTT_CLIENT_ID:edol-ams-service}
+    username: ${EDOL_AMS_MQTT_USERNAME}
+    password: ${EDOL_AMS_MQTT_PASSWORD}

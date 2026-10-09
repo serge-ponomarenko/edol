@@ -16,7 +16,7 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with Po
 
 1. A printer reports telemetry directly or through an agent. Core resolves the printer, updates its in-memory runtime state, and derives application events.
 2. Core handles those events for print lifecycle, metadata, camera, recovery, and commands, then publishes integration events under `edolcore/#`.
-3. Hub, Notify, and AMS subscribe to `edolcore/#`. Hub persists print and inventory effects; Notify sends Telegram messages; AMS changes spool state.
+3. Hub consumes the Core integration-event contract for persistent print and inventory effects. In `secure-multi-tenant` mode, Notify consumes only its declared printer and print topics, and AMS consumes only `edolcore/ams` and `edolcore/print/ams`; both validate the additive v2 envelope before using its tenant context. Home retains the legacy trusted-network subscriptions.
 4. Hub, Notify, and AMS also call Core over HTTP for current printer state or commands. Hub owns its persistence; Core owns printer connectivity and runtime state.
 
 Core runtime is per printer. New printer, connection and session identifiers use UUID v7; historical UUID v4 values are retained. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints; default-printer HTTP endpoints are not supported. Hub, AMS and Notify use only explicit printer endpoints. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
@@ -119,9 +119,17 @@ reverse-timestamp receipt persistence, and malformed, unknown-printer, and
 cross-tenant rejection. A temporarily approved Hub browser ingress deviation
 was reverted during cleanup. This is not deployment configuration, TLS,
 production broker-identity, retention-operation, live-device, development
-database, or production evidence. Notify and AMS retain legacy compatibility
-until Stage 7; AMS will own future terminal enrollment and per-device
-credentials.
+database, or production evidence. Stage 7 source now gives Notify and AMS
+independent client-credentials contracts and restricts their secure MQTT topic
+sets. Notify establishes its tenant from a deployment-managed tenant-to-chat
+mapping; AMS establishes it from a deployment-managed printer-to-tenant mapping
+or the validated v2 envelope, never from an untrusted terminal parameter.
+Core accepts the tenant header only from allowlisted service clients, and Hub
+accepts AMS service JWT ingress only on the exact spool routes. Keycloak
+clients, broker identities and ACLs, deployment mappings, and live acceptance
+remain unapplied. The temporary legacy paths remain available until the later
+observation and Stage 9 removal gates. Stage 8 will own terminal enrollment
+and per-device credentials.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and

@@ -5,15 +5,11 @@ import io.github.natanimn.telebof.types.updates.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.spon.edolnotify.telegram.TelegramMessageController;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component("metadata")
 @RequiredArgsConstructor
 public class MetadataCommand implements Command {
-
-    @Value("${telegram.admin-id}")
-    private Long adminId;
 
     private final TelegramMessageController telegramMessageController;
 
@@ -21,8 +17,6 @@ public class MetadataCommand implements Command {
     @SneakyThrows
     public void runCommand(BotContext ctx, Message message) {
         long chatId = message.getChat().getId();
-        if (chatId != adminId) return;
-
         telegramMessageController.sendPrinterSelection(ctx, chatId, "metadata", "Select a printer for metadata download");
     }
 

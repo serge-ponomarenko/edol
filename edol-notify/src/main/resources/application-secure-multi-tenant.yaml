@@ -1,0 +1,20 @@
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          edol-notify-service:
+            client-id: ${EDOL_NOTIFY_SERVICE_CLIENT_ID:edol-notify-service}
+            client-secret: ${EDOL_NOTIFY_SERVICE_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+            provider: edol-keycloak
+            scope: tenant.context,core.printer.read,core.state.read,core.command.execute,core.media.read
+        provider:
+          edol-keycloak:
+            issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
+
+edol-notify:
+  mqtt:
+    client-id: ${EDOL_NOTIFY_MQTT_CLIENT_ID:edolnotify-secure-subscriber}
+    username: ${EDOL_NOTIFY_MQTT_USERNAME:}
+    password: ${EDOL_NOTIFY_MQTT_PASSWORD:}

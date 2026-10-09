@@ -18,8 +18,14 @@ spring:
         provider:
           edol-keycloak:
             issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
+      resourceserver:
+        jwt:
+          issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
 
 edol-hub:
+  security:
+    required-audience: ${EDOL_HUB_REQUIRED_AUDIENCE:edol-hub-api}
+    trusted-ams-client-id: ${EDOL_AMS_SERVICE_CLIENT_ID:edol-ams-service}
   runtime:
     mqtt-enabled: ${EDOL_HUB_MQTT_ENABLED:false}
   mqtt:

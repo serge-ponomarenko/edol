@@ -4,6 +4,7 @@ import io.github.natanimn.telebof.BotContext;
 import io.github.natanimn.telebof.types.updates.CallbackQuery;
 import org.junit.jupiter.api.Test;
 import org.spon.edolnotify.telegram.callbacks.Callback;
+import org.spon.edolnotify.service.NotifyRecipientResolver;
 
 import java.util.List;
 import java.util.UUID;
@@ -22,7 +23,7 @@ class CallbackHandlerTest {
         Callback pushAll = mock(Callback.class);
         when(metadata.action()).thenReturn("metadata");
         when(pushAll.action()).thenReturn("pushall");
-        CallbackHandler handler = new CallbackHandler(List.of(metadata, pushAll));
+        CallbackHandler handler = new CallbackHandler(List.of(metadata, pushAll), mock(NotifyRecipientResolver.class));
         BotContext context = mock(BotContext.class);
 
         CallbackQuery metadataQuery = query("metadata");
@@ -43,7 +44,7 @@ class CallbackHandlerTest {
         when(second.action()).thenReturn("metadata");
         List<Callback> callbacks = List.of(first, second);
 
-        assertThatThrownBy(() -> new CallbackHandler(callbacks))
+        assertThatThrownBy(() -> new CallbackHandler(callbacks, mock(NotifyRecipientResolver.class)))
                 .isInstanceOf(IllegalStateException.class);
     }
 

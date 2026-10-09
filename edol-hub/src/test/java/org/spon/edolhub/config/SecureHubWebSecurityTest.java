@@ -28,6 +28,7 @@ import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
@@ -215,6 +216,13 @@ class SecureHubWebSecurityTest {
     @TestConfiguration(proxyBeanMethods = false)
     @EnableWebSecurity
     static class OAuthClientTestConfiguration {
+
+        @Bean
+        JwtDecoder jwtDecoder() {
+            return token -> {
+                throw new UnsupportedOperationException("JWT decoding is not exercised by this browser-session test");
+            };
+        }
 
         @Bean
         ClientRegistrationRepository clientRegistrationRepository() {

@@ -30,7 +30,7 @@ edol-core:
       minimum-idle: 0
   security:
     required-audience: ${EDOL_CORE_REQUIRED_AUDIENCE:edol-core-api}
-    trusted-hub-client-id: ${EDOL_CORE_TRUSTED_HUB_CLIENT_ID:edol-hub-service}
+    trusted-service-client-ids: ${EDOL_CORE_TRUSTED_SERVICE_CLIENT_IDS:edol-hub-service}
   legacy-compatibility:
     enabled: ${EDOL_CORE_LEGACY_COMPATIBILITY_ENABLED:false}
     legacy-tenant-id: ${EDOL_CORE_LEGACY_TENANT_ID:}

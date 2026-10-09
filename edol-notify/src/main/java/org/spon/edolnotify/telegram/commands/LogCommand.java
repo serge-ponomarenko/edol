@@ -3,8 +3,9 @@ package org.spon.edolnotify.telegram.commands;
 import io.github.natanimn.telebof.BotContext;
 import io.github.natanimn.telebof.enums.ParseMode;
 import io.github.natanimn.telebof.types.updates.Message;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
-import org.springframework.beans.factory.annotation.Value;
+import org.spon.edol.deployment.DeploymentMode;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -14,16 +15,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component("log")
+@RequiredArgsConstructor
 public class LogCommand implements Command {
 
-    @Value("${telegram.admin-id}")
-    private Long adminId;
+    private final DeploymentMode deploymentMode;
 
     @Override
     @SneakyThrows
     public void runCommand(BotContext ctx, Message message) {
         long chatId = message.getChat().getId();
-        if (chatId != adminId) return;
+        if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
+            ctx.sendMessage(chatId, "This command is unavailable in secure multi-tenant mode.").exec();
+            return;
+        }
 
         Path logPath = Paths.get("./logs/edol_core_application.log");
         List<String> arguments = getArguments(message);

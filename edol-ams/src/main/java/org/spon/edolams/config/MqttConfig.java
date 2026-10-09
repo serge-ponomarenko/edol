@@ -20,11 +20,24 @@ public class MqttConfig {
     @Value("${mqttServer.url}")
     private String mqttServerUrl;
 
+    @Value("${edol-ams.mqtt.client-id:edolams-subscriber}")
+    private String clientId;
+
+    @Value("${edol-ams.mqtt.username:}")
+    private String username;
+
+    @Value("${edol-ams.mqtt.password:}")
+    private String password;
+
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
         mqttConnectOptions.setServerURIs(new String[]{mqttServerUrl});
+        if (!username.isBlank()) {
+            mqttConnectOptions.setUserName(username);
+            mqttConnectOptions.setPassword(password.toCharArray());
+        }
         factory.setConnectionOptions(mqttConnectOptions);
         return factory;
     }
@@ -38,9 +51,10 @@ public class MqttConfig {
     public MessageProducer inbound() {
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(
-                        "edolams-subscriber",
+                        clientId,
                         mqttClientFactory(),
-                        "edolcore/#"
+                        "edolcore/ams",
+                        "edolcore/print/ams"
                 );
 
         adapter.setCompletionTimeout(5000);

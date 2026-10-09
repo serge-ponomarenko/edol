@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CoreTenantContextFilterTest {
 
     private final CoreTenantContext tenantContext = new CoreTenantContext();
-    private final CoreTenantContextFilter filter = new CoreTenantContextFilter(tenantContext, "edol-hub-service");
+    private final CoreTenantContextFilter filter = new CoreTenantContextFilter(tenantContext, List.of("edol-hub-service", "edol-notify-service"));
 
     @AfterEach
     void clearSecurityContext() {
@@ -55,13 +55,31 @@ class CoreTenantContextFilterTest {
         assertThat(response.getStatus()).isEqualTo(400);
     }
 
+    @Test
+    void rejectsTenantContextFromAnUntrustedServiceClient() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-EDOL-Tenant-Id", UUID.randomUUID().toString());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        SecurityContextHolder.getContext().setAuthentication(authentication("edol-ams-service"));
+
+        filter.doFilter(request, response, (ignoredRequest, ignoredResponse) -> {
+            throw new AssertionError("Filter chain must not run");
+        });
+
+        assertThat(response.getStatus()).isEqualTo(403);
+    }
+
     private JwtAuthenticationToken trustedHubAuthentication() {
+        return authentication("edol-hub-service");
+    }
+
+    private JwtAuthenticationToken authentication(String clientId) {
         Jwt token = new Jwt(
                 "token",
                 Instant.now(),
                 Instant.now().plusSeconds(60),
                 java.util.Map.of("alg", "none"),
-                java.util.Map.of("azp", "edol-hub-service")
+                java.util.Map.of("azp", clientId)
         );
         return new JwtAuthenticationToken(token, List.of(new SimpleGrantedAuthority("SCOPE_tenant.context")));
     }
