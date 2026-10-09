@@ -6,7 +6,7 @@ import org.spon.edol.model.AmsState;
 import org.spon.edol.model.ExtTray;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolams.model.AmsStatus;
-import org.spon.edolams.model.FilamentSpool;
+import org.spon.edolams.model.HubFilamentSpool;
 import org.spon.edolams.service.AmsPrinterTenantResolver;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -88,12 +88,12 @@ public class AmsStatusController {
                 extTray.setColor(colorHex);
 
                 String printerFilamentProfileId = ext.getFilamentBrandIndex();
-                FilamentSpool spool = findSpool(printerFilamentProfileId, colorHex);
+                HubFilamentSpool spool = findSpool(printerFilamentProfileId, colorHex);
                 if (spool != null) {
-                    extTray.setVendor(spool.getFilament().getVendor().getName());
-                    extTray.setBrand(spool.getFilament().getBrand());
-                    extTray.setSpoolId(spool.getId());
-                    extTray.setRemaining(spool.getWeightRemaining());
+                    extTray.setVendor(spool.filament().vendor().name());
+                    extTray.setBrand(spool.filament().brand());
+                    extTray.setSpoolId(spool.id());
+                    extTray.setRemaining(spool.weightRemaining().intValue());
                 }
 
                 amsStatus.setExtTray(extTray);
@@ -109,7 +109,7 @@ public class AmsStatusController {
         }
     }
 
-    private FilamentSpool findSpool(String printerFilamentProfileId, String colorHex) {
+    private HubFilamentSpool findSpool(String printerFilamentProfileId, String colorHex) {
         return edolHubClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/spools/find")
@@ -117,7 +117,7 @@ public class AmsStatusController {
                         .queryParam("colorHex", colorHex)
                         .build())
                 .retrieve()
-                .body(FilamentSpool.class);
+                .body(HubFilamentSpool.class);
     }
 
     private AmsStatus.Slot toSlot(AmsSlot amsSlot, int activeSlot) {
@@ -137,15 +137,15 @@ public class AmsStatusController {
     }
 
     private void enrichSlot(AmsStatus.Slot slot, String printerFilamentProfileId, String colorHex) {
-        FilamentSpool spool = findSpool(printerFilamentProfileId, colorHex);
+        HubFilamentSpool spool = findSpool(printerFilamentProfileId, colorHex);
         if (spool == null) {
             return;
         }
 
-        slot.setVendor(spool.getFilament().getVendor().getName());
-        slot.setBrand(spool.getFilament().getBrand());
-        slot.setSpoolId(spool.getId());
-        slot.setRemaining(spool.getWeightRemaining());
+        slot.setVendor(spool.filament().vendor().name());
+        slot.setBrand(spool.filament().brand());
+        slot.setSpoolId(spool.id());
+        slot.setRemaining(spool.weightRemaining().intValue());
     }
 
 }

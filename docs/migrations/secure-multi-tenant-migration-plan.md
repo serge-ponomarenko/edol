@@ -1247,8 +1247,9 @@ configuration, and end-to-end contract tests.
 - Give each service a separate TLS MQTT subscriber identity and topic ACL.
 - Replace Notify's global Telegram administrator assumption with tenant-to-
   recipient configuration before processing multiple tenants.
-- Derive AMS tenant from authenticated terminal, event, or persisted
-  configuration context. Authenticate AMS-to-Core and AMS-to-Hub separately.
+- Until Stage 8, derive AMS tenant only from a validated v2 event or trusted
+  persisted/deployment configuration context; do not infer it from terminal
+  request parameters. Authenticate AMS-to-Core and AMS-to-Hub separately.
 - Propagate a tenant header only after establishing it from trusted local state.
 
 ### Implemented source contract and pending external configuration
@@ -1359,6 +1360,33 @@ paths remain available. Do not reintroduce a shared global credential.
 - Their event processing cannot guess tenant from a printer ID supplied by an
   untrusted source.
 - Legacy usage metrics remain zero for the agreed observation window.
+
+### Disposable smoke evidence (2026-10-09 — partial acceptance)
+
+The controlled run recorded against
+`4e88bc348177d91eb96dad39c47787c13892ef8b` is **PARTIAL ACCEPTANCE — NOT
+FULL PASS**. Isolated PostgreSQL, NanoMQ, and Keycloak resources verified
+restricted-role/RLS behavior, Core and Hub Flyway V1–V9, two-tenant ownership
+and spool isolation, separate service MQTT identities and ACL denials, valid
+Notify and AMS v2 event handling, and exercised cross-tenant rejection. The
+rejected-event receipt checks found no persisted receipt for the invalid
+fixtures and no unintended inspected spool-state change.
+
+This evidence does not meet the criteria above. Positive AMS spool lookup
+(`GET /ams/find`) and unknown-printer AMS state handling returned HTTP 500 and
+led to a source remediation: AMS now consumes a narrow, forward-compatible Hub
+spool read DTO, and an unmapped HTTP printer is reported as `404` before a
+downstream call. Targeted local regression tests also normalize blank optional
+Core `agentId` values to `NULL`. These are source-level results only; a fresh
+disposable rerun must prove the two repaired runtime paths. The `/ams/set-spool`
+runtime path was not invoked: it traverses Hub and Core into a printer command
+boundary, and the disposable harness has no approved safe command sink.
+Remaining evidence includes the complete service-token negative matrix, Notify
+recipient-delivery separation, invalid-mapping startup failures, legacy metric
+counters, and Maven test output. This is neither deployment, TLS, home-mode,
+terminal-identity, live-device, development-database, nor production
+acceptance. Stage 8 terminal enrollment and Stage 9 legacy removal remain out
+of scope.
 
 ### Explicitly out of scope
 

@@ -78,7 +78,7 @@ public class PrinterMapper {
                 .ftpPort(dto.ftpPort())
                 .modelDirectory(dto.modelDirectory())
                 .accessCode(dto.accessCode())
-                .agentId(dto.agentId())
+                .agentId(normalizeOptionalAgentId(dto.agentId()))
                 .build();
     }
 
@@ -111,7 +111,11 @@ public class PrinterMapper {
         connection.setFtpPort(request.ftpPort());
         connection.setModelDirectory(request.modelDirectory());
         connection.setAccessCode(request.accessCode());
-        connection.setAgentId(request.agentId());
+        connection.setAgentId(normalizeOptionalAgentId(request.agentId()));
+    }
+
+    private String normalizeOptionalAgentId(String agentId) {
+        return agentId == null || agentId.isBlank() ? null : agentId;
     }
 
 }

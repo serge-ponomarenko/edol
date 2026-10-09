@@ -126,10 +126,19 @@ mapping; AMS establishes it from a deployment-managed printer-to-tenant mapping
 or the validated v2 envelope, never from an untrusted terminal parameter.
 Core accepts the tenant header only from allowlisted service clients, and Hub
 accepts AMS service JWT ingress only on the exact spool routes. Keycloak
-clients, broker identities and ACLs, deployment mappings, and live acceptance
-remain unapplied. The temporary legacy paths remain available until the later
-observation and Stage 9 removal gates. Stage 8 will own terminal enrollment
-and per-device credentials.
+clients, broker identities/ACLs, and mappings were provisioned only in an
+isolated disposable Stage 7 smoke on 2026-10-09. That run verified dedicated
+connections, ACL denials, selected v2 processing, and selected cross-tenant
+rejections, but is **PARTIAL ACCEPTANCE — NOT FULL PASS**: positive AMS spool
+lookup and unknown-printer handling returned HTTP 500. The subsequent source
+remediation uses a narrow AMS Hub-spool read DTO and maps an unmapped HTTP
+printer to `404` before a downstream call; its local regression tests pass, but
+a fresh disposable rerun is still required. Complete HTTP authorization, Notify
+delivery, mapping-validation, metrics, and Maven evidence also remain open. No
+deployment, TLS, development-database, live-device, home-mode, or production
+acceptance was performed. The temporary legacy paths remain available until the
+later observation and Stage 9 removal gates. Stage 8 will own terminal
+enrollment and per-device credentials.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and

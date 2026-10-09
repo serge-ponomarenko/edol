@@ -21,6 +21,27 @@ Obtain a separate execution-window approval. A PASS is source/disposable
 acceptance only. It is not a deployment, TLS, development-database, production,
 live-device, terminal-enrollment, or Stage 8/9 acceptance.
 
+## Executed disposable evidence (2026-10-09)
+
+The execution against `4e88bc348177d91eb96dad39c47787c13892ef8b` is **PARTIAL
+ACCEPTANCE — NOT FULL PASS**. It used isolated disposable PostgreSQL, NanoMQ,
+and Keycloak resources with two synthetic tenants, printers, and spools. It
+passed the restricted-role/RLS and Core/Hub V1–V9 checks, dedicated MQTT
+connections and ACL denials, valid v2 Notify and AMS event handling, and the
+exercised cross-tenant rejection paths.
+
+It did not complete Stage 7 acceptance. `GET /ams/find` for a tenant-owned
+spool and `/ams/state` for an unknown printer returned HTTP 500; both need
+fresh disposable rerun evidence after source remediation. The complete
+service-token negative matrix, recipient-delivery separation, invalid-mapping
+startup evidence, legacy metric counters, and Maven test output were not
+collected.
+`/ams/set-spool` was deliberately not invoked because its downstream path can
+issue a Core printer command; see the execution sequence below. The test did
+not cover TLS, deployment configuration, home mode, terminal identity, or a
+live device. Preserve the redacted evidence and disposable resources until a
+separate cleanup approval.
+
 ## Stage 7 security boundary
 
 Stage 7 gives the backend services independent identities. `edol-notify-service`
@@ -191,8 +212,15 @@ Terminal request; AMS owns the mapping lookup in this stage.
      mapping and succeed only through AMS's Core service token.
    - `GET /ams/find?id=<tenant-a-spool>&printerId=<printer-a>` must use AMS's
      Hub read scope and return only the tenant-A spool.
-   - `GET /ams/set-spool?id=<tenant-a-spool>&slot=<slot>&printerId=<printer-a>`
-     must use AMS's Hub change scope and mutate only tenant-A disposable data.
+   - Do **not** invoke
+     `GET /ams/set-spool?id=<tenant-a-spool>&slot=<slot>&printerId=<printer-a>`
+     in this runtime smoke. The AMS endpoint calls Hub's change route, which
+     dispatches a Core `spool-change` command and can reach a printer command
+     publisher. The Stage 6 smoke profile disables normal printer runtime but
+     does not provide a safe command sink. Verify its authorization and
+     propagation with an automated test that mocks or stubs the Core command
+     boundary; a successful runtime invocation belongs only to a separately
+     approved safe command-harness execution.
    - Repeat tenant-A spool access through printer B and require Hub's tenant
      isolation to reject it. An unknown printer ID must fail before Core or Hub
      is called.
@@ -224,8 +252,10 @@ Terminal request; AMS owns the mapping lookup in this stage.
   rejected envelope mismatch, recipient separation, zero legacy-path use, and
   unchanged Hub state after each rejected fixture.
 - Core/Hub HTTP response status summaries for valid and invalid service clients,
-  tenant headers, audiences, and scopes; AMS state/read/change results and
-  cross-tenant rejection.
+  tenant headers, audiences, and scopes; AMS state/read results, cross-tenant
+  rejection, and an automated mocked-Core result for the change route. Record
+  that no runtime `/ams/set-spool` request was made unless a separate safe
+  command-harness approval exists.
 - Maven test outputs and explicit limitations. The expected limitation is that
   this harness does not prove TLS, production configuration, terminal identity,
   firmware storage, a live printer, or home-mode deployment.
@@ -236,8 +266,9 @@ Stop immediately if a target is not the recorded disposable resource; any port
 is not loopback-only; a role has `SUPERUSER` or `BYPASSRLS`; Flyway clean is
 enabled; a secret/token is about to be captured; a real Telegram chat, printer,
 terminal, agent, database, broker, or Keycloak realm is selected; or terminal
-identity is claimed as evidence. Preserve redacted evidence and do not repair
-the environment in place.
+identity is claimed as evidence; or `/ams/set-spool` is about to be invoked
+without a separately approved safe command harness. Preserve redacted evidence
+and do not repair the environment in place.
 
 Rollback is additive and per service: stop Notify or AMS first, then Hub,
 Core, and the smoke-owned broker. Keep the Core legacy allowlist and Hub AMS

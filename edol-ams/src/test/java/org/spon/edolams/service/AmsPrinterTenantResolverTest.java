@@ -6,6 +6,7 @@ import org.spon.edolams.config.AmsPrinterTenantProperties;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,8 +22,13 @@ class AmsPrinterTenantResolverTest {
 
         resolver.withPrinter(printerId, () -> assertThat(context.currentTenantId()).isEqualTo(tenantId));
 
-        assertThatThrownBy(() -> resolver.withPrinter(UUID.randomUUID(), () -> { }))
-                .isInstanceOf(IllegalArgumentException.class);
+        AtomicBoolean downstreamWorkRan = new AtomicBoolean();
+
+        assertThatThrownBy(() -> resolver.withPrinter(UUID.randomUUID(), () -> {
+            downstreamWorkRan.set(true);
+        }))
+                .isInstanceOf(UnmappedAmsPrinterException.class);
+        assertThat(downstreamWorkRan).isFalse();
     }
 
     @Test

@@ -82,6 +82,17 @@ must never be copied into the repository or a Codex configuration file.
   migrate Core and Hub `com.fasterxml.jackson.databind` usages and Stage 6 MQTT
   serialization to Jackson 3. Until then, retain the explicitly tested
   `spring-boot-jackson2` bridges; do not replace them with ad hoc mapper beans.
+- Design a separate post-Stage-7 Telegram recipient enrollment feature before
+  replacing deployment-managed recipient mappings: require an authenticated
+  EDOL user, a short-lived single-use link, tenant-scoped persisted mappings,
+  revocation, and replay/cross-tenant rejection. Do not treat static smoke
+  mappings as end-user onboarding.
+- Decide separately whether user-facing spool references need a tenant-scoped
+  display identifier while retaining the current technical ID. The observed
+  global sequence is not evidence of an RLS bypass.
+- Reproduce the suspected short-lived Hub BFF session-expiration behavior before
+  assigning it a defect or changing session handling; the Stage 7 smoke report
+  did not establish a root cause.
 ## Subagent Status
 
 Project-scoped Codex roles are configured under `.codex/agents`. They are

@@ -85,7 +85,7 @@ public class AmsPrinterTenantResolver {
     private UUID mappedTenant(UUID printerId) {
         UUID tenantId = tenantsByPrinter.get(printerId);
         if (tenantId == null) {
-            throw new IllegalArgumentException("AMS printer is not mapped to a tenant: " + printerId);
+            throw new UnmappedAmsPrinterException(printerId);
         }
         return tenantId;
     }

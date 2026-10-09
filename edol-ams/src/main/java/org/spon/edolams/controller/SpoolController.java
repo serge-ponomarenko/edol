@@ -1,7 +1,7 @@
 package org.spon.edolams.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.spon.edolams.model.FilamentSpool;
+import org.spon.edolams.model.HubFilamentSpool;
 import org.spon.edolams.model.Spool;
 import org.spon.edolams.service.AmsSpoolChangerService;
 import org.spon.edolams.service.AmsPrinterTenantResolver;
@@ -47,35 +47,41 @@ public class SpoolController {
 
     private ResponseEntity<Spool> findSpoolForTrustedPrinter(Long id, UUID printerId) {
         try {
-            FilamentSpool filamentSpool = edolHubClient.get()
+            HubFilamentSpool filamentSpool = edolHubClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/spools/find-by-id")
                             .queryParam("id", id)
                             .build())
                     .retrieve()
-                    .body(FilamentSpool.class);
+                    .body(HubFilamentSpool.class);
 
             if (filamentSpool == null) {
                 return ResponseEntity.noContent().build();
             }
 
-            Spool spool = new Spool();
-            spool.setSpoolId(filamentSpool.getId());
-            spool.setBrand(filamentSpool.getFilament().getBrand());
-            spool.setColor(filamentSpool.getFilament().getColorHex());
-            spool.setMaterial(filamentSpool.getFilament().getMaterialType().getName());
-            spool.setVendor(filamentSpool.getFilament().getVendor().getName());
-            spool.setRemaining(filamentSpool.getWeightRemaining());
+            Spool spool = toAmsSpool(filamentSpool);
 
-            amsSpoolChangerService.setSpoolScannedState(printerId, filamentSpool.getId());
+            amsSpoolChangerService.setSpoolScannedState(printerId, filamentSpool.id());
 
             return ResponseEntity.ok(spool);
 
         } catch (HttpClientErrorException.NotFound e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
+            log.warn("Unable to resolve Hub spool {} for AMS printer {}", id, printerId, e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    static Spool toAmsSpool(HubFilamentSpool filamentSpool) {
+        Spool spool = new Spool();
+        spool.setSpoolId(filamentSpool.id());
+        spool.setBrand(filamentSpool.filament().brand());
+        spool.setColor(filamentSpool.filament().colorHex());
+        spool.setMaterial(filamentSpool.filament().materialType().name());
+        spool.setVendor(filamentSpool.filament().vendor().name());
+        spool.setRemaining(filamentSpool.weightRemaining().intValue());
+        return spool;
     }
 
     @GetMapping("/set-spool")
