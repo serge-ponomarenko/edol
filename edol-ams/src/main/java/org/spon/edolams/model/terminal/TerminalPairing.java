@@ -38,6 +38,9 @@ public class TerminalPairing {
     @Column(name = "code_key_version", nullable = false, updatable = false)
     private int codeKeyVersion;
 
+    @Column(name = "failed_attempt_count", nullable = false)
+    private int failedAttemptCount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PairingState state;

@@ -1,5 +1,6 @@
 package org.spon.edolams.service;
 
+import jakarta.annotation.PostConstruct;
 import org.spon.edolams.config.AmsTerminalProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -10,8 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.Comparator;
-import java.util.List;
 
 /** Derives stored digests; plaintext pairing codes and terminal secrets are never persisted. */
 @Component
@@ -24,6 +23,14 @@ public class TerminalCredentialCodec {
 
     public TerminalCredentialCodec(AmsTerminalProperties properties) {
         this.properties = properties;
+    }
+
+    @PostConstruct
+    void validateConfiguration() {
+        int currentVersion = keyVersion();
+        pairingKey(currentVersion);
+        validatePairingKeyVersions(currentVersion);
+        credentialKey(currentVersion);
     }
 
     public String newPairingCode() {
@@ -49,19 +56,19 @@ public class TerminalCredentialCodec {
         return hmac(pairingKey(keyVersion), normalizePairingCode(pairingCode));
     }
 
-    public List<byte[]> pairingCodeDigests(String pairingCode) {
-        if (properties.pairingCodeHmacKeys() == null || properties.pairingCodeHmacKeys().isEmpty()) {
-            throw new IllegalStateException("AMS terminal pairing-code HMAC keys are required in secure multi-tenant mode");
-        }
+    public PairingCodeDigests pairingCodeDigests(String pairingCode) {
         int currentVersion = keyVersion();
-        return java.util.stream.Stream.concat(
-                        java.util.stream.Stream.of(currentVersion),
-                        properties.pairingCodeHmacKeys().keySet().stream()
-                                .filter(version -> version != currentVersion)
-                .sorted(Comparator.reverseOrder())
-                )
-                .map(version -> pairingCodeDigest(version, pairingCode))
-                .toList();
+        validatePairingKeyVersions(currentVersion);
+        int previousVersion = currentVersion - 1;
+        if (!properties.pairingCodeHmacKeys().containsKey(previousVersion)) {
+            return new PairingCodeDigests(
+                    pairingCodeDigest(currentVersion, pairingCode), currentVersion, null, null
+            );
+        }
+        return new PairingCodeDigests(
+                pairingCodeDigest(currentVersion, pairingCode), currentVersion,
+                pairingCodeDigest(previousVersion, pairingCode), previousVersion
+        );
     }
 
     public byte[] terminalCredentialDigest(int keyVersion, String secret) {
@@ -98,6 +105,20 @@ public class TerminalCredentialCodec {
         return key(properties.pairingCodeHmacKeys(), keyVersion, "pairing-code");
     }
 
+    private void validatePairingKeyVersions(int currentVersion) {
+        if (properties.pairingCodeHmacKeys() == null || properties.pairingCodeHmacKeys().isEmpty()) {
+            throw new IllegalStateException("AMS terminal pairing-code HMAC keys are required in secure multi-tenant mode");
+        }
+        int previousVersion = currentVersion - 1;
+        boolean hasUnsupportedVersion = properties.pairingCodeHmacKeys().keySet().stream()
+                .anyMatch(version -> version != currentVersion && version != previousVersion);
+        if (hasUnsupportedVersion) {
+            throw new IllegalStateException(
+                    "AMS terminal pairing-code HMAC keys may contain only the current and immediately previous versions"
+            );
+        }
+    }
+
     private String credentialKey(int keyVersion) {
         return key(properties.credentialHmacKeys(), keyVersion, "credential");
     }
@@ -115,5 +136,41 @@ public class TerminalCredentialCodec {
             return "";
         }
         return pairingCode.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    public static final class PairingCodeDigests {
+
+        private final byte[] currentDigest;
+        private final int currentKeyVersion;
+        private final byte[] previousDigest;
+        private final Integer previousKeyVersion;
+
+        PairingCodeDigests(
+                byte[] currentDigest,
+                int currentKeyVersion,
+                byte[] previousDigest,
+                Integer previousKeyVersion
+        ) {
+            this.currentDigest = currentDigest.clone();
+            this.currentKeyVersion = currentKeyVersion;
+            this.previousDigest = previousDigest == null ? null : previousDigest.clone();
+            this.previousKeyVersion = previousKeyVersion;
+        }
+
+        public byte[] currentDigest() {
+            return currentDigest.clone();
+        }
+
+        public int currentKeyVersion() {
+            return currentKeyVersion;
+        }
+
+        public byte[] previousDigest() {
+            return previousDigest == null ? null : previousDigest.clone();
+        }
+
+        public Integer previousKeyVersion() {
+            return previousKeyVersion;
+        }
     }
 }

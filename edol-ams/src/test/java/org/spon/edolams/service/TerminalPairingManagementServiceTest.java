@@ -13,6 +13,9 @@ import org.spon.edolams.repository.AmsTerminalRepository;
 import org.spon.edolams.repository.TerminalPairingRepository;
 
 import java.util.Collection;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,8 +89,43 @@ class TerminalPairingManagementServiceTest {
         verify(pairingRepository).transitionPendingPairing(terminal.getId(), PairingState.REVOKED);
     }
 
+    @Test
+    void replacesAnExpiredPendingPairingWithANewPairing() {
+        Instant now = Instant.parse("2026-10-10T13:00:00Z");
+        AmsTerminal pendingTerminal = pendingTerminal();
+        TerminalPairing expiredPairing = new TerminalPairing();
+        expiredPairing.setTerminalId(pendingTerminal.getId());
+        expiredPairing.setState(PairingState.PENDING);
+        expiredPairing.setExpiresAt(now.minusSeconds(1));
+        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+                TENANT_ID, PRINTER_ID, List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
+        )).thenReturn(Optional.of(pendingTerminal));
+        when(pairingRepository.findTopByTerminalIdOrderByCreatedAtDesc(pendingTerminal.getId()))
+                .thenReturn(Optional.of(expiredPairing));
+        when(credentialCodec.newPairingCode()).thenReturn("ABCDEFGHJK");
+        when(credentialCodec.pairingCodeDigest("ABCDEFGHJK")).thenReturn(new byte[]{1});
+        when(credentialCodec.keyVersion()).thenReturn(1);
+
+        AmsTenantContext tenantContext = new AmsTenantContext();
+        try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
+            service(tenantContext, now).createPairing(PRINTER_ID);
+        }
+
+        assertThat(expiredPairing.getState()).isEqualTo(PairingState.EXPIRED);
+        assertThat(pendingTerminal.getLifecycleState()).isEqualTo(TerminalLifecycle.REVOKED);
+        assertThat(pendingTerminal.getRevokedAt()).isEqualTo(now);
+        verify(terminalRepository).saveAndFlush(pendingTerminal);
+        verify(pairingRepository).save(any(TerminalPairing.class));
+    }
+
     private TerminalPairingManagementService service(AmsTenantContext tenantContext) {
         return new TerminalPairingManagementService(terminalRepository, pairingRepository, tenantContext, credentialCodec);
+    }
+
+    private TerminalPairingManagementService service(AmsTenantContext tenantContext, Instant now) {
+        return new TerminalPairingManagementService(
+                terminalRepository, pairingRepository, tenantContext, credentialCodec, Clock.fixed(now, ZoneOffset.UTC)
+        );
     }
 
     private AmsTerminal liveTerminal() {
@@ -98,6 +136,14 @@ class TerminalPairingManagementServiceTest {
         terminal.setLifecycleState(TerminalLifecycle.ACTIVE);
         terminal.setCredentialDigest(new byte[]{7});
         terminal.setCredentialKeyVersion(1);
+        return terminal;
+    }
+
+    private AmsTerminal pendingTerminal() {
+        AmsTerminal terminal = liveTerminal();
+        terminal.setLifecycleState(TerminalLifecycle.PENDING);
+        terminal.setCredentialDigest(null);
+        terminal.setCredentialKeyVersion(null);
         return terminal;
     }
 }

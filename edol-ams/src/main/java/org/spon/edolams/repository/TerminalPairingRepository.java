@@ -8,8 +8,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.UUID;
+import java.util.Optional;
 
 public interface TerminalPairingRepository extends JpaRepository<TerminalPairing, UUID> {
+
+    Optional<TerminalPairing> findTopByTerminalIdOrderByCreatedAtDesc(UUID terminalId);
 
     @Modifying
     @Query("""

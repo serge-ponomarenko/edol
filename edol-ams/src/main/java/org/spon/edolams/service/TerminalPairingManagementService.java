@@ -1,7 +1,6 @@
 package org.spon.edolams.service;
 
 import com.github.f4b6a3.uuid.UuidCreator;
-import lombok.RequiredArgsConstructor;
 import org.spon.edolams.model.terminal.AmsTerminal;
 import org.spon.edolams.model.terminal.PairingState;
 import org.spon.edolams.model.terminal.TerminalLifecycle;
@@ -19,7 +18,6 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "secure-multi-tenant")
 public class TerminalPairingManagementService {
 
@@ -28,21 +26,42 @@ public class TerminalPairingManagementService {
     private final TerminalPairingRepository pairingRepository;
     private final AmsTenantContext tenantContext;
     private final TerminalCredentialCodec credentialCodec;
-    private final Clock clock = Clock.systemUTC();
+    private final Clock clock;
+
+    public TerminalPairingManagementService(
+            AmsTerminalRepository terminalRepository,
+            TerminalPairingRepository pairingRepository,
+            AmsTenantContext tenantContext,
+            TerminalCredentialCodec credentialCodec
+    ) {
+        this(terminalRepository, pairingRepository, tenantContext, credentialCodec, Clock.systemUTC());
+    }
+
+    TerminalPairingManagementService(
+            AmsTerminalRepository terminalRepository,
+            TerminalPairingRepository pairingRepository,
+            AmsTenantContext tenantContext,
+            TerminalCredentialCodec credentialCodec,
+            Clock clock
+    ) {
+        this.terminalRepository = terminalRepository;
+        this.pairingRepository = pairingRepository;
+        this.tenantContext = tenantContext;
+        this.credentialCodec = credentialCodec;
+        this.clock = clock;
+    }
 
     @Transactional
     public CreatedPairing createPairing(UUID printerId) {
         UUID tenantId = tenantContext.currentTenantId();
+        Instant now = clock.instant();
         terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
                         tenantId,
                         printerId,
                         List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
                 )
-                .ifPresent(terminal -> {
-                    throw new TerminalLifecycleConflictException("A live terminal already exists for this printer");
-                });
+                .ifPresent(terminal -> retireRecoverablePendingTerminal(terminal, now));
 
-        Instant now = clock.instant();
         AmsTerminal terminal = new AmsTerminal();
         terminal.setId(UuidCreator.getTimeOrderedEpoch());
         terminal.setTenantId(tenantId);
@@ -59,6 +78,7 @@ public class TerminalPairingManagementService {
         pairing.setAllowedPrinterId(printerId);
         pairing.setCodeDigest(credentialCodec.pairingCodeDigest(code));
         pairing.setCodeKeyVersion(credentialCodec.keyVersion());
+        pairing.setFailedAttemptCount(0);
         pairing.setState(PairingState.PENDING);
         pairing.setCreatedAt(now);
         pairing.setExpiresAt(now.plus(PAIRING_LIFETIME));
@@ -108,6 +128,27 @@ public class TerminalPairingManagementService {
             terminal.setResetAt(now);
         }
         return terminal;
+    }
+
+    private void retireRecoverablePendingTerminal(AmsTerminal terminal, Instant now) {
+        if (terminal.getLifecycleState() == TerminalLifecycle.ACTIVE) {
+            throw new TerminalLifecycleConflictException("A live terminal already exists for this printer");
+        }
+        TerminalPairing pairing = pairingRepository.findTopByTerminalIdOrderByCreatedAtDesc(terminal.getId())
+                .orElseThrow(() -> new TerminalLifecycleConflictException("Pending terminal has no pairing"));
+        PairingState state = pairing.getState();
+        if (state == PairingState.PENDING && !pairing.getExpiresAt().isAfter(now)) {
+            pairing.setState(PairingState.EXPIRED);
+            state = PairingState.EXPIRED;
+        }
+        if (state != PairingState.EXPIRED && state != PairingState.EXHAUSTED) {
+            throw new TerminalLifecycleConflictException("A pending pairing already exists for this printer");
+        }
+        terminal.setLifecycleState(TerminalLifecycle.REVOKED);
+        terminal.setRevokedAt(now);
+        terminal.setCredentialDigest(null);
+        terminal.setCredentialKeyVersion(null);
+        terminalRepository.saveAndFlush(terminal);
     }
 
     public record CreatedPairing(UUID terminalId, UUID printerId, String pairingCode, Instant expiresAt) {

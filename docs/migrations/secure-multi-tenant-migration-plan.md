@@ -1442,18 +1442,25 @@ owner-facing UX, ESP32 protocol documentation, and security tests.
 
 ### Schema and API changes
 
-- `edol-ams` source contains additive Flyway V1 for `ams.terminals` and
+- `edol-ams` source contains additive Flyway V1/V2 for `ams.terminals` and
   `ams.terminal_pairings`. Both have direct tenant ownership, forced RLS, an
   index for each tenant/printer lookup, and a partial uniqueness constraint
-  allowing only one `PENDING` or `ACTIVE` terminal per tenant/printer.
+  allowing only one `PENDING` or `ACTIVE` terminal per tenant/printer. V2 adds
+  the durable pairing failure counter and exhausted state without a legacy
+  credential backfill. The pre-tenant functions are owned by a dedicated
+  no-login, narrow `BYPASSRLS` function role; AMS runtime remains a non-owner,
+  `NOBYPASSRLS` application role.
 - Hub's secure owner API creates, revokes, rotates, replaces, factory-resets,
   and re-pairs through AMS using Hub's service identity, `tenant.context`, and
   a trusted tenant header. Only an active `OWNER` membership may invoke it.
 - Pairing creation returns a 10-character Crockford Base32 code with roughly 50
   bits of entropy and a five-minute lifetime. AMS stores only a keyed HMAC
-  digest and key version. The secure endpoint applies five failed attempts per
-  source window; production ingress must enforce the equivalent distributed
-  rate limit.
+  digest and key version. Atomic pairing consumption records a durable maximum
+  of five failed attempts regardless of source address; the in-process
+  per-source limiter remains a supplementary control and production ingress
+  must enforce an equivalent distributed source limit. Verification accepts
+  only the current pairing HMAC key and the immediately previous key version;
+  stale configured versions fail startup validation.
 - `POST /api/terminal/v1/enroll` accepts the code and a current `printerId`
   lookup hint, atomically consumes the pairing through a narrow database
   function, and returns `terminalId.secret` once with `Cache-Control: no-store`.
@@ -1492,8 +1499,8 @@ pairing code into a permanent credential.
 
 ### Required tests
 
-- Guessing/rate limit, expiry, attempt exhaustion, replay, and concurrent
-  consume.
+- Guessing/rate limit, expiry, durable attempt exhaustion, replay, current/
+  previous-key boundary, and concurrent consume.
 - Wrong tenant/printer/API, revoked credential, rotation, and re-pair.
 - Credential disclosure response occurs only once.
 - TLS validation failure and terminal storage/recovery behavior.
@@ -1529,9 +1536,9 @@ It remains a plan until a separately approved run records its evidence.
 
 | Gate | Required evidence and cases | Boundary |
 | --- | --- | --- |
-| 8.0 Source and protocol | `mvn -B -pl edol-ams,edol-hub -am test`; verify pairing-code alphabet/length, HMAC-only storage, current/previous pairing-key overlap, constant-time credential comparison, five-attempt source limit, no-store responses, owner-before-printer authorization, pending-pairing invalidation, replacement linkage, and no old terminal credential after lifecycle transition. Build the ESP32 firmware without upload and record RAM/flash use. | No network state, device action, secret, or deployment. |
-| 8.1 Disposable PostgreSQL | Run `AmsTerminalMigrationTest` through `with-remote-docker.ps1`. Extend and execute it for missing tenant context, tenant A/B invisibility, atomic single consume, expired/revoked pairing rejection, one-live-terminal uniqueness, and runtime-role/function privileges. The test role model must not rely on a superuser to prove the production RLS boundary. | Testcontainers-managed PostgreSQL only; no existing database or role mutation. |
-| 8.2 Disposable secure service flow | In an isolated secure profile with disposable Keycloak, PostgreSQL, Hub, AMS, and a safe Core/Hub command sink, prove owner create/rotate/replace/revoke/factory-reset, one-time response redaction, replay, malformed/wrong credential `401`, five failures then `429`, tenant A/B isolation, and terminal operational state/find/set-spool authorization. The set-spool case must end at a harmless stub, never a live printer command. Record only redacted identifiers and counters. | Requires a separate approved disposable-runtime run; no live device, broker, development database, or production. |
+| 8.0 Source and protocol | `mvn -B -pl edol-ams,edol-hub -am test`; verify pairing-code alphabet/length, HMAC-only storage, bounded current/previous pairing-key overlap, constant-time credential comparison, durable five-attempt pairing exhaustion plus source limiting, no-store responses, owner-before-printer authorization, expired/exhausted re-pair, pending-pairing invalidation, replacement linkage, and no old terminal credential after lifecycle transition. Build the ESP32 firmware without upload and record RAM/flash use. | No network state, device action, secret, or deployment. |
+| 8.1 Disposable PostgreSQL | Run `AmsTerminalMigrationTest` through `with-remote-docker.ps1`. Extend and execute it for missing tenant context, tenant A/B invisibility, atomic single consume, expired/revoked/exhausted pairing rejection, one-live-terminal uniqueness, bounded previous-key acceptance, and runtime-role/function privileges. The test role model must not rely on a superuser to prove the production RLS boundary. | Testcontainers-managed PostgreSQL only; no existing database or role mutation. |
+| 8.2 Disposable secure service flow | In an isolated secure profile with disposable Keycloak, PostgreSQL, Hub, AMS, and a safe Core/Hub command sink, prove owner create/rotate/replace/revoke/factory-reset, one-time response redaction, replay, malformed/wrong credential `401`, five pairing failures preventing later valid enrollment, independent source limiting returning `429`, tenant A/B isolation, and terminal operational state/find/set-spool authorization. The set-spool case must end at a harmless stub, never a live printer command. Record only redacted identifiers and counters. | Requires a separate approved disposable-runtime run; no live device, broker, development database, or production. |
 | 8.3 Physical secure terminal | After explicit approval for flashing and for any irreversible ESP32 eFuse step, verify the target board/partition has adequate flash headroom, secure boot and flash encryption are enabled, encrypted NVS is readable after a power cycle, and the compiled CA validates the HTTPS host. Test a first enrollment, reboot recovery, normal state/find/set-spool traffic with no tenant or operational printer ID, invalid/expired/replayed code, wrong or absent CA, hostname mismatch, unavailable clock, owner revoke, rotate, replacement, Hub factory-reset followed by local **FORGET SECURE**, and re-pair. Confirm every retired credential receives `401` and cannot recover access. | One explicitly approved physical terminal and an isolated safe service environment; do not expose pairing codes, secrets, or live-printer commands. |
 | 8.4 Home compatibility | In a later, separate Home smoke, verify the existing trusted-network HTTP and manually entered `printerId` workflow. Secure `/api/terminal/v1/**`, terminal credentials, Keycloak, RLS, and secure-enrollment emulation must be absent. A future Home-only short-code printer-selection UX is not terminal authentication and is separately reviewed. | Home smoke is not secure-mode acceptance and does not weaken secure fail-closed behavior. |
 

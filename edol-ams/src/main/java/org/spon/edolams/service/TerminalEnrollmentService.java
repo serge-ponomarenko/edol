@@ -24,18 +24,20 @@ public class TerminalEnrollmentService {
     public EnrollmentResult enroll(UUID printerId, String pairingCode) {
         String secret = credentialCodec.newTerminalSecret();
         byte[] credentialDigest = credentialCodec.terminalCredentialDigest(credentialCodec.keyVersion(), secret);
-        for (byte[] pairingDigest : credentialCodec.pairingCodeDigests(pairingCode)) {
-            List<EnrollmentResult> rows = jdbcTemplate.query(
-                    "select terminal_id, tenant_id, allowed_printer_id from ams.consume_terminal_pairing(?, ?, ?, ?)",
-                    (resultSet, rowNumber) -> mapEnrollment(resultSet, secret),
-                    printerId,
-                    pairingDigest,
-                    credentialDigest,
-                    credentialCodec.keyVersion()
-            );
-            if (!rows.isEmpty()) {
-                return rows.getFirst();
-            }
+        TerminalCredentialCodec.PairingCodeDigests pairingDigests = credentialCodec.pairingCodeDigests(pairingCode);
+        List<EnrollmentResult> rows = jdbcTemplate.query(
+                "select terminal_id, tenant_id, allowed_printer_id from ams.consume_terminal_pairing(?, ?, ?, ?, ?, ?, ?)",
+                (resultSet, rowNumber) -> mapEnrollment(resultSet, secret),
+                printerId,
+                pairingDigests.currentDigest(),
+                pairingDigests.currentKeyVersion(),
+                pairingDigests.previousDigest(),
+                pairingDigests.previousKeyVersion(),
+                credentialDigest,
+                credentialCodec.keyVersion()
+        );
+        if (!rows.isEmpty()) {
+            return rows.getFirst();
         }
         throw new InvalidTerminalPairingException();
     }

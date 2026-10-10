@@ -54,7 +54,7 @@ disposable secure-service run but must be supplied outside the repositories:
 
 | Input | Required condition |
 | --- | --- |
-| AMS database | Fresh disposable PostgreSQL with Flyway V1, `ams_runtime` without `SUPERUSER` or `BYPASSRLS`, and Stage 8 RLS/function grants. |
+| AMS database | Fresh disposable PostgreSQL after [the Stage 8 role bootstrap](stage8-disposable-postgres-bootstrap.sql) and Flyway V1/V2. `ams_runtime` is `NOSUPERUSER`/`NOBYPASSRLS`; `ams_terminal_authenticator` is a dedicated `NOLOGIN`/`NOINHERIT` function owner with only the narrow pre-tenant privileges and `BYPASSRLS`. |
 | Tenant data | Two synthetic tenants and one disabled synthetic printer per tenant. Create one terminal only for each printer. |
 | Hub identity | A disposable Hub service client accepted by AMS with narrow terminal-management scope and trusted tenant propagation. |
 | AMS identity | Existing independent AMS service identity for Core/Hub calls; do not use it on the terminal. |
@@ -86,10 +86,11 @@ pass. From the terminal repository, build without upload:
 Verify and retain redacted output for:
 
 - 10-character Crockford Base32 generation, five-minute expiry, one atomic
-  consumption, maximum five failed attempts, rate limit, expiry, replay, and
-  concurrent-consume behavior.
-- HMAC-only pairing and credential storage, configured pairing-key overlap,
-  constant-time comparison, credential versioning, and `no-store` response.
+  consumption, durable maximum five failed attempts per pairing, supplementary
+  source rate limit, expiry, replay, and concurrent-consume behavior.
+- HMAC-only pairing and credential storage, current/immediately-previous
+  pairing-key overlap only, stale-key startup rejection, constant-time
+  credential comparison, credential versioning, and `no-store` response.
 - Owner authorization before lifecycle management; cross-tenant denial;
   revoke, rotate, replacement, factory-reset, re-pair, pending-pairing
   invalidation, and denial of every retired credential.
@@ -114,11 +115,11 @@ Keycloak, or service credentials.
 | --- | --- |
 | Owner creates pairing for tenant A/printer A | Exactly one `PENDING` terminal and a five-minute, single-use code are created. Display the code only in the approved owner UI. |
 | Terminal enrollment | `POST /api/terminal/v1/enroll` over valid TLS consumes the code once and returns `terminalId.secret` once with `no-store`. A concurrent or replayed request does not obtain another secret. |
-| Enrollment failures | Malformed, expired, already-used, wrong-printer, and five-times-invalid codes disclose neither tenant nor terminal state. Rate-limited requests return `429`; invalid terminal credentials return `401`. |
+| Enrollment failures | Malformed, expired, already-used, wrong-printer, and five-times-invalid codes disclose neither tenant nor terminal state. A pairing exhausted after five failures rejects a later valid code; independently source-rate-limited requests return `429`; invalid terminal credentials return `401`. |
 | Tenant isolation | Tenant B cannot manage printer A, and terminal B cannot read, find, or set spool data for terminal A. Verify RLS and HTTP behavior. |
 | Narrow operation surface | A valid terminal can call only terminal `state`, `find`, and `set-spool`; AMS derives tenant and printer from the credential. An added tenant/printer parameter cannot select another printer. |
 | Safe mutation | `set-spool` succeeds only through the approved harmless command stub. Preserve a stub receipt, not a printer command. |
-| Lifecycle | Revoke, rotate, replace, and factory-reset deny the prior secret with `401`, invalidate pending pairings as applicable, and create no automatic replacement credential. Explicit re-pair is required. |
+| Lifecycle | Revoke, rotate, replace, and factory-reset deny the prior secret with `401`, invalidate pending pairings as applicable, and create no automatic replacement credential. An expired or exhausted pending pairing is retired before explicit re-pair creates a new terminal credential. |
 | Key rotation | Current and configured previous pairing-key digests work only during the approved overlap. Retired key versions fail closed after overlap removal. |
 
 Inspect audit/metric summaries for pairing creation, failed verification,

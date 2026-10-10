@@ -4,5 +4,6 @@ public enum PairingState {
     PENDING,
     CONSUMED,
     REVOKED,
-    EXPIRED
+    EXPIRED,
+    EXHAUSTED
 }
