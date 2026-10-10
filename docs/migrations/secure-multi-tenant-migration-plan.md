@@ -1388,21 +1388,39 @@ terminal-identity, live-device, development-database, nor production
 acceptance. Stage 8 terminal enrollment and Stage 9 legacy removal remain out
 of scope.
 
-### Post-remediation delta closure preparation (2026-10-10)
+### Final disposable closure acceptance (2026-10-10)
 
-The operator's disposable delta report against
-`55e891b467b3cb52c4272320499732b67f1a8a09` gives a conditional pass for the
-repaired AMS HTTP paths and the selected Notify, authorization, RLS, and
-migration checks. It does not change the Stage 7 acceptance criteria. Follow-up
-source review added a missing Hub compatibility-ingress counter
-(`edol.hub.legacy_tenant_compatibility.uses`) and focused regression coverage
-for Core/Hub legacy counters, two-tenant Notify v2 tenant context and mocked
-recipient-delivery isolation, and fail-closed Notify/AMS mapping bean
-initialization. The final disposable delta must record a new immutable
-revision, targeted test output,
-and zero-value compatibility logs for the observation window. It must not
-enable Telegram delivery, expose Actuator, broaden scopes, or invoke the AMS
-spool-change command path.
+Stage 7 is accepted for its defined source/disposable secure multi-tenant scope
+at `88145ac1af2b8b4936e7595f674af062dd3622ee` (`EDOL-048-41`). The final
+delta reused the isolated environment and passed the repaired Tenant A AMS
+state/spool paths, Tenant B-to-Tenant A spool isolation, unknown-printer `404`,
+and Tenant B Notify v2 ingestion. It did not invoke the spool-change command
+path or real Telegram delivery.
+
+The final observation window was
+`2026-10-10T11:18:08.1410652+03:00` through
+`2026-10-10T11:21:45.9374332+03:00`. Core compatibility ingress was explicitly
+disabled in that disposable configuration, so its counter was not registered;
+the absence of Core legacy acceptance is configuration evidence rather than a
+numeric zero. Hub compatibility ingress remained instrumented, initialized
+`edol.hub.legacy_tenant_compatibility.uses` at zero, and emitted no accepted
+legacy warning during the window. The source counter/log path is covered by
+focused automated tests.
+
+Automated evidence includes a 308-test successful reactor verification, with
+38 local Docker/Testcontainers skips explicitly unexecuted, plus remote Debian
+Docker migration tests: Core 9/9 and Hub 24/24. Added focused tests cover
+mocked two-tenant Notify delivery isolation, v2 event tenant context,
+fail-closed Notify/AMS mapping bean initialization, Core/Hub counters, and the
+AMS Core allowlist fixture. The prior `55e891...` disposable database, RLS,
+Flyway, ACL, and selected authorization evidence remains part of the closure
+record because these contracts were unchanged by the final delta.
+
+This acceptance does not authorize deployment, TLS, home-mode, terminal
+identity, real-device, development-database, or production claims. Stage 8
+terminal enrollment and Stage 9 compatibility removal remain separate. Retain
+`S7-OBS-001` as a nonblocking Hub BFF/session investigation; do not infer a
+root cause from the Stage 7 evidence.
 
 ### Explicitly out of scope
 

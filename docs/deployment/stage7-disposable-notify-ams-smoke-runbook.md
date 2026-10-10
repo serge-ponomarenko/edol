@@ -42,49 +42,45 @@ not cover TLS, deployment configuration, home mode, terminal identity, or a
 live device. Preserve the redacted evidence and disposable resources until a
 separate cleanup approval.
 
-## Post-remediation delta closure (2026-10-10)
+## Final closure acceptance (2026-10-10)
 
-The operator's delta report against
-`55e891b467b3cb52c4272320499732b67f1a8a09` verified the repaired AMS HTTP
-paths, a second DIRECT printer without an agent ID, selected service-token
-boundaries, Tenant B Notify MQTT ingestion, and the final disposable database
-state. It remains **CONDITIONAL PASS**, not a full Stage 7 acceptance: actual
-Telegram recipient delivery, invalid-mapping startup lifecycle, complete HTTP
-authorization coverage, and measured legacy-path inactivity were not all
-available as runtime evidence.
+The final delta against `88145ac1af2b8b4936e7595f674af062dd3622ee`
+(`EDOL-048-41`) is **PASS — Stage 7 closure accepted for the disposable secure
+multi-tenant scope**. It preserved the isolated PostgreSQL, Keycloak, NanoMQ,
+ACL, mapping, and synthetic-printer environment and restarted Core, Hub, Notify,
+and AMS without infrastructure reconfiguration.
 
-The follow-up source review found that Hub's temporary AMS compatibility
-ingress did not create the documented
-`edol.hub.legacy_tenant_compatibility.uses` counter. The current source adds
-that counter, initializes it at zero, increments it only after a trusted
-legacy ingress is accepted, and logs the count without tokens or secrets. Core
-now likewise logs the initialization and accepted-use count of
-`edol.core.legacy_compatibility.requests`. This is an observability correction;
-it does not open Actuator, broaden OAuth scopes, or change the compatibility
-route.
+The safe AMS HTTP regression returned `200` for Tenant A state and spool lookup,
+`204` for a Tenant B printer querying Tenant A's spool, and `404` for an unknown
+printer. A Tenant B QoS 1 `printer.online` v2 event was published and ingested
+by Notify. Telegram remained deliberately disabled; recipient isolation is
+instead covered by mocked two-tenant automated tests. No runtime
+`/ams/set-spool` request or hardware action occurred.
 
-Before a final decision, run only this delta on the already isolated
-environment after recording the new immutable source revision:
+The observation window ran from `2026-10-10T11:18:08.1410652+03:00` through
+`2026-10-10T11:21:45.9374332+03:00`. Core legacy compatibility was explicitly
+disabled (`EDOL_CORE_LEGACY_COMPATIBILITY_ENABLED=false`), so its filter and
+counter were not registered; this is configuration evidence, not a measured
+numeric zero. Hub retained its compatibility ingress and logged
+`edol.hub.legacy_tenant_compatibility.uses` initialized at `uses=0.0`. Neither
+Core nor Hub logged an `Accepted temporary legacy` warning during the window.
+The accepted Hub path increments that counter and emits that warning.
 
-1. Restart local Core and Hub from that revision with the existing disposable
-   profile and external configuration. Do not change Keycloak, broker ACLs,
-   database roles, mappings, secrets, or ports.
-2. Retain the startup lines showing both compatibility counters initialized at
-   `uses=0`. During the agreed secure-client observation window, retain the
-   absence of either `Accepted temporary legacy` warning. An accepted legacy
-   request is the only path that increments either counter.
-3. Run the targeted automated tests for the two counters, secure Notify v2
-   tenant context, mocked tenant-recipient delivery isolation, Notify and AMS
-   missing-mapping bean initialization, and the existing mocked AMS change-route
-   test. Do not enable a real Telegram bot or chat.
-4. Reuse the recorded `55e891...` HTTP/MQTT/RLS evidence for code paths not
-   changed by the observability correction. Do not invoke `/ams/set-spool`,
-   publish a printer command, or repeat the full runbook merely to collect
-   these additions.
+Codex evidence for this revision includes `mvn -B clean verify` with 308
+executed tests and no failures or errors; 38 local Docker/Testcontainers tests
+were skipped and are not counted as passed. The remote Debian Docker workflow
+ran `CoreMigrationTest` (9/9) and `HubMigrationTest` (24/24). Focused tests
+cover mocked tenant-recipient delivery isolation, v2 event tenant context,
+missing Notify/AMS mappings during Spring bean initialization, Core/Hub legacy
+counters, AMS's Core allowlist identity, and the mocked AMS command route.
 
-The final record must distinguish this automated and log-based proof from a
-runtime Telegram delivery test. It must still state that terminal enrollment,
-home-mode deployment, TLS, and Stage 9 compatibility removal are out of scope.
+This acceptance reuses the unchanged `55e891b467b3cb52c4272320499732b67f1a8a09`
+database, RLS, Flyway, ACL, and selected service-token evidence. It does not
+cover deployment, TLS, development databases, home mode, live devices, actual
+Telegram delivery, terminal enrollment, or Stage 9 compatibility removal.
+Keep the disposable environment and redacted evidence until separate cleanup
+approval. `S7-OBS-001`, the intermittent Hub printer-overview disappearance,
+remains a separate nonblocking investigation in `docs/ai-workflow.md`.
 
 ## Stage 7 security boundary
 

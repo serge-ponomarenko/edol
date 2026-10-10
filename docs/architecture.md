@@ -127,18 +127,21 @@ or the validated v2 envelope, never from an untrusted terminal parameter.
 Core accepts the tenant header only from allowlisted service clients, and Hub
 accepts AMS service JWT ingress only on the exact spool routes. Keycloak
 clients, broker identities/ACLs, and mappings were provisioned only in an
-isolated disposable Stage 7 smoke on 2026-10-09. That run verified dedicated
-connections, ACL denials, selected v2 processing, and selected cross-tenant
-rejections, but is **PARTIAL ACCEPTANCE — NOT FULL PASS**: positive AMS spool
-lookup and unknown-printer handling returned HTTP 500. The subsequent source
-remediation uses a narrow AMS Hub-spool read DTO and maps an unmapped HTTP
-printer to `404` before a downstream call; its local regression tests pass, but
-a fresh disposable rerun is still required. Complete HTTP authorization, Notify
-delivery, mapping-validation, metrics, and Maven evidence also remain open. No
-deployment, TLS, development-database, live-device, home-mode, or production
-acceptance was performed. The temporary legacy paths remain available until the
-later observation and Stage 9 removal gates. Stage 8 will own terminal
-enrollment and per-device credentials.
+isolated disposable Stage 7 smoke. The initial 2026-10-09 run was partial; its
+AMS lookup and unmapped-printer defects were remediated with a narrow AMS
+Hub-spool read DTO and a pre-downstream `404`. Final disposable secure
+multi-tenant acceptance passed on 2026-10-10 at
+`88145ac1af2b8b4936e7595f674af062dd3622ee`: four safe AMS HTTP cases,
+Tenant B Notify v2 ingestion, recipient/mapping/counter regression coverage,
+and the previously recorded RLS, Flyway, ACL, and service-token evidence were
+reconciled. Core legacy compatibility ingress was explicitly disabled in that
+disposable configuration; Hub's retained compatibility ingress initialized its
+counter at zero and accepted no legacy requests during the recorded observation
+window. This is source/disposable acceptance only. It does not accept
+deployment, TLS, development-database, live-device, home-mode, terminal
+identity, or production behavior. Compatibility source paths remain subject to
+the Stage 9 removal gate. Stage 8 owns terminal enrollment and per-device
+credentials.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and
