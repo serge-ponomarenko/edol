@@ -42,6 +42,50 @@ not cover TLS, deployment configuration, home mode, terminal identity, or a
 live device. Preserve the redacted evidence and disposable resources until a
 separate cleanup approval.
 
+## Post-remediation delta closure (2026-10-10)
+
+The operator's delta report against
+`55e891b467b3cb52c4272320499732b67f1a8a09` verified the repaired AMS HTTP
+paths, a second DIRECT printer without an agent ID, selected service-token
+boundaries, Tenant B Notify MQTT ingestion, and the final disposable database
+state. It remains **CONDITIONAL PASS**, not a full Stage 7 acceptance: actual
+Telegram recipient delivery, invalid-mapping startup lifecycle, complete HTTP
+authorization coverage, and measured legacy-path inactivity were not all
+available as runtime evidence.
+
+The follow-up source review found that Hub's temporary AMS compatibility
+ingress did not create the documented
+`edol.hub.legacy_tenant_compatibility.uses` counter. The current source adds
+that counter, initializes it at zero, increments it only after a trusted
+legacy ingress is accepted, and logs the count without tokens or secrets. Core
+now likewise logs the initialization and accepted-use count of
+`edol.core.legacy_compatibility.requests`. This is an observability correction;
+it does not open Actuator, broaden OAuth scopes, or change the compatibility
+route.
+
+Before a final decision, run only this delta on the already isolated
+environment after recording the new immutable source revision:
+
+1. Restart local Core and Hub from that revision with the existing disposable
+   profile and external configuration. Do not change Keycloak, broker ACLs,
+   database roles, mappings, secrets, or ports.
+2. Retain the startup lines showing both compatibility counters initialized at
+   `uses=0`. During the agreed secure-client observation window, retain the
+   absence of either `Accepted temporary legacy` warning. An accepted legacy
+   request is the only path that increments either counter.
+3. Run the targeted automated tests for the two counters, secure Notify v2
+   tenant context, mocked tenant-recipient delivery isolation, Notify and AMS
+   missing-mapping bean initialization, and the existing mocked AMS change-route
+   test. Do not enable a real Telegram bot or chat.
+4. Reuse the recorded `55e891...` HTTP/MQTT/RLS evidence for code paths not
+   changed by the observability correction. Do not invoke `/ams/set-spool`,
+   publish a printer command, or repeat the full runbook merely to collect
+   these additions.
+
+The final record must distinguish this automated and log-based proof from a
+runtime Telegram delivery test. It must still state that terminal enrollment,
+home-mode deployment, TLS, and Stage 9 compatibility removal are out of scope.
+
 ## Stage 7 security boundary
 
 Stage 7 gives the backend services independent identities. `edol-notify-service`

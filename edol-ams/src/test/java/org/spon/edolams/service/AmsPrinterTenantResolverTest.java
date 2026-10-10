@@ -3,6 +3,7 @@ package org.spon.edolams.service;
 import org.junit.jupiter.api.Test;
 import org.spon.edol.deployment.DeploymentMode;
 import org.spon.edolams.config.AmsPrinterTenantProperties;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.util.List;
 import java.util.UUID;
@@ -38,6 +39,21 @@ class AmsPrinterTenantResolverTest {
 
         assertThatThrownBy(() -> resolver.openForEnvelope(printerId, UUID.randomUUID()))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void failsSpringBeanInitializationWhenSecureMappingsAreMissing() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        context.registerBean(AmsPrinterTenantResolver.class, () -> new AmsPrinterTenantResolver(
+                DeploymentMode.SECURE_MULTI_TENANT,
+                new AmsPrinterTenantProperties(List.of()),
+                new AmsTenantContext()
+        ));
+
+        assertThatThrownBy(context::refresh)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("secure-multi-tenant AMS requires printer tenant mappings");
+        context.close();
     }
 
     private AmsPrinterTenantResolver resolver(AmsTenantContext context, UUID printerId, UUID tenantId) {

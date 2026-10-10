@@ -1388,6 +1388,22 @@ terminal-identity, live-device, development-database, nor production
 acceptance. Stage 8 terminal enrollment and Stage 9 legacy removal remain out
 of scope.
 
+### Post-remediation delta closure preparation (2026-10-10)
+
+The operator's disposable delta report against
+`55e891b467b3cb52c4272320499732b67f1a8a09` gives a conditional pass for the
+repaired AMS HTTP paths and the selected Notify, authorization, RLS, and
+migration checks. It does not change the Stage 7 acceptance criteria. Follow-up
+source review added a missing Hub compatibility-ingress counter
+(`edol.hub.legacy_tenant_compatibility.uses`) and focused regression coverage
+for Core/Hub legacy counters, two-tenant Notify v2 tenant context and mocked
+recipient-delivery isolation, and fail-closed Notify/AMS mapping bean
+initialization. The final disposable delta must record a new immutable
+revision, targeted test output,
+and zero-value compatibility logs for the observation window. It must not
+enable Telegram delivery, expose Actuator, broaden scopes, or invoke the AMS
+spool-change command path.
+
 ### Explicitly out of scope
 
 AMS Terminal pairing, terminal firmware changes, persisted terminal or pairing

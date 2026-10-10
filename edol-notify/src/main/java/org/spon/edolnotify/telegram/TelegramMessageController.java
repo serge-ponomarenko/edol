@@ -181,8 +181,8 @@ public class TelegramMessageController {
     }
 
     private BotContext getBotContext() {
-        if (telegramBotService != null && telegramBotService.getBot() != null) {
-            return telegramBotService.getBot().context;
+        if (telegramBotService != null && telegramBotService.getContext() != null) {
+            return telegramBotService.getContext();
         }
         log.error("Telegram bot is unavailable or disabled");
         return null;

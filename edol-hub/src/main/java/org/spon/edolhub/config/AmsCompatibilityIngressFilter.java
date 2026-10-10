@@ -1,10 +1,12 @@
 package org.spon.edolhub.config;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.spon.edolhub.service.TenantContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,19 +26,29 @@ import java.util.UUID;
  * strips it from every public request. This is a temporary Stage 4 boundary.
  */
 @Component
-@RequiredArgsConstructor
+@Slf4j
 @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "secure-multi-tenant")
 public class AmsCompatibilityIngressFilter extends OncePerRequestFilter implements RequestMatcher {
 
     private static final String INGRESS_HEADER = "X-EDOL-AMS-INGRESS";
 
     private final TenantContext tenantContext;
+    private final Counter acceptedRequests;
 
     @Value("${edol-hub.ams-compatibility.legacy-tenant-id:}")
     private String legacyTenantId;
 
     @Value("${edol-hub.ams-compatibility.ingress-token:}")
     private String ingressToken;
+
+    public AmsCompatibilityIngressFilter(TenantContext tenantContext, MeterRegistry meterRegistry) {
+        this.tenantContext = tenantContext;
+        this.acceptedRequests = Counter.builder("edol.hub.legacy_tenant_compatibility.uses")
+                .description("Accepted temporary Hub AMS compatibility ingress requests")
+                .register(meterRegistry);
+        log.info("Hub AMS compatibility usage metric initialized: name={}, uses={}",
+                acceptedRequests.getId().getName(), acceptedRequests.count());
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -71,6 +83,9 @@ public class AmsCompatibilityIngressFilter extends OncePerRequestFilter implemen
         ));
         SecurityContextHolder.setContext(internalContext);
         try (TenantContext.TenantScope ignored = tenantContext.open(tenantId)) {
+            acceptedRequests.increment();
+            log.warn("Accepted temporary Hub AMS compatibility ingress request: {} {} (uses={})",
+                    request.getMethod(), request.getRequestURI(), acceptedRequests.count());
             filterChain.doFilter(request, response);
         } finally {
             SecurityContextHolder.setContext(previous);

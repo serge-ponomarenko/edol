@@ -52,11 +52,16 @@ class CoreLegacyCompatibilityFilter extends OncePerRequestFilter {
         this.properties = properties;
         this.tenantContext = tenantContext;
         this.catalogJdbc = JdbcClient.create(catalogDataSource);
-        this.acceptedRequests = meterRegistry.getIfAvailable() == null
+        MeterRegistry registry = meterRegistry.getIfAvailable();
+        this.acceptedRequests = registry == null
                 ? null
                 : Counter.builder("edol.core.legacy_compatibility.requests")
                 .description("Accepted temporary legacy Core compatibility requests")
-                .register(meterRegistry.getIfAvailable());
+                .register(registry);
+        if (acceptedRequests != null) {
+            log.info("Core legacy compatibility usage metric initialized: name={}, uses={}",
+                    acceptedRequests.getId().getName(), acceptedRequests.count());
+        }
         if (properties.legacyTenantId() == null || properties.allowedCidrs().isEmpty()) {
             throw new IllegalStateException("Legacy Core compatibility requires a tenant and source CIDRs");
         }
@@ -84,11 +89,12 @@ class CoreLegacyCompatibilityFilter extends OncePerRequestFilter {
             return;
         }
 
-        log.warn("Accepted temporary legacy Core compatibility request: {} {} from {}",
-                request.getMethod(), request.getRequestURI(), request.getRemoteAddr());
         if (acceptedRequests != null) {
             acceptedRequests.increment();
         }
+        log.warn("Accepted temporary legacy Core compatibility request: {} {} from {} (uses={})",
+                request.getMethod(), request.getRequestURI(), request.getRemoteAddr(),
+                acceptedRequests == null ? "unavailable" : acceptedRequests.count());
 
         SecurityContext previous = SecurityContextHolder.getContext();
         SecurityContext legacyContext = SecurityContextHolder.createEmptyContext();

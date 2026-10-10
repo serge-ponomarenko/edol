@@ -1,5 +1,7 @@
 package org.spon.edolhub.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.spon.edolhub.controller.TenantSelectionController;
 import org.spon.edolhub.model.entity.Tenant;
@@ -216,6 +218,11 @@ class SecureHubWebSecurityTest {
     @TestConfiguration(proxyBeanMethods = false)
     @EnableWebSecurity
     static class OAuthClientTestConfiguration {
+
+        @Bean
+        MeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
+        }
 
         @Bean
         JwtDecoder jwtDecoder() {

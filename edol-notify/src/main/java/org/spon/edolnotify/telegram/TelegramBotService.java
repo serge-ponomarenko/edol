@@ -2,6 +2,7 @@ package org.spon.edolnotify.telegram;
 
 
 import io.github.natanimn.telebof.BotClient;
+import io.github.natanimn.telebof.BotContext;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,10 @@ public class TelegramBotService {
 
     private final CommandHandler commandHandler;
     private final CallbackHandler callbackHandler;
+
+    public BotContext getContext() {
+        return bot == null ? null : bot.context;
+    }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onAppReady() {
@@ -82,12 +87,6 @@ public class TelegramBotService {
                 commandHandler::handleMessage
         );
 
-//        bot.onMessage(
-//                Filter::text, (ctx, message) ->
-//                        log.info("{} message was received from user_id {}, {}",
-//                                message.getText(), message.getChat().getId(), message.getMessageThreadId())
-//        );
-
         String[] callbackNames = findAllComponentNames("callbacks");
         String callbackNamesRegex = regexifyNames(callbackNames, "^", "");
         log.info("Found callbacks: {}", String.join(", ", callbackNames));
@@ -115,7 +114,7 @@ public class TelegramBotService {
                 Object value = annotationType.getMethod("value").invoke(annotation);
                 values[i++] = String.valueOf(value);
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                throw new IllegalStateException("Unable to resolve Telegram component name", e);
             }
         }
         return values;
