@@ -16,6 +16,9 @@ logging:
 edol-core:
   url: http://edolcore:8080
 
+edol-ams:
+  url: http://edolams:8099
+
 edol-hub:
   session:
     maximum-age: 8h

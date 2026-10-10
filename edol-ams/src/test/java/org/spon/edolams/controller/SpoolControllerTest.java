@@ -62,7 +62,6 @@ class SpoolControllerTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         AmsSpoolChangerService changerService = mock(AmsSpoolChangerService.class);
         SpoolController controller = new SpoolController(
-                RestClient.create(),
                 builder.build(),
                 changerService,
                 homeTenantResolver()

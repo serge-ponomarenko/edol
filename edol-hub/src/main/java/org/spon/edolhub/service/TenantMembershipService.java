@@ -3,6 +3,7 @@ package org.spon.edolhub.service;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.entity.TenantMembership;
 import org.spon.edolhub.model.entity.TenantMembershipStatus;
+import org.spon.edolhub.model.entity.TenantMembershipRole;
 import org.spon.edolhub.model.entity.User;
 import org.spon.edolhub.repository.TenantMembershipRepository;
 import org.spon.edolhub.repository.UserRepository;
@@ -35,5 +36,15 @@ public class TenantMembershipService {
                         user.getId(), tenantId, TenantMembershipStatus.ACTIVE
                 ))
                 .isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasActiveOwnerMembership(OidcIdentity identity, UUID tenantId) {
+        return userRepository.findByIssuerAndSubject(identity.issuer(), identity.subject())
+                .flatMap(user -> membershipRepository.findByUserIdAndTenantIdAndStatus(
+                        user.getId(), tenantId, TenantMembershipStatus.ACTIVE
+                ))
+                .map(membership -> membership.getRole() == TenantMembershipRole.OWNER)
+                .orElse(false);
     }
 }

@@ -44,7 +44,7 @@ public class AmsStatusController {
         return tenantResolver.withPrinter(printerId, () -> getStateForTrustedPrinter(printerId));
     }
 
-    private AmsStatus getStateForTrustedPrinter(UUID printerId) {
+    public AmsStatus getStateForTrustedPrinter(UUID printerId) {
         try {
             PrinterState printerState = edolCoreClient.get()
                     .uri("/api/printers/{printerId}/state", printerId)

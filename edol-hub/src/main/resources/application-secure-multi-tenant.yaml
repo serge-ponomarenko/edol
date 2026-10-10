@@ -14,7 +14,7 @@ spring:
             client-secret: ${EDOL_HUB_SERVICE_CLIENT_SECRET}
             authorization-grant-type: client_credentials
             provider: edol-keycloak
-            scope: tenant.context,core.printer.read,core.printer.manage,core.state.read,core.command.execute,core.media.read
+            scope: tenant.context,core.printer.read,core.printer.manage,core.state.read,core.command.execute,core.media.read,ams.terminal.manage
         provider:
           edol-keycloak:
             issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}

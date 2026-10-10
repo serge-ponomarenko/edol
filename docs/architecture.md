@@ -10,7 +10,7 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with Po
 | `edol-core` | Printer provisioning, direct/agent telemetry, commands, model metadata, camera, runtime and recovery state. | Bambu printer protocols, agents, MQTT, `core` PostgreSQL schema, HTTP state API. |
 | `edol-hub` | Persistent operational domain and dashboard: inventory, spools, print jobs, allocation, maintenance, labels. | `hub` PostgreSQL schema, Core HTTP API, Core MQTT events, browser clients. |
 | `edol-notify` | Printer-scoped Telegram commands and printer/print notifications. | Core HTTP API, Core MQTT events, Telegram. |
-| `edol-ams` | Printer-scoped AMS status and spool-change workflow. | Core and Hub HTTP APIs, Core MQTT events. |
+| `edol-ams` | Printer-scoped AMS workflow and secure terminal enrollment. | Core and Hub HTTP APIs, Core MQTT events, `ams` PostgreSQL schema. |
 
 ## Runtime and Data Flows
 
@@ -142,6 +142,24 @@ deployment, TLS, development-database, live-device, home-mode, terminal
 identity, or production behavior. Compatibility source paths remain subject to
 the Stage 9 removal gate. Stage 8 owns terminal enrollment and per-device
 credentials.
+
+Stage 8 source now introduces an AMS-owned `ams` schema with tenant-scoped
+terminal and pairing records, forced RLS, and narrow security-definer database
+functions for the two pre-tenant operations: atomically consuming a pairing and
+looking up an active terminal credential. Hub exposes owner-authorized terminal
+management routes and calls AMS under Hub's independent service identity with a
+server-established tenant header. Secure mode rejects the historical anonymous
+`/ams/**` terminal routes; the terminal uses only `/api/terminal/v1/**` with
+its own `EDOL-Terminal terminalId.secret` credential. The terminal never
+supplies tenant identity and its `printerId` is only an enrollment lookup hint;
+AMS binds the resulting credential to the persisted tenant and one allowed
+printer. Pairing codes are ten Crockford Base32 characters, expire in five
+minutes, are single-use, and have per-source failure limiting. Plaintext codes
+and secrets are never persisted or logged; a secret is returned only by the
+successful enrollment response with `Cache-Control: no-store`. Home retains
+the existing trusted-network AMS routes and does not expose secure enrollment.
+This is source implementation only pending PostgreSQL, Keycloak audience/scope,
+TLS, firmware, and physical-terminal acceptance.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and

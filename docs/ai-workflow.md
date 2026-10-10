@@ -46,6 +46,23 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
+- **High priority — persistence identity convention:** before the next
+  cross-module persistence expansion, assess a shared UUIDv7 identity strategy.
+  Hub currently uses its local `PersistableEntity`, AMS Stage 8 generates the
+  same UUIDv7 values explicitly, and Core has no equivalent superclass. Do not
+  move the JPA superclass into `edol-core-api` by default: first decide whether
+  that module may own Jakarta Persistence/Lombok dependencies, inventory every
+  entity and explicit ID producer, and prepare a separately reviewed,
+  compatibility-preserving migration with JPA and Testcontainers evidence.
+  Preserve existing UUID values and do not mix generated-ID behavior with a
+  schema or tenant-isolation change.
+- Consider a separate Home-only terminal printer-selection UX if manual
+  `printerId` entry proves impractical in the planned Home smoke test. It may
+  exchange a short-lived local code for a printer ID, but is not terminal
+  authentication: it must not reuse secure `/api/terminal/v1/enroll`, create
+  terminal/pairing persistence, issue or store a secret, or imply protection
+  beyond the owner-controlled trusted network. Keep it opt-in and mode-local;
+  secure multi-tenant enrollment must remain unavailable in Home mode.
 - Centralize application time handling through a shared `Clock` or time
   configuration, then migrate direct `now()` calls consistently. Preserve the
   current `Europe/Kyiv` business-time behavior until a persistence-time

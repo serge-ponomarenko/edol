@@ -1,4 +1,26 @@
 spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+    username: ${AMS_RUNTIME_DB_USER}
+    password: ${AMS_RUNTIME_DB_PASSWORD}
+  flyway:
+    enabled: true
+    schemas:
+      - ams
+    default-schema: ams
+    create-schemas: true
+    user: ${AMS_FLYWAY_DB_USER}
+    password: ${AMS_FLYWAY_DB_PASSWORD}
+    init-sqls:
+      - SET ROLE ams_schema_owner
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: ams
   security:
     oauth2:
       client:
@@ -12,8 +34,20 @@ spring:
         provider:
           edol-keycloak:
             issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
+      resourceserver:
+        jwt:
+          issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
 
 edol-ams:
+  security:
+    required-audience: ${EDOL_AMS_REQUIRED_AUDIENCE:edol-ams-api}
+    trusted-hub-client-id: ${EDOL_HUB_SERVICE_CLIENT_ID:edol-hub-service}
+  terminal:
+    key-version: ${EDOL_AMS_TERMINAL_KEY_VERSION:1}
+    pairing-code-hmac-keys:
+      1: ${EDOL_AMS_TERMINAL_PAIRING_CODE_HMAC_KEY}
+    credential-hmac-keys:
+      1: ${EDOL_AMS_TERMINAL_CREDENTIAL_HMAC_KEY}
   mqtt:
     client-id: ${EDOL_AMS_MQTT_CLIENT_ID:edol-ams-service}
     username: ${EDOL_AMS_MQTT_USERNAME}

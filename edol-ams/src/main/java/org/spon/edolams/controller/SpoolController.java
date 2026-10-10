@@ -22,18 +22,15 @@ import java.util.UUID;
 @Slf4j
 public class SpoolController {
 
-    private final RestClient edolCoreClient;
     private final RestClient edolHubClient;
     private final AmsSpoolChangerService amsSpoolChangerService;
     private final AmsPrinterTenantResolver tenantResolver;
 
     public SpoolController(
-            @Qualifier("edolCoreRestClient") RestClient edolCoreClient,
             @Qualifier("edolHubRestClient") RestClient edolHubClient,
             AmsSpoolChangerService amsSpoolChangerService,
             AmsPrinterTenantResolver tenantResolver
     ) {
-        this.edolCoreClient = edolCoreClient;
         this.edolHubClient = edolHubClient;
         this.amsSpoolChangerService = amsSpoolChangerService;
         this.tenantResolver = tenantResolver;
@@ -45,7 +42,7 @@ public class SpoolController {
         return tenantResolver.withPrinter(printerId, () -> findSpoolForTrustedPrinter(id, printerId));
     }
 
-    private ResponseEntity<Spool> findSpoolForTrustedPrinter(Long id, UUID printerId) {
+    public ResponseEntity<Spool> findSpoolForTrustedPrinter(Long id, UUID printerId) {
         try {
             HubFilamentSpool filamentSpool = edolHubClient.get()
                     .uri(uriBuilder -> uriBuilder
@@ -90,19 +87,19 @@ public class SpoolController {
             @RequestParam("slot") Integer slot,
             @RequestParam UUID printerId
     ) {
-        return tenantResolver.withPrinter(printerId, () -> {
-            edolHubClient.post()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/s/{printerId}/{spoolId}/{slot}")
-                            .build(printerId, id, slot))
-                    .retrieve()
-                    .toBodilessEntity();
+        return tenantResolver.withPrinter(printerId, () -> setSpoolForTrustedPrinter(id, slot, printerId));
+    }
 
-            amsSpoolChangerService.resetScannedSpool(printerId);
-            return ResponseEntity.ok(
-                    "Spool " + id + " assigned to AMS slot " + slot + " for printer " + printerId
-            );
-        });
+    public ResponseEntity<String> setSpoolForTrustedPrinter(Long id, Integer slot, UUID printerId) {
+        edolHubClient.post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/s/{printerId}/{spoolId}/{slot}")
+                        .build(printerId, id, slot))
+                .retrieve()
+                .toBodilessEntity();
+
+        amsSpoolChangerService.resetScannedSpool(printerId);
+        return ResponseEntity.ok("Spool " + id + " assigned to AMS slot " + slot + " for printer " + printerId);
     }
 
 
