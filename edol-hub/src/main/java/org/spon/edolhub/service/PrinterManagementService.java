@@ -1,9 +1,9 @@
 package org.spon.edolhub.service;
 
-import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.dto.CorePrinterConnectionDto;
 import org.spon.edolhub.model.dto.CorePrinterDto;
 import org.spon.edolhub.model.dto.PrinterForm;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -11,12 +11,15 @@ import org.springframework.web.client.RestClient;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class PrinterManagementService {
 
     private static final String PRINTER_ENDPOINT = "/api/printers/{printerId}";
 
     private final RestClient edolCoreClient;
+
+    public PrinterManagementService(@Qualifier("edolCoreRestClient") RestClient edolCoreClient) {
+        this.edolCoreClient = edolCoreClient;
+    }
 
     public CorePrinterDto getPrinter(UUID printerId) {
         return edolCoreClient.get()

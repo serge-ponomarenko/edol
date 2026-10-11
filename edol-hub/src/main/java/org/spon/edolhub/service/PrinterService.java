@@ -1,9 +1,9 @@
 package org.spon.edolhub.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.model.dto.CorePrinterDto;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -12,11 +12,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class PrinterService {
 
     private final RestClient edolCoreClient;
+
+    public PrinterService(@Qualifier("edolCoreRestClient") RestClient edolCoreClient) {
+        this.edolCoreClient = edolCoreClient;
+    }
 
     public List<CorePrinterDto> getPrinters() {
         CorePrinterDto[] printers = edolCoreClient.get()

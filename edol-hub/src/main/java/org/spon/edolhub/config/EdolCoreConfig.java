@@ -19,7 +19,7 @@ public class EdolCoreConfig {
     }
 
     @Bean
-    public RestClient edloCoreRestClient() {
+    public RestClient edolCoreRestClient() {
         return RestClient.builder()
                 .baseUrl(edolCoreUrl)
                 .requestInterceptor(coreTenantPropagationInterceptor)

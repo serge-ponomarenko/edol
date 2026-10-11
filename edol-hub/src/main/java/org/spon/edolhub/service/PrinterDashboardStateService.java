@@ -1,12 +1,12 @@
 package org.spon.edolhub.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolhub.controller.PrinterStateController.PrinterStateEnriched;
 import org.spon.edolhub.model.dto.PrintAllocationPreviewDto;
 import org.spon.edolhub.model.entity.PrintJob;
 import org.spon.edolhub.service.spool.AllocationPreviewRuntimeCacheService;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -14,7 +14,6 @@ import org.springframework.web.client.RestClient;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class PrinterDashboardStateService {
 
@@ -24,6 +23,16 @@ public class PrinterDashboardStateService {
             runtimeStateService;
     private final AllocationPreviewRuntimeCacheService
             runtimeCacheService;
+
+    public PrinterDashboardStateService(
+            @Qualifier("edolCoreRestClient") RestClient edolCoreClient,
+            PrintRuntimeStateService runtimeStateService,
+            AllocationPreviewRuntimeCacheService runtimeCacheService
+    ) {
+        this.edolCoreClient = edolCoreClient;
+        this.runtimeStateService = runtimeStateService;
+        this.runtimeCacheService = runtimeCacheService;
+    }
 
     public PrinterStateEnriched getState(UUID printerId) {
         try {
