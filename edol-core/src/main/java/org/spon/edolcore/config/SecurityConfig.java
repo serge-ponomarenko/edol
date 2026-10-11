@@ -1,5 +1,6 @@
 package org.spon.edolcore.config;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,6 +22,8 @@ import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 public class SecurityConfig {
+
+    private static final String PRINTER_MANAGE_SCOPE = "SCOPE_core.printer.manage";
 
     @Value("${bot.webAdminName}")
     private String adminName;
@@ -56,11 +59,12 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/printers").hasAuthority("SCOPE_core.printer.manage")
-                        .requestMatchers(HttpMethod.PATCH, "/api/printers/**").hasAuthority("SCOPE_core.printer.manage")
-                        .requestMatchers(HttpMethod.DELETE, "/api/printers/**").hasAuthority("SCOPE_core.printer.manage")
-                        .requestMatchers(HttpMethod.PATCH, "/api/printers/*/connection").hasAuthority("SCOPE_core.printer.manage")
+                        .requestMatchers(HttpMethod.POST, "/api/printers").hasAuthority(PRINTER_MANAGE_SCOPE)
+                        .requestMatchers(HttpMethod.PATCH, "/api/printers/**").hasAuthority(PRINTER_MANAGE_SCOPE)
+                        .requestMatchers(HttpMethod.DELETE, "/api/printers/**").hasAuthority(PRINTER_MANAGE_SCOPE)
+                        .requestMatchers(HttpMethod.PATCH, "/api/printers/*/connection").hasAuthority(PRINTER_MANAGE_SCOPE)
                         .requestMatchers(HttpMethod.GET, "/api/printers/*/connection").hasAuthority("SCOPE_core.printer.read")
                         .requestMatchers("/api/printers/*/state", "/api/printers/state").hasAnyAuthority("SCOPE_core.state.read", CoreLegacyCompatibilityFilter.LEGACY_AUTHORITY)
                         .requestMatchers("/api/printers/*/commands/**").hasAnyAuthority("SCOPE_core.command.execute", CoreLegacyCompatibilityFilter.LEGACY_AUTHORITY)

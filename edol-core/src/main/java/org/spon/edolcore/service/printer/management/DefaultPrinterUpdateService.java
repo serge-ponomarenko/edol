@@ -10,10 +10,12 @@ import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
 import org.spon.edolcore.persistence.printer.PrinterRepository;
 import org.spon.edolcore.service.LogContextFactory;
+import org.spon.edolcore.service.printer.management.exception.PrinterNotFoundException;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeLifecycleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -59,14 +61,13 @@ public class DefaultPrinterUpdateService implements PrinterUpdateService {
     public PrinterConnectionConfiguration updateConnection(
             UUID printerId,
             UpdatePrinterConnectionRequest request) {
-        PrinterConnectionConfiguration configuration =
-                configurationRepository.findByPrinterId(printerId)
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "Printer not found: " + printerId
-                                ));
-
-        printerMapper.updateConnection(configuration, request);
+        Printer printer = printerRepository.findById(printerId)
+                .orElseThrow(() -> new PrinterNotFoundException(printerId));
+        Optional<PrinterConnectionConfiguration> existingConfiguration =
+                configurationRepository.findByPrinterId(printerId);
+        PrinterConnectionConfiguration configuration = existingConfiguration
+                .orElseGet(() -> printerMapper.createConnection(printer, request));
+        existingConfiguration.ifPresent(value -> printerMapper.updateConnection(value, request));
 
         printerRuntimeLifecycleService.restartRuntime(
                 printerId

@@ -146,6 +146,12 @@ class Stage5SmokeApplicationContextTest {
                     .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
                     .GET()
                     .build())).isEqualTo(200);
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context,
+                            "/api/printers/00000000-0000-0000-0000-000000000099/connection"))
+                    .header("Authorization", "Bearer " + TRUSTED_SERVICE_TOKEN)
+                    .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
+                    .GET()
+                    .build())).isEqualTo(404);
             assertThat(JdbcClient.create(administratorDataSource)
                     .sql("select has_table_privilege(:roleName, 'core.printers', 'select')")
                     .param("roleName", CORE_RUNTIME)
@@ -173,6 +179,21 @@ class Stage5SmokeApplicationContextTest {
                     .param("printerId", printerId)
                     .query(UUID.class)
                     .single()).isEqualTo(TENANT_ID);
+
+            URI connectionEndpoint = endpoint(context, "/api/printers/" + printerId + "/connection");
+            assertThat(requestStatus(HttpRequest.newBuilder(connectionEndpoint)
+                    .header("Authorization", "Bearer " + TRUSTED_SERVICE_TOKEN)
+                    .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
+                    .header("Content-Type", "application/json")
+                    .method("PATCH", HttpRequest.BodyPublishers.ofString("""
+                            {"mqttHost":"mqtt.example.test","mqttPort":1883,"accessCode":"access-code","agentId":"agent-1"}
+                            """))
+                    .build())).isEqualTo(200);
+            assertThat(requestStatus(HttpRequest.newBuilder(connectionEndpoint)
+                    .header("Authorization", "Bearer " + TRUSTED_SERVICE_TOKEN)
+                    .header("X-EDOL-Tenant-Id", TENANT_ID.toString())
+                    .GET()
+                    .build())).isEqualTo(200);
 
             assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status ->
                     printerRepository.findAll()
@@ -238,7 +259,7 @@ class Stage5SmokeApplicationContextTest {
                         "iss", "https://issuer.invalid/realms/edol",
                         "aud", List.of("edol-core-api"),
                         "azp", "edol-hub-service",
-                        "scope", "tenant.context core.printer.read"
+                        "scope", "tenant.context core.printer.read core.printer.manage"
                 );
                 case WRONG_CLIENT_TOKEN -> Map.of(
                         "iss", "https://issuer.invalid/realms/edol",

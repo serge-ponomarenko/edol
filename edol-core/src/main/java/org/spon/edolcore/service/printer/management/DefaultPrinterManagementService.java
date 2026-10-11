@@ -7,12 +7,14 @@ import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepos
 import org.spon.edolcore.persistence.printer.PrinterRepository;
 import org.spon.edolcore.service.printer.management.exception.PrinterNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class DefaultPrinterManagementService implements PrinterManagementService {
 
     private final PrinterRepository printerRepository;

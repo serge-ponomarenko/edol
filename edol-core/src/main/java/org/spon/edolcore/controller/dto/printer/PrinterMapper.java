@@ -82,6 +82,20 @@ public class PrinterMapper {
                 .build();
     }
 
+    public PrinterConnectionConfiguration createConnection(
+            Printer printer,
+            UpdatePrinterConnectionRequest request) {
+        return createConnection(printer, new PrinterConnectionDto(
+                request.mqttHost(),
+                request.mqttPort(),
+                request.ftpHost(),
+                request.ftpPort(),
+                request.modelDirectory(),
+                request.accessCode(),
+                request.agentId()
+        ));
+    }
+
     /*
      * ==========================
      * Update existing entity

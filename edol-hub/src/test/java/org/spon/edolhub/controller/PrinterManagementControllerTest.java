@@ -10,6 +10,7 @@ import org.spon.edolhub.service.PrinterAccessService;
 import org.spon.edolhub.service.PrinterCatalogSyncService;
 import org.spon.edolhub.service.PrinterManagementService;
 import org.springframework.ui.Model;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.UUID;
@@ -80,5 +81,29 @@ class PrinterManagementControllerTest {
         assertThat(view).isEqualTo("dashboard/printers/form");
         verify(model).addAttribute("newPrinterForm", false);
         verify(model).addAttribute("editingPrinterId", PRINTER_ID);
+    }
+
+    @Test
+    void opensTheEditFormWhenTheConnectionConfigurationIsMissing() {
+        org.spon.edolhub.model.entity.Printer printer = new org.spon.edolhub.model.entity.Printer();
+        printer.setId(PRINTER_ID);
+        when(printerAccessService.getPrinter(PRINTER_ID)).thenReturn(printer);
+        when(printerManagementService.getPrinter(PRINTER_ID)).thenReturn(
+                new org.spon.edolhub.model.dto.CorePrinterDto(PRINTER_ID, "P1", "Printer", true)
+        );
+        when(printerManagementService.getConnection(PRINTER_ID))
+                .thenThrow(HttpClientErrorException.create(
+                        org.springframework.http.HttpStatus.NOT_FOUND,
+                        "Not Found",
+                        org.springframework.http.HttpHeaders.EMPTY,
+                        new byte[0],
+                        null
+                ));
+
+        String view = controller.editForm(PRINTER_ID, model);
+
+        assertThat(view).isEqualTo("dashboard/printers/form");
+        verify(model).addAttribute(eq("printerForm"), any(PrinterForm.class));
+        verify(model).addAttribute(eq("printerError"), any(String.class));
     }
 }

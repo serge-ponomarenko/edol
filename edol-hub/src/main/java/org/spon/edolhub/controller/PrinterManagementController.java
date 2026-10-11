@@ -2,11 +2,13 @@ package org.spon.edolhub.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edolhub.model.dto.CorePrinterDto;
+import org.spon.edolhub.model.dto.CorePrinterConnectionDto;
 import org.spon.edolhub.model.dto.PrinterForm;
 import org.spon.edolhub.service.PrinterAccessService;
 import org.spon.edolhub.service.PrinterCatalogSyncService;
 import org.spon.edolhub.service.PrinterManagementService;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -59,12 +61,21 @@ public class PrinterManagementController {
     @GetMapping("/{printerId}/edit")
     public String editForm(@PathVariable UUID printerId, Model model) {
         printerAccessService.getPrinter(printerId);
+        CorePrinterDto printer = printerManagementService.getPrinter(printerId);
+        CorePrinterConnectionDto connection;
+        try {
+            connection = printerManagementService.getConnection(printerId);
+        } catch (HttpClientErrorException exception) {
+            if (!exception.getStatusCode().isSameCodeAs(org.springframework.http.HttpStatus.NOT_FOUND)) {
+                throw exception;
+            }
+            connection = new CorePrinterConnectionDto(null, null, null, null, null, null, null);
+            model.addAttribute(PRINTER_ERROR_ATTRIBUTE,
+                    "Connection configuration is missing. Complete and save the form to recreate it.");
+        }
         model.addAttribute(
                 "printerForm",
-                PrinterForm.from(
-                        printerManagementService.getPrinter(printerId),
-                        printerManagementService.getConnection(printerId)
-                )
+                PrinterForm.from(printer, connection)
         );
         model.addAttribute("newPrinterForm", false);
         model.addAttribute("editingPrinterId", printerId);
