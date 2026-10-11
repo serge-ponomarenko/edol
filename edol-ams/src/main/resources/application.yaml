@@ -1,4 +1,5 @@
 server:
+  address: ${EDOL_AMS_BIND_ADDRESS:0.0.0.0}
   port: 8099
 
 logging:

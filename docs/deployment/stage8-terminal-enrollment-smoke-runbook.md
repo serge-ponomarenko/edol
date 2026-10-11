@@ -23,7 +23,7 @@ Never use HTTP on an untrusted or Internet-exposed network.
 
 ## Preconditions
 
-1. Start the disposable `secure-multi-tenant` Stage 8 services and sign in as the owner of the selected printer.
+1. Start the disposable `secure-multi-tenant` Stage 8 services and sign in as the owner of the selected printer. AMS must listen on the LAN interface of the computer running it; the default `EDOL_AMS_BIND_ADDRESS` is `0.0.0.0`. Use a restricted address only when no physical terminal is being tested.
 2. Build the terminal firmware from its repository without upload:
 
    ```powershell
@@ -31,7 +31,7 @@ Never use HTTP on an untrusted or Internet-exposed network.
    ```
 
 3. Flashing is a separate, operator-approved action. Do not upload from this runbook until the board, serial port, and recovery path are confirmed.
-4. In the terminal Settings screen, set Wi-Fi, AMS host, AMS port, and the desired transport. Leave **Printer ID (legacy Home)** empty for this workflow.
+4. In the terminal Settings screen, set Wi-Fi, **AMS host** to the LAN IP address or DNS name of the computer running `edol-ams` (never the Hub address), **AMS port** to the actual listening AMS port, and the desired transport. For the current local smoke layout, this is `192.168.0.110` and `18088`; choose HTTP by leaving HTTPS switched off. Leave **Printer ID (legacy Home)** empty for this workflow.
 
 ## Hub enrollment workflow
 
