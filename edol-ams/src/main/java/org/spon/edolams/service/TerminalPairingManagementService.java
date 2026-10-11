@@ -7,6 +7,7 @@ import org.spon.edolams.model.terminal.TerminalLifecycle;
 import org.spon.edolams.model.terminal.TerminalPairing;
 import org.spon.edolams.repository.AmsTerminalRepository;
 import org.spon.edolams.repository.TerminalPairingRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class TerminalPairingManagementService {
     private final TerminalCredentialCodec credentialCodec;
     private final Clock clock;
 
+    @Autowired
     public TerminalPairingManagementService(
             AmsTerminalRepository terminalRepository,
             TerminalPairingRepository pairingRepository,
