@@ -8,8 +8,9 @@ import org.spon.edolhub.model.entity.PrintJob;
 import org.spon.edolhub.service.spool.AllocationPreviewRuntimeCacheService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.UUID;
 
@@ -84,7 +85,7 @@ public class PrinterDashboardStateService {
 
             return response;
 
-        } catch (ResourceAccessException e) {
+        } catch (ResourceAccessException | RestClientResponseException e) {
             return null;
         }
     }

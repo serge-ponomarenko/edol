@@ -19,9 +19,7 @@ public class InMemoryPrinterRuntimeRegistry
         PrinterRuntime runtime = runtimes.get(printerId);
 
         if (runtime == null) {
-            throw new IllegalArgumentException(
-                    "Runtime not found for printer: " + printerId
-            );
+            throw new PrinterRuntimeNotFoundException(printerId);
         }
 
         return runtime;

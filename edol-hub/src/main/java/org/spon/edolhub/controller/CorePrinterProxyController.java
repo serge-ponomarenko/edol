@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
@@ -68,22 +69,32 @@ public class CorePrinterProxyController {
         if (!Set.of("plate", "top").contains(image)) {
             return ResponseEntity.badRequest().build();
         }
-        return restTemplate.exchange(
-                edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/media/model/" + image,
-                HttpMethod.GET,
-                null,
-                byte[].class
-        );
+        try {
+            return restTemplate.exchange(
+                    edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/media/model/" + image,
+                    HttpMethod.GET,
+                    null,
+                    byte[].class
+            );
+        } catch (RestClientResponseException exception) {
+            return ResponseEntity.status(exception.getStatusCode())
+                    .body(exception.getResponseBodyAsByteArray());
+        }
     }
 
     @GetMapping("/camera/snapshot")
     public ResponseEntity<byte[]> camera(@PathVariable UUID printerId) {
         printerAccessService.getPrinter(printerId);
-        return restTemplate.exchange(
-                edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/camera/snapshot",
-                HttpMethod.GET,
-                null,
-                byte[].class
-        );
+        try {
+            return restTemplate.exchange(
+                    edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/camera/snapshot",
+                    HttpMethod.GET,
+                    null,
+                    byte[].class
+            );
+        } catch (RestClientResponseException exception) {
+            return ResponseEntity.status(exception.getStatusCode())
+                    .body(exception.getResponseBodyAsByteArray());
+        }
     }
 }

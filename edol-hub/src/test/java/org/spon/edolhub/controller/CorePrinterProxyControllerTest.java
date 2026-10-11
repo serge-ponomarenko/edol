@@ -12,6 +12,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
@@ -58,6 +59,23 @@ class CorePrinterProxyControllerTest {
 
         assertThat(response).isSameAs(coreResponse);
         verify(printerAccessService).getPrinter(PRINTER_ID);
+    }
+
+    @Test
+    void preservesCoreAuthorizationFailureForCameraSnapshot() {
+        Printer printer = new Printer();
+        printer.setId(PRINTER_ID);
+        when(printerAccessService.getPrinter(PRINTER_ID)).thenReturn(printer);
+        when(restTemplate.exchange(
+                "http://edolcore:8080/api/printers/" + PRINTER_ID + "/camera/snapshot",
+                HttpMethod.GET,
+                null,
+                byte[].class
+        )).thenThrow(HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden", null, null, null));
+
+        ResponseEntity<byte[]> response = controller.camera(PRINTER_ID);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test

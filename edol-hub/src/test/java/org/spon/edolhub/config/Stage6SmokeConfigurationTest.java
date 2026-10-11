@@ -27,6 +27,10 @@ class Stage6SmokeConfigurationTest {
                 .containsEntry("spring.flyway.user", "${EDOL_HUB_STAGE6_SMOKE_FLYWAY_DB_USER}")
                 .containsEntry("spring.flyway.clean-disabled", true)
                 .containsEntry("edol-core.url", "${EDOL_CORE_STAGE6_SMOKE_URL}")
+                .containsEntry(
+                        "spring.security.oauth2.client.registration.edol-hub-service.scope",
+                        "tenant.context,core.printer.read,core.printer.manage,core.state.read,core.command.execute,core.media.read,ams.terminal.manage"
+                )
                 .containsEntry("mqttServer.url", "${EDOL_STAGE6_SMOKE_MQTT_URL}")
                 .containsEntry("edol-hub.runtime.mqtt-enabled", true)
                 .containsEntry("edol-hub.registration.self-service-enabled", true)
