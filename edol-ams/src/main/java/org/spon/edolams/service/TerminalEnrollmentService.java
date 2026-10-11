@@ -21,14 +21,13 @@ public class TerminalEnrollmentService {
         this.credentialCodec = credentialCodec;
     }
 
-    public EnrollmentResult enroll(UUID printerId, String pairingCode) {
+    public EnrollmentResult enroll(String pairingCode) {
         String secret = credentialCodec.newTerminalSecret();
         byte[] credentialDigest = credentialCodec.terminalCredentialDigest(credentialCodec.keyVersion(), secret);
         TerminalCredentialCodec.PairingCodeDigests pairingDigests = credentialCodec.pairingCodeDigests(pairingCode);
         List<EnrollmentResult> rows = jdbcTemplate.query(
-                "select terminal_id, tenant_id, allowed_printer_id from ams.consume_terminal_pairing(?, ?, ?, ?, ?, ?, ?)",
+                "select terminal_id, tenant_id, allowed_printer_id from ams.consume_terminal_pairing(?, ?, ?, ?, ?, ?)",
                 (resultSet, rowNumber) -> mapEnrollment(resultSet, secret),
-                printerId,
                 pairingDigests.currentDigest(),
                 pairingDigests.currentKeyVersion(),
                 pairingDigests.previousDigest(),

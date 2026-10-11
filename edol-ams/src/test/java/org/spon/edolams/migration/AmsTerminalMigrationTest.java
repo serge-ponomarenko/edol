@@ -84,9 +84,9 @@ class AmsTerminalMigrationTest {
         assertThatThrownBy(() -> runtime.sql("select count(*) from ams.terminals").query(Long.class).single())
                 .hasMessageContaining("EDOL tenant context is required");
 
-        assertThat(consume(runtime, pairing.printerId(), pairing.codeDigest(), pairing.credentialDigest()))
+        assertThat(consume(runtime, pairing.codeDigest(), pairing.credentialDigest()))
                 .containsExactly(pairing.terminalId());
-        assertThat(consume(runtime, pairing.printerId(), pairing.codeDigest(), pairing.credentialDigest())).isEmpty();
+        assertThat(consume(runtime, pairing.codeDigest(), pairing.credentialDigest())).isEmpty();
 
         runtime.sql("select set_config('edol.tenant_id', :tenantId, false)")
                 .param("tenantId", UUID.randomUUID().toString()).query(String.class).single();
@@ -96,21 +96,20 @@ class AmsTerminalMigrationTest {
     }
 
     @Test
-    void exhaustsAPairingAfterFiveInvalidAttemptsRegardlessOfSourceRateLimit() {
+    void invalidCodeDoesNotExposeOrAlterAnUnrelatedPairing() {
         PendingPairing pairing = pendingPairing();
         byte[] invalidCodeDigest = {9, 9, 9};
 
-        for (int attempt = 0; attempt < 5; attempt++) {
-            assertThat(consume(runtime, pairing.printerId(), invalidCodeDigest, pairing.credentialDigest())).isEmpty();
-        }
+        assertThat(consume(runtime, invalidCodeDigest, pairing.credentialDigest())).isEmpty();
 
-        assertThat(consume(runtime, pairing.printerId(), pairing.codeDigest(), pairing.credentialDigest())).isEmpty();
+        assertThat(consume(runtime, pairing.codeDigest(), pairing.credentialDigest()))
+                .containsExactly(pairing.terminalId());
         assertThat(administrator.sql("select failed_attempt_count from ams.terminal_pairings where id = :pairingId")
-                .param("pairingId", pairing.pairingId()).query(Integer.class).single()).isEqualTo(5);
+                .param("pairingId", pairing.pairingId()).query(Integer.class).single()).isZero();
         assertThat(administrator.sql("select state from ams.terminal_pairings where id = :pairingId")
-                .param("pairingId", pairing.pairingId()).query(String.class).single()).isEqualTo("EXHAUSTED");
+                .param("pairingId", pairing.pairingId()).query(String.class).single()).isEqualTo("CONSUMED");
         assertThat(administrator.sql("select lifecycle_state from ams.terminals where id = :terminalId")
-                .param("terminalId", pairing.terminalId()).query(String.class).single()).isEqualTo("PENDING");
+                .param("terminalId", pairing.terminalId()).query(String.class).single()).isEqualTo("ACTIVE");
     }
 
     @Test
@@ -120,9 +119,8 @@ class AmsTerminalMigrationTest {
 
         List<UUID> consumed = runtime.sql("""
                         select terminal_id from ams.consume_terminal_pairing(
-                            :printerId, :currentDigest, 2, :previousDigest, 1, :credentialDigest, 1)
+                            :currentDigest, 2, :previousDigest, 1, :credentialDigest, 1)
                         """)
-                .param("printerId", pairing.printerId())
                 .param("currentDigest", currentDigest)
                 .param("previousDigest", pairing.codeDigest())
                 .param("credentialDigest", pairing.credentialDigest())
@@ -137,15 +135,14 @@ class AmsTerminalMigrationTest {
 
         List<UUID> consumed = runtime.sql("""
                         select terminal_id from ams.consume_terminal_pairing(
-                            :printerId, null::bytea, 1, null::bytea, null::integer, :credentialDigest, 1)
+                            null::bytea, 1, null::bytea, null::integer, :credentialDigest, 1)
                         """)
-                .param("printerId", pairing.printerId())
                 .param("credentialDigest", pairing.credentialDigest())
                 .query(UUID.class).list();
 
         assertThat(consumed).isEmpty();
         assertThat(administrator.sql("select failed_attempt_count from ams.terminal_pairings where id = :pairingId")
-                .param("pairingId", pairing.pairingId()).query(Integer.class).single()).isEqualTo(1);
+                .param("pairingId", pairing.pairingId()).query(Integer.class).single()).isZero();
     }
 
     @Test
@@ -169,7 +166,7 @@ class AmsTerminalMigrationTest {
 
     @Test
     void grantsTheNarrowFunctionToRuntimeButNotPublic() {
-        String signature = "ams.consume_terminal_pairing(uuid,bytea,integer,bytea,integer,bytea,integer)";
+        String signature = "ams.consume_terminal_pairing(bytea,integer,bytea,integer,bytea,integer)";
 
         assertThat(administrator.sql("select has_function_privilege('public', :signature, 'EXECUTE')")
                 .param("signature", signature).query(Boolean.class).single()).isFalse();
@@ -215,12 +212,12 @@ class AmsTerminalMigrationTest {
         return new PendingPairing(pairingId, terminalId, printerId, codeDigest, credentialDigest);
     }
 
-    private List<UUID> consume(JdbcClient client, UUID printerId, byte[] codeDigest, byte[] credentialDigest) {
+    private List<UUID> consume(JdbcClient client, byte[] codeDigest, byte[] credentialDigest) {
         return client.sql("""
                         select terminal_id from ams.consume_terminal_pairing(
-                            :printerId, :codeDigest, 1, null::bytea, null::integer, :credentialDigest, 1)
+                            :codeDigest, 1, null::bytea, null::integer, :credentialDigest, 1)
                         """)
-                .param("printerId", printerId).param("codeDigest", codeDigest)
+                .param("codeDigest", codeDigest)
                 .param("credentialDigest", credentialDigest).query(UUID.class).list();
     }
 
@@ -232,7 +229,7 @@ class AmsTerminalMigrationTest {
         if (!start.await(5, TimeUnit.SECONDS)) {
             throw new IllegalStateException("Concurrent pairing consumers were not released");
         }
-        return consume(isolatedRuntime, pairing.printerId(), pairing.codeDigest(), pairing.credentialDigest()).size();
+        return consume(isolatedRuntime, pairing.codeDigest(), pairing.credentialDigest()).size();
     }
 
     private record PendingPairing(

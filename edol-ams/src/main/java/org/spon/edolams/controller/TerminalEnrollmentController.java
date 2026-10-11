@@ -3,7 +3,6 @@ package org.spon.edolams.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import org.spon.edolams.service.InvalidTerminalPairingException;
 import org.spon.edolams.service.TerminalEnrollmentRateLimiter;
 import org.spon.edolams.service.TerminalEnrollmentService;
@@ -47,7 +46,7 @@ public class TerminalEnrollmentController {
         }
         try {
             TerminalEnrollmentService.EnrollmentResult result = enrollmentService.enroll(
-                    request.printerId(), request.pairingCode()
+                    request.pairingCode()
             );
             rateLimiter.succeeded(source);
             return ResponseEntity.ok()
@@ -61,7 +60,7 @@ public class TerminalEnrollmentController {
         }
     }
 
-    public record EnrollmentRequest(@NotNull UUID printerId, @NotBlank String pairingCode) {
+    public record EnrollmentRequest(@NotBlank String pairingCode) {
     }
 
     public record EnrollmentResponse(UUID terminalId, String secret) {

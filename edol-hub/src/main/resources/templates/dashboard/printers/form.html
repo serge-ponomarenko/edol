@@ -48,7 +48,7 @@
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <div>
                                     <h4 class="mb-0">AMS Terminal</h4>
-                                    <div class="text-secondary">Owner-managed secure terminal enrollment</div>
+                                    <div class="text-secondary">Owner-managed terminal enrollment</div>
                                 </div>
                                 <span class="badge bg-secondary" th:if="${terminalStatus == null}">Not enrolled</span>
                                 <span class="badge bg-success" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">Active</span>

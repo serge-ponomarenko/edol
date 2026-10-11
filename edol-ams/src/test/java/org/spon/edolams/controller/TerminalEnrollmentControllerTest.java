@@ -19,8 +19,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TerminalEnrollmentControllerTest {
 
-    private static final UUID PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000091");
-
     @Mock
     private TerminalEnrollmentService enrollmentService;
 
@@ -33,11 +31,11 @@ class TerminalEnrollmentControllerTest {
     @Test
     void returnsTheCredentialOnceWithNoStoreAfterAValidPairing() {
         when(servletRequest.getRemoteAddr()).thenReturn("192.0.2.91");
-        when(enrollmentService.enroll(PRINTER_ID, "ABCDEFGHJK")).thenReturn(
-                new TerminalEnrollmentService.EnrollmentResult(UUID.randomUUID(), UUID.randomUUID(), PRINTER_ID, "secret")
+        when(enrollmentService.enroll("ABCDEFGHJK")).thenReturn(
+                new TerminalEnrollmentService.EnrollmentResult(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "secret")
         );
 
-        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest(PRINTER_ID, "ABCDEFGHJK"), servletRequest);
+        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHJK"), servletRequest);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
@@ -48,9 +46,9 @@ class TerminalEnrollmentControllerTest {
     @Test
     void rejectsInvalidPairingWithoutLeakingAReasonAndCountsTheFailure() {
         when(servletRequest.getRemoteAddr()).thenReturn("192.0.2.92");
-        when(enrollmentService.enroll(PRINTER_ID, "ABCDEFGHJK")).thenThrow(new InvalidTerminalPairingException());
+        when(enrollmentService.enroll("ABCDEFGHJK")).thenThrow(new InvalidTerminalPairingException());
 
-        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest(PRINTER_ID, "ABCDEFGHJK"), servletRequest);
+        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHJK"), servletRequest);
 
         assertThat(response.getStatusCode().value()).isEqualTo(401);
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
@@ -63,11 +61,11 @@ class TerminalEnrollmentControllerTest {
         when(servletRequest.getRemoteAddr()).thenReturn("192.0.2.93");
         when(rateLimiter.isBlocked("192.0.2.93")).thenReturn(true);
 
-        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest(PRINTER_ID, "ABCDEFGHJK"), servletRequest);
+        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHJK"), servletRequest);
 
         assertThat(response.getStatusCode().value()).isEqualTo(429);
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
-        verify(enrollmentService, never()).enroll(PRINTER_ID, "ABCDEFGHJK");
+        verify(enrollmentService, never()).enroll("ABCDEFGHJK");
     }
 
     private TerminalEnrollmentController controller() {

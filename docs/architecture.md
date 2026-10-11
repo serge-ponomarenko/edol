@@ -143,33 +143,35 @@ identity, or production behavior. Compatibility source paths remain subject to
 the Stage 9 removal gate. Stage 8 owns terminal enrollment and per-device
 credentials.
 
-Stage 8 source now introduces an AMS-owned `ams` schema with tenant-scoped
-terminal and pairing records, forced RLS, and narrow security-definer database
-functions for the two pre-tenant operations: atomically consuming a pairing and
-looking up an active terminal credential. AMS runtime remains a non-owner,
-`NOSUPERUSER`, `NOBYPASSRLS` role. A dedicated `NOLOGIN`, `NOINHERIT`
-terminal-function owner has only the function-required schema/table privileges
-and `BYPASSRLS`; it owns those pre-tenant functions and is not an application
-datasource. Hub exposes owner-authorized terminal management through the
-printer edit UI and its matching routes, and calls AMS under Hub's independent
-service identity with a server-established tenant header. The UI exposes only
-the newly issued pairing code with `no-store`, shows terminal lifecycle and
-last authenticated metadata, and maps expected lifecycle conflicts to a
-recoverable owner action instead of a server error. Secure mode rejects the historical anonymous
-`/ams/**` terminal routes; the terminal uses only `/api/terminal/v1/**` with
-its own `EDOL-Terminal terminalId.secret` credential. The terminal never
-supplies tenant identity and its `printerId` is only an enrollment lookup hint;
-AMS binds the resulting credential to the persisted tenant and one allowed
-printer. Pairing codes are ten Crockford Base32 characters, expire in five
-minutes, are single-use, and have a durable per-pairing maximum of five failed
-attempts in addition to supplementary per-source limiting. Pairing-code HMAC
-verification permits only the current key and its immediately previous version;
-any older configured version fails startup validation. Plaintext codes and
-secrets are never persisted or logged; a secret is returned only by the
-successful enrollment response with `Cache-Control: no-store`. Home retains
-the existing trusted-network AMS routes and does not expose secure enrollment.
-This is source implementation only pending PostgreSQL, Keycloak audience/scope,
-TLS, firmware, and physical-terminal acceptance.
+Stage 8 uses an AMS-owned `ams` schema with tenant-scoped terminal and pairing
+records, forced RLS, and narrow security-definer functions for pre-tenant
+pairing consumption and terminal credential lookup. AMS runtime remains a
+non-owner, `NOSUPERUSER`, `NOBYPASSRLS` role. A dedicated `NOLOGIN`,
+`NOINHERIT` terminal-function owner has only function-required privileges and
+`BYPASSRLS`; it is not an application datasource. Hub exposes owner-authorized
+terminal management on the printer edit page and calls AMS using Hub's service
+identity with a server-established tenant header. The UI shows a newly issued
+pairing code once with `no-store`, lifecycle metadata, and recoverable pairing
+conflicts.
+
+A terminal sends only the pairing code during enrollment. AMS locates the
+pending pairing by HMAC digest and derives the bound tenant and printer from
+that record; the terminal never supplies tenant or printer identity. A
+successful enrollment returns one random `EDOL-Terminal terminalId.secret`
+credential with `Cache-Control: no-store`, and all operational terminal calls
+authenticate with that credential. Codes are ten Crockford Base32 characters,
+expire in five minutes, and are single-use. Invalid attempts are rate-limited
+by source without disclosing pairing state. Pairing-code HMAC verification
+accepts only current and immediately previous configured key versions.
+Plaintext codes and credentials are neither persisted nor logged.
+
+The standard ESP32 image stores the terminal credential in Preferences (NVS)
+and does not require Secure Boot, Flash Encryption, encrypted NVS, eFuses, or
+hardware-backed storage. Its transport is explicit: HTTP is allowed only for a
+trusted LAN and exposes credentials to a network interceptor; HTTPS continues
+to validate its configured CA and never falls back to HTTP after a TLS failure.
+Home retains its existing trusted-network routes. This is source implementation
+pending disposable runtime, firmware build, and physical-terminal acceptance.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and

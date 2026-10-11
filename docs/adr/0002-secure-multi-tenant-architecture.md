@@ -324,17 +324,22 @@ creates, revokes, or re-pairs a terminal through an authenticated Hub-to-AMS
 management API.
 
 The initial protocol uses a short-lived, single-use EDOL pairing credential.
-The terminal submits it to AMS over TLS and receives a persistent per-device
-credential exactly once. The pairing code is tenant-bound, rate-limited,
-expires, has a strict attempt limit, is stored only as a digest, and is consumed
-atomically.
+The terminal submits only that code to AMS and receives a persistent per-device
+credential exactly once. AMS resolves the tenant and printer from the persisted
+pairing, so the terminal does not supply either identity at enrollment. The
+pairing code is tenant-bound, source-rate-limited, expires after five minutes,
+is stored only as a digest, and is consumed atomically.
 
 The persistent credential is an opaque random 256-bit secret represented with
 a terminal identifier. AMS stores only a keyed digest and validates it in
-constant time. The ESP32 stores it using encrypted NVS/flash and uses server-
-authenticated TLS. Credentials are endpoint- and printer-scoped, revocable,
-rotatable, and replaceable through re-pairing. Factory reset or terminal
-replacement requires revocation and a new pairing operation.
+constant time. The ESP32 stores it in standard Preferences (NVS); secure boot,
+flash encryption, encrypted NVS, eFuse provisioning, and hardware-backed
+storage are not enrollment prerequisites. Transport is explicitly selected:
+HTTP is supported only on a trusted LAN, while configured HTTPS remains
+server-authenticated and never downgrades to HTTP after a TLS failure.
+Credentials are endpoint- and printer-scoped, revocable, rotatable, and
+replaceable through re-pairing. Factory reset or terminal replacement requires
+revocation and a new pairing operation.
 
 OAuth 2.0 Device Authorization Grant is not used for the first implementation.
 It adds authorization-server, polling, and user-code UX complexity without a
