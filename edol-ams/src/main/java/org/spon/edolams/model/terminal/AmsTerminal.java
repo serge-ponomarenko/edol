@@ -53,4 +53,7 @@ public class AmsTerminal {
 
     @Column(name = "replaced_by_terminal_id")
     private UUID replacedByTerminalId;
+
+    @Column(name = "last_authenticated_at")
+    private Instant lastAuthenticatedAt;
 }

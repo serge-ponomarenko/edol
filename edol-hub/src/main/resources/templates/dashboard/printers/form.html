@@ -43,11 +43,111 @@
                             </div>
                             <div class="mt-4"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-secondary" href="/printers">Cancel</a></div>
                         </form>
+                        <section class="mt-5" th:if="${!newPrinterForm and terminalManagementAvailable}">
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h4 class="mb-0">AMS Terminal</h4>
+                                    <div class="text-secondary">Owner-managed secure terminal enrollment</div>
+                                </div>
+                                <span class="badge bg-secondary" th:if="${terminalStatus == null}">Not enrolled</span>
+                                <span class="badge bg-success" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">Active</span>
+                                <span class="badge bg-warning text-dark" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'PENDING'}">Pairing pending</span>
+                                <span class="badge bg-secondary" th:if="${terminalStatus != null and terminalStatus.lifecycleState != 'ACTIVE' and terminalStatus.lifecycleState != 'PENDING'}" th:text="${terminalStatus.lifecycleState}"></span>
+                            </div>
+
+                            <div class="alert alert-danger" role="alert" th:if="${terminalError}" th:text="${terminalError}"></div>
+                            <div class="alert alert-success" role="alert" th:if="${terminalInfo}" th:text="${terminalInfo}"></div>
+
+                            <div class="alert alert-primary" role="alert" th:if="${terminalPairing}">
+                                <div class="fw-bold">Enter this one-time code on the AMS Terminal now.</div>
+                                <div class="display-6 font-monospace my-2" id="terminalPairingCode" th:text="${terminalPairing.pairingCode}"></div>
+                                <div class="mb-2">Expires in <span id="terminalPairingCountdown" th:attr="data-expires-at=${terminalPairing.expiresAt}">5:00</span>.</div>
+                                <button class="btn btn-outline-primary btn-sm" id="copyTerminalPairingCode" type="button">Copy code</button>
+                            </div>
+
+                            <div class="card card-sm mb-3" th:if="${terminalStatus != null}">
+                                <div class="card-body">
+                                    <dl class="row mb-0">
+                                        <dt class="col-sm-4">Terminal ID</dt><dd class="col-sm-8 font-monospace" th:text="${terminalStatus.terminalId}"></dd>
+                                        <dt class="col-sm-4">Lifecycle</dt><dd class="col-sm-8" th:text="${terminalStatus.lifecycleState}"></dd>
+                                        <dt class="col-sm-4" th:if="${terminalStatus.pairingState != null}">Pairing</dt><dd class="col-sm-8" th:if="${terminalStatus.pairingState != null}" th:text="${terminalStatus.pairingState}"></dd>
+                                        <dt class="col-sm-4" th:if="${terminalStatus.pairingExpiresAt != null}">Pairing expires</dt><dd class="col-sm-8" th:if="${terminalStatus.pairingExpiresAt != null}" th:text="${terminalStatus.pairingExpiresAt}"></dd>
+                                        <dt class="col-sm-4" th:if="${terminalStatus.activatedAt != null}">Enrolled</dt><dd class="col-sm-8" th:if="${terminalStatus.activatedAt != null}" th:text="${terminalStatus.activatedAt}"></dd>
+                                        <dt class="col-sm-4" th:if="${terminalStatus.lastAuthenticatedAt != null}">Last connection</dt><dd class="col-sm-8" th:if="${terminalStatus.lastAuthenticatedAt != null}" th:text="${terminalStatus.lastAuthenticatedAt}"></dd>
+                                    </dl>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-warning" role="alert" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'PENDING' and !terminalPairingExpired}">
+                                A pairing is already active. It remains valid until its expiry; use the code shown when it was created. Replace the terminal only when that code is unavailable and you intentionally want to invalidate it.
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-outline-secondary" th:href="@{/printers/{printerId}/edit(printerId=${editingPrinterId})}">
+                                    Refresh terminal status
+                                </a>
+                                <form method="post" th:action="@{/printers/{printerId}/terminal/pairings(printerId=${editingPrinterId})}" th:if="${terminalStatus == null or terminalPairingExpired}">
+                                    <button class="btn btn-primary" type="submit" th:text="${terminalStatus == null} ? 'Pair AMS Terminal' : 'Regenerate expired pairing'"></button>
+                                </form>
+                                <form method="post" onsubmit="return confirm('Rotate this terminal credential? The terminal must enroll again with a new pairing code.');" th:action="@{/printers/{printerId}/terminal/rotate(printerId=${editingPrinterId})}" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">
+                                    <button class="btn btn-outline-primary" type="submit">Rotate credential</button>
+                                </form>
+                                <form method="post" onsubmit="return confirm('Replace this terminal? Its current credential will stop working immediately.');" th:action="@{/printers/{printerId}/terminal/replace(printerId=${editingPrinterId})}" th:if="${terminalStatus != null}">
+                                    <button class="btn btn-outline-warning" type="submit">Replace terminal</button>
+                                </form>
+                                <form method="post" onsubmit="return confirm('Revoke this terminal enrollment? The device will lose access immediately.');" th:action="@{/printers/{printerId}/terminal/revoke(printerId=${editingPrinterId})}" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">
+                                    <button class="btn btn-outline-danger" type="submit">Revoke enrollment</button>
+                                </form>
+                                <form method="post" onsubmit="return confirm('Factory-reset this terminal enrollment? The device credential will be invalidated.');" th:action="@{/printers/{printerId}/terminal/factory-reset(printerId=${editingPrinterId})}" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">
+                                    <button class="btn btn-outline-danger" type="submit">Factory reset</button>
+                                </form>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+<script>
+    const pairingCode = document.getElementById('terminalPairingCode');
+    const countdown = document.getElementById('terminalPairingCountdown');
+    const copyButton = document.getElementById('copyTerminalPairingCode');
+
+    if (pairingCode && copyButton) {
+        copyButton.addEventListener('click', async () => {
+            const value = pairingCode.textContent.trim();
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(value);
+            } else {
+                const input = document.createElement('textarea');
+                input.value = value;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                input.remove();
+            }
+            copyButton.textContent = 'Copied';
+        });
+    }
+
+    if (countdown) {
+        const expiresAt = Date.parse(countdown.dataset.expiresAt);
+        let timer;
+        const updateCountdown = () => {
+            const remaining = Math.max(0, expiresAt - Date.now());
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            countdown.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
+            if (remaining === 0) {
+                if (timer) clearInterval(timer);
+                countdown.textContent = 'expired — regenerate the pairing';
+            }
+        };
+        updateCountdown();
+        timer = setInterval(updateCountdown, 1000);
+    }
+</script>
 </body>
 </html>

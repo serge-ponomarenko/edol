@@ -2,12 +2,13 @@ package org.spon.edolhub.service;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.CacheControl;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -32,6 +33,20 @@ public class AmsTerminalManagementClient {
         return pairing("/internal/terminals/replace", printerId);
     }
 
+    public Optional<TerminalStatus> status(UUID printerId) {
+        try {
+            return Optional.ofNullable(amsClient.get()
+                    .uri("/internal/terminals/{printerId}", printerId)
+                    .retrieve()
+                    .body(TerminalStatus.class));
+        } catch (HttpClientErrorException exception) {
+            if (exception.getStatusCode().isSameCodeAs(HttpStatus.NOT_FOUND)) {
+                return Optional.empty();
+            }
+            throw exception;
+        }
+    }
+
     public void revoke(UUID printerId) {
         command("/internal/terminals/revoke", printerId);
     }
@@ -41,11 +56,20 @@ public class AmsTerminalManagementClient {
     }
 
     private Pairing pairing(String path, UUID printerId) {
-        return amsClient.post()
-                .uri(path)
-                .body(new PrinterRequest(printerId))
-                .retrieve()
-                .body(Pairing.class);
+        try {
+            return amsClient.post()
+                    .uri(path)
+                    .body(new PrinterRequest(printerId))
+                    .retrieve()
+                    .body(Pairing.class);
+        } catch (HttpClientErrorException exception) {
+            if (exception.getStatusCode().isSameCodeAs(HttpStatus.CONFLICT)) {
+                throw new AmsTerminalManagementConflictException(
+                        "The terminal already has an active pairing or enrollment"
+                );
+            }
+            throw exception;
+        }
     }
 
     private void command(String path, UUID printerId) {
@@ -60,5 +84,19 @@ public class AmsTerminalManagementClient {
     }
 
     public record Pairing(UUID terminalId, UUID printerId, String pairingCode, Instant expiresAt) {
+    }
+
+    public record TerminalStatus(
+            UUID terminalId,
+            String lifecycleState,
+            Instant createdAt,
+            Instant activatedAt,
+            Instant lastAuthenticatedAt,
+            Instant revokedAt,
+            Instant resetAt,
+            UUID replacedByTerminalId,
+            String pairingState,
+            Instant pairingExpiresAt
+    ) {
     }
 }

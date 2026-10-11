@@ -2,11 +2,13 @@ package org.spon.edolhub.controller;
 
 import jakarta.validation.constraints.NotNull;
 import org.spon.edolhub.service.AmsTerminalManagementClient;
+import org.spon.edolhub.service.AmsTerminalManagementConflictException;
 import org.spon.edolhub.service.PrinterAccessService;
 import org.spon.edolhub.service.TenantOwnerAuthorizationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -61,6 +63,19 @@ public class TerminalManagementApiController {
         authorizePrinter(printerId);
         terminalManagementClient.factoryReset(printerId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{printerId}")
+    public ResponseEntity<AmsTerminalManagementClient.TerminalStatus> status(@PathVariable UUID printerId) {
+        authorizePrinter(printerId);
+        return terminalManagementClient.status(printerId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(AmsTerminalManagementConflictException.class)
+    ResponseEntity<Void> conflict() {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
     }
 
     private ResponseEntity<PairingResponse> pairingResponse(

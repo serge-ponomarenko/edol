@@ -104,6 +104,66 @@ The current firmware image is close to its partition limit. Record RAM and
 flash use for every candidate; stop if the selected board/partition does not
 leave the project-approved recovery margin.
 
+## Hub UI enrollment workflow
+
+Ordinary enrollment is performed only through the authenticated Hub printer
+page and the terminal touchscreen. It does not require browser developer tools,
+direct AMS requests, a temporary proxy, or a per-enrollment certificate.
+
+### Deployment and initial device provisioning
+
+1. Publish AMS at its approved HTTPS DNS name. Its certificate must validate
+   for that name through the deployment CA; do not use an IP address in the
+   terminal setting unless the certificate contains that IP subject alternative
+   name.
+2. Obtain the **public** deployment CA PEM from the existing ingress or PKI
+   process. Do not generate a certificate for an individual enrollment and do
+   not place a CA file, private key, pairing code, or secret in source control.
+3. Build the image with the protected CA-file input. The build hook rejects a
+   secure build without this input:
+
+   ```powershell
+   $env:EDOL_TERMINAL_SECURE_BUILD = "1"
+   $env:EDOL_AMS_ROOT_CA_FILE = "C:\protected\edol-stage8-ca.pem"
+   & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run
+   ```
+
+   The CA PEM becomes the `EDOL_AMS_ROOT_CA_PEM` compile definition for that
+   image only. The build hook reads it from the protected path and never writes
+   it to the repository. A normal non-secure development build may omit both
+   variables.
+4. Gate B approval is required before uploading that image. Before a secure
+   enrollment, separately verify that secure boot and flash encryption are
+   already enabled; Gate C approval is required for any eFuse operation.
+5. On the terminal touchscreen, save Wi-Fi, the AMS DNS host (without a URL
+   scheme), HTTPS port, and the UUID of the selected printer. This printer UUID
+   is used only while consuming the pairing code; it never accompanies secure
+   terminal operations.
+
+### Owner enrollment and management
+
+1. An authenticated tenant owner opens **Printers → Edit → AMS Terminal** for
+   the intended printer and chooses **Pair AMS Terminal**.
+2. Hub displays the 10-character code once, a five-minute countdown, and a
+   copy control. The response and edit page are `no-store`; the code is not
+   recoverable after leaving the page.
+3. The operator enters that code in the terminal's **Secure pairing code**
+   field and selects **ENROLL**. The device sends the secure enrollment request
+   over validated HTTPS and displays either completion or an actionable failure
+   on the settings screen.
+4. Refreshing the Hub printer page shows the terminal identity, lifecycle,
+   enrollment time, and last authenticated time. A still-valid pending pairing
+   is preserved. Once it expires, **Regenerate expired pairing** retires the
+   old pending terminal and starts a new pairing safely.
+5. **Rotate credential**, **Replace terminal**, **Revoke enrollment**, and
+   **Factory reset** require explicit browser confirmations. Replacement and
+   revocation immediately deny the old credential; the device must be paired
+   again. **FORGET SECURE** on the terminal clears only the local encrypted
+   credential after the owner has performed the server-side lifecycle action.
+
+Only the build/provisioning step uses a local build command. The owner
+enrollment flow itself uses the Hub and terminal UI.
+
 ## Gate 8.2: disposable secure-service flow
 
 After Gate A approval, use a new isolated secure profile and execute the cases

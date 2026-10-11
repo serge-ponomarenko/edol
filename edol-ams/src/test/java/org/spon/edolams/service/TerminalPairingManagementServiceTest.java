@@ -11,6 +11,7 @@ import org.spon.edolams.model.terminal.TerminalLifecycle;
 import org.spon.edolams.model.terminal.TerminalPairing;
 import org.spon.edolams.repository.AmsTerminalRepository;
 import org.spon.edolams.repository.TerminalPairingRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Collection;
 import java.time.Clock;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -116,6 +118,66 @@ class TerminalPairingManagementServiceTest {
         assertThat(pendingTerminal.getRevokedAt()).isEqualTo(now);
         verify(terminalRepository).saveAndFlush(pendingTerminal);
         verify(pairingRepository).save(any(TerminalPairing.class));
+    }
+
+    @Test
+    void deniesRepeatedPairingWhileTheExistingCodeIsStillValid() {
+        Instant now = Instant.parse("2026-10-10T13:00:00Z");
+        AmsTerminal pendingTerminal = pendingTerminal();
+        TerminalPairing activePairing = new TerminalPairing();
+        activePairing.setTerminalId(pendingTerminal.getId());
+        activePairing.setState(PairingState.PENDING);
+        activePairing.setExpiresAt(now.plusSeconds(1));
+        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+                TENANT_ID, PRINTER_ID, List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
+        )).thenReturn(Optional.of(pendingTerminal));
+        when(pairingRepository.findTopByTerminalIdOrderByCreatedAtDesc(pendingTerminal.getId()))
+                .thenReturn(Optional.of(activePairing));
+
+        AmsTenantContext tenantContext = new AmsTenantContext();
+        try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
+            assertThatThrownBy(() -> service(tenantContext, now).createPairing(PRINTER_ID))
+                    .isInstanceOf(TerminalLifecycleConflictException.class);
+        }
+    }
+
+    @Test
+    void mapsConcurrentPairingCreationToTheExpectedLifecycleConflict() {
+        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+                TENANT_ID, PRINTER_ID, List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
+        )).thenReturn(Optional.empty());
+        when(terminalRepository.saveAndFlush(any(AmsTerminal.class)))
+                .thenThrow(new DataIntegrityViolationException("live terminal constraint"));
+
+        AmsTenantContext tenantContext = new AmsTenantContext();
+        try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
+            assertThatThrownBy(() -> service(tenantContext).createPairing(PRINTER_ID))
+                    .isInstanceOf(TerminalLifecycleConflictException.class)
+                    .hasMessageContaining("already being created");
+        }
+    }
+
+    @Test
+    void reportsTheLatestTerminalAndPairingStateForTheCurrentTenant() {
+        AmsTerminal terminal = liveTerminal();
+        terminal.setCreatedAt(Instant.parse("2026-10-10T12:00:00Z"));
+        TerminalPairing pairing = new TerminalPairing();
+        pairing.setState(PairingState.CONSUMED);
+        pairing.setExpiresAt(Instant.parse("2026-10-10T12:05:00Z"));
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdOrderByCreatedAtDesc(TENANT_ID, PRINTER_ID))
+                .thenReturn(Optional.of(terminal));
+        when(pairingRepository.findTopByTerminalIdOrderByCreatedAtDesc(terminal.getId()))
+                .thenReturn(Optional.of(pairing));
+
+        AmsTenantContext tenantContext = new AmsTenantContext();
+        TerminalPairingManagementService.TerminalStatus status;
+        try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
+            status = service(tenantContext).status(PRINTER_ID);
+        }
+
+        assertThat(status.terminalId()).isEqualTo(terminal.getId());
+        assertThat(status.lifecycleState()).isEqualTo(TerminalLifecycle.ACTIVE);
+        assertThat(status.pairingState()).isEqualTo(PairingState.CONSUMED);
     }
 
     private TerminalPairingManagementService service(AmsTenantContext tenantContext) {

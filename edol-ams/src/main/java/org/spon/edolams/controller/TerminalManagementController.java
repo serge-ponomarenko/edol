@@ -8,6 +8,8 @@ import org.spon.edolams.service.TerminalPairingManagementService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,6 +33,26 @@ public class TerminalManagementController {
     @PostMapping("/pairings")
     public ResponseEntity<PairingResponse> createPairing(@Valid @RequestBody PrinterRequest request) {
         return pairingResponse(pairingManagementService.createPairing(request.printerId()));
+    }
+
+    @GetMapping("/{printerId}")
+    public ResponseEntity<TerminalStatusResponse> status(@PathVariable UUID printerId) {
+        TerminalPairingManagementService.TerminalStatus status = pairingManagementService.status(printerId);
+        if (status == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(new TerminalStatusResponse(
+                status.terminalId(),
+                status.lifecycleState().name(),
+                status.createdAt(),
+                status.activatedAt(),
+                status.lastAuthenticatedAt(),
+                status.revokedAt(),
+                status.resetAt(),
+                status.replacedByTerminalId(),
+                status.pairingState() == null ? null : status.pairingState().name(),
+                status.pairingExpiresAt()
+        ));
     }
 
     @PostMapping("/rotate")
@@ -75,5 +97,19 @@ public class TerminalManagementController {
     }
 
     public record PairingResponse(UUID terminalId, UUID printerId, String pairingCode, Instant expiresAt) {
+    }
+
+    public record TerminalStatusResponse(
+            UUID terminalId,
+            String lifecycleState,
+            Instant createdAt,
+            Instant activatedAt,
+            Instant lastAuthenticatedAt,
+            Instant revokedAt,
+            Instant resetAt,
+            UUID replacedByTerminalId,
+            String pairingState,
+            Instant pairingExpiresAt
+    ) {
     }
 }

@@ -15,4 +15,9 @@ public interface AmsTerminalRepository extends JpaRepository<AmsTerminal, UUID> 
             UUID printerId,
             Collection<TerminalLifecycle> lifecycleStates
     );
+
+    Optional<AmsTerminal> findFirstByTenantIdAndAllowedPrinterIdOrderByCreatedAtDesc(
+            UUID tenantId,
+            UUID printerId
+    );
 }

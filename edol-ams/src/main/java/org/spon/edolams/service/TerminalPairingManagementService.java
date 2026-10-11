@@ -10,6 +10,7 @@ import org.spon.edolams.repository.TerminalPairingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -70,7 +71,13 @@ public class TerminalPairingManagementService {
         terminal.setAllowedPrinterId(printerId);
         terminal.setLifecycleState(TerminalLifecycle.PENDING);
         terminal.setCreatedAt(now);
-        terminalRepository.save(terminal);
+        try {
+            terminalRepository.saveAndFlush(terminal);
+        } catch (DataIntegrityViolationException exception) {
+            throw new TerminalLifecycleConflictException(
+                    "A terminal pairing is already being created for this printer"
+            );
+        }
 
         String code = credentialCodec.newPairingCode();
         TerminalPairing pairing = new TerminalPairing();
@@ -110,6 +117,32 @@ public class TerminalPairingManagementService {
     public CreatedPairing rotate(UUID printerId) {
         retireLiveTerminal(printerId, TerminalLifecycle.REVOKED);
         return createPairing(printerId);
+    }
+
+    @Transactional(readOnly = true)
+    public TerminalStatus status(UUID printerId) {
+        return terminalRepository.findFirstByTenantIdAndAllowedPrinterIdOrderByCreatedAtDesc(
+                        tenantContext.currentTenantId(),
+                        printerId
+                )
+                .map(terminal -> {
+                    TerminalPairing pairing = pairingRepository
+                            .findTopByTerminalIdOrderByCreatedAtDesc(terminal.getId())
+                            .orElse(null);
+                    return new TerminalStatus(
+                            terminal.getId(),
+                            terminal.getLifecycleState(),
+                            terminal.getCreatedAt(),
+                            terminal.getActivatedAt(),
+                            terminal.getLastAuthenticatedAt(),
+                            terminal.getRevokedAt(),
+                            terminal.getResetAt(),
+                            terminal.getReplacedByTerminalId(),
+                            pairing == null ? null : pairing.getState(),
+                            pairing == null ? null : pairing.getExpiresAt()
+                    );
+                })
+                .orElse(null);
     }
 
     private AmsTerminal retireLiveTerminal(UUID printerId, TerminalLifecycle target) {
@@ -154,5 +187,19 @@ public class TerminalPairingManagementService {
     }
 
     public record CreatedPairing(UUID terminalId, UUID printerId, String pairingCode, Instant expiresAt) {
+    }
+
+    public record TerminalStatus(
+            UUID terminalId,
+            TerminalLifecycle lifecycleState,
+            Instant createdAt,
+            Instant activatedAt,
+            Instant lastAuthenticatedAt,
+            Instant revokedAt,
+            Instant resetAt,
+            UUID replacedByTerminalId,
+            PairingState pairingState,
+            Instant pairingExpiresAt
+    ) {
     }
 }

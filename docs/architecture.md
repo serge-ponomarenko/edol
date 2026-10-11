@@ -150,9 +150,12 @@ looking up an active terminal credential. AMS runtime remains a non-owner,
 `NOSUPERUSER`, `NOBYPASSRLS` role. A dedicated `NOLOGIN`, `NOINHERIT`
 terminal-function owner has only the function-required schema/table privileges
 and `BYPASSRLS`; it owns those pre-tenant functions and is not an application
-datasource. Hub exposes owner-authorized terminal
-management routes and calls AMS under Hub's independent service identity with a
-server-established tenant header. Secure mode rejects the historical anonymous
+datasource. Hub exposes owner-authorized terminal management through the
+printer edit UI and its matching routes, and calls AMS under Hub's independent
+service identity with a server-established tenant header. The UI exposes only
+the newly issued pairing code with `no-store`, shows terminal lifecycle and
+last authenticated metadata, and maps expected lifecycle conflicts to a
+recoverable owner action instead of a server error. Secure mode rejects the historical anonymous
 `/ams/**` terminal routes; the terminal uses only `/api/terminal/v1/**` with
 its own `EDOL-Terminal terminalId.secret` credential. The terminal never
 supplies tenant identity and its `printerId` is only an enrollment lookup hint;
