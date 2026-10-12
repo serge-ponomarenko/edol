@@ -158,6 +158,28 @@ class TerminalPairingManagementServiceTest {
     }
 
     @Test
+    void reportsAnExpiredPairingWithoutMutatingItsPersistedState() {
+        Instant now = Instant.parse("2026-10-10T13:00:00Z");
+        AmsTerminal terminal = pendingTerminal();
+        TerminalPairing pairing = new TerminalPairing();
+        pairing.setState(PairingState.PENDING);
+        pairing.setExpiresAt(now.minusSeconds(1));
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdOrderByCreatedAtDesc(TENANT_ID, PRINTER_ID))
+                .thenReturn(Optional.of(terminal));
+        when(pairingRepository.findTopByTerminalIdOrderByCreatedAtDesc(terminal.getId()))
+                .thenReturn(Optional.of(pairing));
+
+        AmsTenantContext tenantContext = new AmsTenantContext();
+        TerminalPairingManagementService.TerminalStatus status;
+        try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
+            status = service(tenantContext, now).status(PRINTER_ID);
+        }
+
+        assertThat(status.pairingState()).isEqualTo(PairingState.EXPIRED);
+        assertThat(pairing.getState()).isEqualTo(PairingState.PENDING);
+    }
+
+    @Test
     void reportsTheLatestTerminalAndPairingStateForTheCurrentTenant() {
         AmsTerminal terminal = liveTerminal();
         terminal.setCreatedAt(Instant.parse("2026-10-10T12:00:00Z"));

@@ -165,9 +165,10 @@ public class PrinterManagementController {
             model.addAttribute(TERMINAL_MANAGEMENT_AVAILABLE_ATTRIBUTE, true);
             client.status(printerId).ifPresent(status -> {
                 model.addAttribute("terminalStatus", status);
-                model.addAttribute("terminalPairingExpired", "PENDING".equals(status.pairingState())
+                model.addAttribute("terminalPairingExpired", "EXPIRED".equals(status.pairingState())
+                        || ("PENDING".equals(status.pairingState())
                         && status.pairingExpiresAt() != null
-                        && !status.pairingExpiresAt().isAfter(Instant.now()));
+                        && !status.pairingExpiresAt().isAfter(Instant.now())));
             });
         } catch (AccessDeniedException exception) {
             model.addAttribute(TERMINAL_MANAGEMENT_AVAILABLE_ATTRIBUTE, false);

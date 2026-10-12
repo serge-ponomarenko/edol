@@ -138,11 +138,21 @@ public class TerminalPairingManagementService {
                             terminal.getRevokedAt(),
                             terminal.getResetAt(),
                             terminal.getReplacedByTerminalId(),
-                            pairing == null ? null : pairing.getState(),
+                            effectivePairingState(pairing),
                             pairing == null ? null : pairing.getExpiresAt()
                     );
                 })
                 .orElse(null);
+    }
+
+    private PairingState effectivePairingState(TerminalPairing pairing) {
+        if (pairing == null) {
+            return null;
+        }
+        if (pairing.getState() == PairingState.PENDING && !pairing.getExpiresAt().isAfter(clock.instant())) {
+            return PairingState.EXPIRED;
+        }
+        return pairing.getState();
     }
 
     private AmsTerminal retireLiveTerminal(UUID printerId, TerminalLifecycle target) {

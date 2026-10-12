@@ -51,9 +51,10 @@
                                     <div class="text-secondary">Owner-managed terminal enrollment</div>
                                 </div>
                                 <span class="badge bg-secondary" th:if="${terminalStatus == null}">Not enrolled</span>
-                                <span class="badge bg-success" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">Active</span>
-                                <span class="badge bg-warning text-dark" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'PENDING'}">Pairing pending</span>
-                                <span class="badge bg-secondary" th:if="${terminalStatus != null and terminalStatus.lifecycleState != 'ACTIVE' and terminalStatus.lifecycleState != 'PENDING'}" th:text="${terminalStatus.lifecycleState}"></span>
+                                <span class="badge bg-secondary" th:if="${terminalStatus != null and terminalPairingExpired}">Pairing expired</span>
+                                <span class="badge bg-success" th:if="${terminalStatus != null and !terminalPairingExpired and terminalStatus.lifecycleState == 'ACTIVE'}">Active</span>
+                                <span class="badge bg-warning text-dark" th:if="${terminalStatus != null and !terminalPairingExpired and terminalStatus.lifecycleState == 'PENDING'}">Pairing pending</span>
+                                <span class="badge bg-secondary" th:if="${terminalStatus != null and !terminalPairingExpired and terminalStatus.lifecycleState != 'ACTIVE' and terminalStatus.lifecycleState != 'PENDING'}" th:text="${terminalStatus.lifecycleState}"></span>
                             </div>
 
                             <div class="alert alert-danger" role="alert" th:if="${terminalError}" th:text="${terminalError}"></div>
@@ -70,9 +71,9 @@
                                 <div class="card-body">
                                     <dl class="row mb-0">
                                         <dt class="col-sm-4">Terminal ID</dt><dd class="col-sm-8 font-monospace" th:text="${terminalStatus.terminalId}"></dd>
-                                        <dt class="col-sm-4">Lifecycle</dt><dd class="col-sm-8" th:text="${terminalStatus.lifecycleState}"></dd>
-                                        <dt class="col-sm-4" th:if="${terminalStatus.pairingState != null}">Pairing</dt><dd class="col-sm-8" th:if="${terminalStatus.pairingState != null}" th:text="${terminalStatus.pairingState}"></dd>
-                                        <dt class="col-sm-4" th:if="${terminalStatus.pairingExpiresAt != null}">Pairing expires</dt><dd class="col-sm-8" th:if="${terminalStatus.pairingExpiresAt != null}" th:text="${terminalStatus.pairingExpiresAt}"></dd>
+                                        <dt class="col-sm-4">Lifecycle</dt><dd class="col-sm-8" th:text="${terminalPairingExpired ? 'AWAITING RE-PAIR' : terminalStatus.lifecycleState}"></dd>
+                                        <dt class="col-sm-4" th:if="${terminalStatus.pairingState != null}">Pairing</dt><dd class="col-sm-8" th:if="${terminalStatus.pairingState != null}" th:text="${terminalPairingExpired ? 'EXPIRED' : terminalStatus.pairingState}"></dd>
+                                        <dt class="col-sm-4" th:if="${terminalStatus.pairingExpiresAt != null}" th:text="${terminalStatus.pairingState == 'CONSUMED' ? 'Pairing code deadline (used)' : 'Pairing code deadline'}"></dt><dd class="col-sm-8" th:if="${terminalStatus.pairingExpiresAt != null}" th:text="${terminalStatus.pairingExpiresAt}"></dd>
                                         <dt class="col-sm-4" th:if="${terminalStatus.activatedAt != null}">Enrolled</dt><dd class="col-sm-8" th:if="${terminalStatus.activatedAt != null}" th:text="${terminalStatus.activatedAt}"></dd>
                                         <dt class="col-sm-4" th:if="${terminalStatus.lastAuthenticatedAt != null}">Last connection</dt><dd class="col-sm-8" th:if="${terminalStatus.lastAuthenticatedAt != null}" th:text="${terminalStatus.lastAuthenticatedAt}"></dd>
                                     </dl>

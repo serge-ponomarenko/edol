@@ -7,6 +7,7 @@ import org.spon.edolams.model.Spool;
 import org.spon.edolams.service.AmsTenantContext;
 import org.spon.edolams.service.InvalidTerminalCredentialException;
 import org.spon.edolams.service.TerminalAuthenticationService;
+import org.spon.edolams.service.TerminalOperationalService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,24 +26,21 @@ public class TerminalOperationalController {
 
     private final TerminalAuthenticationService authenticationService;
     private final AmsTenantContext tenantContext;
-    private final AmsStatusController statusController;
-    private final SpoolController spoolController;
+    private final TerminalOperationalService operationalService;
 
     public TerminalOperationalController(
             TerminalAuthenticationService authenticationService,
             AmsTenantContext tenantContext,
-            AmsStatusController statusController,
-            SpoolController spoolController
+            TerminalOperationalService operationalService
     ) {
         this.authenticationService = authenticationService;
         this.tenantContext = tenantContext;
-        this.statusController = statusController;
-        this.spoolController = spoolController;
+        this.operationalService = operationalService;
     }
 
     @GetMapping("/state")
     public AmsStatus state(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-        return withTerminal(authorization, terminal -> statusController.getStateForTrustedPrinter(terminal.printerId()));
+        return withTerminal(authorization, operationalService::state);
     }
 
     @GetMapping("/find")
@@ -50,7 +48,7 @@ public class TerminalOperationalController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestParam("id") Long spoolId
     ) {
-        return withTerminal(authorization, terminal -> spoolController.findSpoolForTrustedPrinter(spoolId, terminal.printerId()));
+        return withTerminal(authorization, terminal -> operationalService.findSpool(terminal, spoolId));
     }
 
     @PostMapping("/set-spool")
@@ -58,8 +56,8 @@ public class TerminalOperationalController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @Valid @RequestBody SetSpoolRequest request
     ) {
-        return withTerminal(authorization, terminal -> spoolController.setSpoolForTrustedPrinter(
-                request.spoolId(), request.slot(), terminal.printerId()
+        return withTerminal(authorization, terminal -> operationalService.setSpool(
+                terminal, request.spoolId(), request.slot()
         ));
     }
 

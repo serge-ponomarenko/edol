@@ -9,7 +9,8 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties({
         DeploymentModeProperties.class,
         AmsPrinterTenantProperties.class,
-        AmsTerminalProperties.class
+        AmsTerminalProperties.class,
+        Stage8TerminalSimulatorProperties.class
 })
 public class DeploymentModeConfiguration {
 

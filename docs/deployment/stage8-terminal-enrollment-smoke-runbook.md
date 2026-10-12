@@ -57,6 +57,46 @@ The code must succeed exactly once. Do not record it in command history, screens
 
 Use only the harmless AMS state/find/set-spool stub during this smoke. Do not cause a printer command, Core printer runtime command, or MQTT action.
 
+## Disposable operational simulator
+
+The current synthetic printer has no Core runtime, so its normal AMS state is intentionally empty. For the physical-terminal operational checks, AMS provides a deterministic simulator. It is an AMS-only adapter behind the already authenticated `/api/terminal/v1/state`, `/find`, and `/set-spool` routes: terminal credential verification, printer binding, and tenant context remain unchanged.
+
+The simulator never calls Core, Hub, MQTT, or a printer command endpoint. It is therefore safe for the synthetic printer and cannot operate a physical printer.
+
+Enable it only for this disposable environment by adding these four values to the AMS launch configuration:
+
+```text
+SPRING_PROFILES_ACTIVE=secure-multi-tenant,stage8-terminal-simulator
+EDOL_AMS_TERMINAL_SIMULATOR_ENABLED=true
+EDOL_AMS_TERMINAL_SIMULATOR_TENANT_ID=da4b2480-4774-4eb3-bc88-c625497ce5d1
+EDOL_AMS_TERMINAL_SIMULATOR_PRINTER_ID=01a12a14-289f-7843-8036-7a450c9567f5
+```
+
+Do not add these values to shared, development, or production configuration. The profile alone leaves the normal adapter active; setting the flag without the profile makes AMS fail at startup rather than enabling a simulator unexpectedly.
+
+The deterministic fixture starts with these values after every AMS restart:
+
+| Location | Spool ID | Metadata |
+| --- | ---: | --- |
+| A1 | 800001 | Bambu Lab Basic PLA, red, 780 g |
+| A2 | empty | — |
+| A3 | 800002 | Bambu Lab Basic PETG, blue, 640 g |
+| A4 | empty | — |
+| External tray | empty | — |
+
+The simulated environment reports 23.5 °C and humidity raw value 35. It accepts those two spool IDs in AMS slots A1–A4 or the External tray, returns `404` for another spool ID, and returns `400` for an invalid slot. A terminal whose persisted tenant or printer binding differs from the explicit fixture binding receives `403` and cannot read or mutate the fixture.
+
+### Physical operational sequence
+
+1. Restart AMS after adding the four environment values above. Wait for normal AMS startup; do not restart Core or Hub.
+2. On the already enrolled terminal, wait for the next state refresh. A1 and A3 must show the two fixture spools, and the environment must show 23.5 °C / humidity 35.
+3. Open the A1 spool details and use its NFC write control on a blank supported tag. This writes the terminal's normal EDOL v1 tag for spool `800001`; no manual tag payload is needed.
+4. Return Home and present that tag. The staging area must show the A1 spool metadata.
+5. Select the staging area, choose A2, and wait for the next refresh. A2 must now show spool `800001` and be active. This is an in-memory simulator state update, not a printer command.
+6. Present an operator-provided EDOL tag containing an unknown spool ID. The terminal must not stage a spool. Current firmware reports the lookup failure only through its normal generic request-failure path; a dedicated on-screen error remains a firmware acceptance gap.
+
+Disable the simulator by removing the `stage8-terminal-simulator` profile and its three `EDOL_AMS_TERMINAL_SIMULATOR_*` values, then restart AMS. No database data or external service state is created by this simulator.
+
 ## Automated checks
 
 Run from the EDOL repository:

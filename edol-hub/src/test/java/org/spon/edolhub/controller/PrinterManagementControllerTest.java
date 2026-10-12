@@ -143,12 +143,12 @@ class PrinterManagementControllerTest {
     }
 
     @Test
-    void marksAnExpiredPendingPairingAsRecoverableInTheEditForm() {
+    void marksAnExpiredPairingAsRecoverableInTheEditForm() {
         org.spon.edolhub.model.entity.Printer printer = new org.spon.edolhub.model.entity.Printer();
         printer.setId(PRINTER_ID);
         AmsTerminalManagementClient.TerminalStatus status = new AmsTerminalManagementClient.TerminalStatus(
                 UUID.randomUUID(), "PENDING", java.time.Instant.now().minusSeconds(600), null, null,
-                null, null, null, "PENDING", java.time.Instant.now().minusSeconds(1)
+                null, null, null, "EXPIRED", java.time.Instant.now().minusSeconds(1)
         );
         when(printerAccessService.getPrinter(PRINTER_ID)).thenReturn(printer);
         when(printerManagementService.getPrinter(PRINTER_ID)).thenReturn(

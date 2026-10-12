@@ -1,0 +1,6 @@
+# The simulator requires both this profile and EDOL_AMS_TERMINAL_SIMULATOR_ENABLED=true.
+edol-ams:
+  terminal-simulator:
+    enabled: ${EDOL_AMS_TERMINAL_SIMULATOR_ENABLED:false}
+    tenant-id: ${EDOL_AMS_TERMINAL_SIMULATOR_TENANT_ID:}
+    printer-id: ${EDOL_AMS_TERMINAL_SIMULATOR_PRINTER_ID:}

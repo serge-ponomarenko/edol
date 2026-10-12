@@ -3,9 +3,12 @@ package org.spon.edolams.migration;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import org.spon.edolams.service.TerminalAuthenticationService;
+import org.spon.edolams.service.TerminalCredentialCodec;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -23,6 +26,10 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @Testcontainers(disabledWithoutDocker = true)
 class AmsTerminalMigrationTest {
@@ -34,6 +41,7 @@ class AmsTerminalMigrationTest {
 
     private JdbcClient administrator;
     private JdbcClient runtime;
+    private DataSource runtimeDataSource;
 
     @BeforeEach
     void setUp() {
@@ -72,9 +80,10 @@ class AmsTerminalMigrationTest {
                 .initSql("set role ams_schema_owner")
                 .load()
                 .migrate();
-        runtime = JdbcClient.create(new SingleConnectionDataSource(
+        runtimeDataSource = new SingleConnectionDataSource(
                 POSTGRES.getJdbcUrl(), "ams_runtime", RUNTIME_PASSWORD, true
-        ));
+        );
+        runtime = JdbcClient.create(runtimeDataSource);
     }
 
     @Test
@@ -162,6 +171,29 @@ class AmsTerminalMigrationTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    void authenticatesAnActiveTerminalAndRecordsItsLastConnection() {
+        PendingPairing pairing = pendingPairing();
+        assertThat(consume(runtime, pairing.codeDigest(), pairing.credentialDigest()))
+                .containsExactly(pairing.terminalId());
+        TerminalCredentialCodec credentialCodec = mock(TerminalCredentialCodec.class);
+        when(credentialCodec.matchesTerminalCredential(any(byte[].class), eq(1), eq("terminal-secret"))).thenReturn(true);
+        TerminalAuthenticationService authenticationService = new TerminalAuthenticationService(
+                new JdbcTemplate(runtimeDataSource), credentialCodec
+        );
+
+        TerminalAuthenticationService.AuthenticatedTerminal authenticated = authenticationService.authenticate(
+                "EDOL-Terminal " + pairing.terminalId() + ".terminal-secret"
+        );
+
+        assertThat(authenticated.terminalId()).isEqualTo(pairing.terminalId());
+        assertThat(authenticated.tenantId()).isNotNull();
+        assertThat(authenticated.printerId()).isEqualTo(pairing.printerId());
+        assertThat(authenticated.credentialDigest()).isNull();
+        assertThat(administrator.sql("select last_authenticated_at from ams.terminals where id = :terminalId")
+                .param("terminalId", pairing.terminalId()).query(Timestamp.class).single()).isNotNull();
     }
 
     @Test

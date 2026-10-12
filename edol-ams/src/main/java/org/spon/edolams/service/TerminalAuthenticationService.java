@@ -55,7 +55,11 @@ public class TerminalAuthenticationService {
                 || !credentialCodec.matchesTerminalCredential(terminal.credentialDigest(), terminal.credentialKeyVersion(), secret)) {
             throw new InvalidTerminalCredentialException();
         }
-        jdbcTemplate.update("select ams.record_terminal_authentication(?)", terminalId);
+        jdbcTemplate.query(
+                "select ams.record_terminal_authentication(?)",
+                resultSet -> null,
+                terminalId
+        );
         return terminal.withoutCredentialDigest();
     }
 
