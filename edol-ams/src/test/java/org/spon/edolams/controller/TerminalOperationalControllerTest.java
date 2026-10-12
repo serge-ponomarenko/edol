@@ -6,12 +6,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.spon.edolams.model.AmsStatus;
 import org.spon.edolams.service.AmsTenantContext;
+import org.spon.edolams.service.InvalidTerminalCredentialException;
 import org.spon.edolams.service.TerminalAuthenticationService;
 import org.spon.edolams.service.TerminalOperationalService;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +45,19 @@ class TerminalOperationalControllerTest {
         assertThat(actual).isSameAs(expected);
         verify(authenticationService).authenticate(AUTHORIZATION);
         verify(operationalService).state(terminal);
+    }
+
+    @Test
+    void exposesRejectedTerminalCredentialsAsUnauthorized() {
+        when(authenticationService.authenticate(AUTHORIZATION)).thenThrow(new InvalidTerminalCredentialException());
+
+        assertThatThrownBy(() -> controller().state(AUTHORIZATION))
+                .isInstanceOf(InvalidTerminalCredentialException.class);
+        var response = controller().invalidCredential();
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+        assertThat(response.getHeaders().getFirst("WWW-Authenticate")).isEqualTo("EDOL-Terminal");
+        verify(operationalService, never()).state(org.mockito.ArgumentMatchers.any());
     }
 
     private TerminalOperationalController controller() {

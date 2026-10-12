@@ -174,6 +174,19 @@ class AmsTerminalMigrationTest {
     }
 
     @Test
+    void rejectsAnExpiredPairingWithoutActivatingItsTerminal() {
+        PendingPairing pairing = pendingPairing();
+        administrator.sql("update ams.terminal_pairings set expires_at = now() - interval '1 second' where id = :pairingId")
+                .param("pairingId", pairing.pairingId()).update();
+
+        assertThat(consume(runtime, pairing.codeDigest(), pairing.credentialDigest())).isEmpty();
+        assertThat(administrator.sql("select state from ams.terminal_pairings where id = :pairingId")
+                .param("pairingId", pairing.pairingId()).query(String.class).single()).isEqualTo("EXPIRED");
+        assertThat(administrator.sql("select lifecycle_state from ams.terminals where id = :terminalId")
+                .param("terminalId", pairing.terminalId()).query(String.class).single()).isEqualTo("PENDING");
+    }
+
+    @Test
     void authenticatesAnActiveTerminalAndRecordsItsLastConnection() {
         PendingPairing pairing = pendingPairing();
         assertThat(consume(runtime, pairing.codeDigest(), pairing.credentialDigest()))
@@ -194,6 +207,23 @@ class AmsTerminalMigrationTest {
         assertThat(authenticated.credentialDigest()).isNull();
         assertThat(administrator.sql("select last_authenticated_at from ams.terminals where id = :terminalId")
                 .param("terminalId", pairing.terminalId()).query(Timestamp.class).single()).isNotNull();
+    }
+
+    @Test
+    void rejectsARevokedTerminalCredential() {
+        PendingPairing pairing = pendingPairing();
+        assertThat(consume(runtime, pairing.codeDigest(), pairing.credentialDigest()))
+                .containsExactly(pairing.terminalId());
+        administrator.sql("update ams.terminals set lifecycle_state = 'REVOKED' where id = :terminalId")
+                .param("terminalId", pairing.terminalId()).update();
+        TerminalCredentialCodec credentialCodec = mock(TerminalCredentialCodec.class);
+        TerminalAuthenticationService authenticationService = new TerminalAuthenticationService(
+                new JdbcTemplate(runtimeDataSource), credentialCodec
+        );
+
+        assertThatThrownBy(() -> authenticationService.authenticate(
+                "EDOL-Terminal " + pairing.terminalId() + ".terminal-secret"
+        )).isInstanceOf(org.spon.edolams.service.InvalidTerminalCredentialException.class);
     }
 
     @Test
