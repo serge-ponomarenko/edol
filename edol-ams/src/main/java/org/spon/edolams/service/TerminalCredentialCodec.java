@@ -34,12 +34,16 @@ public class TerminalCredentialCodec {
     }
 
     public String newPairingCode() {
-        final char[] alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ".toCharArray();
-        char[] code = new char[10];
+        final char[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
+        char[] code = new char[11];
         for (int index = 0; index < code.length; index++) {
             code[index] = alphabet[RANDOM.nextInt(alphabet.length)];
         }
         return new String(code);
+    }
+
+    public boolean isValidPairingCode(String pairingCode) {
+        return pairingCode != null && pairingCode.matches("[A-Za-z]{11}");
     }
 
     public String newTerminalSecret() {

@@ -107,7 +107,18 @@ public class TerminalPairingManagementService {
 
     @Transactional
     public CreatedPairing replace(UUID printerId) {
-        AmsTerminal replacedTerminal = retireLiveTerminal(printerId, TerminalLifecycle.REPLACED);
+        AmsTerminal replacedTerminal = terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+                        tenantContext.currentTenantId(),
+                        printerId,
+                        List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE, TerminalLifecycle.REVOKED)
+                )
+                .orElseThrow(() -> new TerminalNotFoundException(printerId));
+        if (replacedTerminal.getLifecycleState() != TerminalLifecycle.REVOKED) {
+            replacedTerminal.setCredentialDigest(null);
+            replacedTerminal.setCredentialKeyVersion(null);
+            pairingRepository.transitionPendingPairing(replacedTerminal.getId(), PairingState.REVOKED);
+        }
+        replacedTerminal.setLifecycleState(TerminalLifecycle.REPLACED);
         CreatedPairing replacement = createPairing(printerId);
         replacedTerminal.setReplacedByTerminalId(replacement.terminalId());
         return replacement;

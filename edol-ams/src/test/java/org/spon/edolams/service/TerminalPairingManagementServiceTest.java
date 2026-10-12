@@ -50,8 +50,8 @@ class TerminalPairingManagementServiceTest {
                 eq(TENANT_ID), eq(PRINTER_ID), org.mockito.ArgumentMatchers.<Collection<TerminalLifecycle>>any()
         )).thenReturn(Optional.of(previous))
                 .thenReturn(Optional.empty());
-        when(credentialCodec.newPairingCode()).thenReturn("ABCDEFGHJK");
-        when(credentialCodec.pairingCodeDigest("ABCDEFGHJK")).thenReturn(new byte[]{1});
+        when(credentialCodec.newPairingCode()).thenReturn("ABCDEFGHIJK");
+        when(credentialCodec.pairingCodeDigest("ABCDEFGHIJK")).thenReturn(new byte[]{1});
         when(credentialCodec.keyVersion()).thenReturn(1);
 
         TerminalPairingManagementService.CreatedPairing replacement;
@@ -70,6 +70,33 @@ class TerminalPairingManagementServiceTest {
         verify(pairingRepository).save(pairingCaptor.capture());
         assertThat(pairingCaptor.getValue().getTerminalId()).isEqualTo(replacement.terminalId());
         assertThat(pairingCaptor.getValue().getAllowedPrinterId()).isEqualTo(PRINTER_ID);
+    }
+
+    @Test
+    void replacesARevokedTerminalWithANewPairingWithoutRestoringItsCredential() {
+        AmsTerminal revokedTerminal = liveTerminal();
+        revokedTerminal.setLifecycleState(TerminalLifecycle.REVOKED);
+        revokedTerminal.setCredentialDigest(null);
+        revokedTerminal.setCredentialKeyVersion(null);
+        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+                eq(TENANT_ID), eq(PRINTER_ID), org.mockito.ArgumentMatchers.<Collection<TerminalLifecycle>>any()
+        )).thenReturn(Optional.of(revokedTerminal)).thenReturn(Optional.empty());
+        when(credentialCodec.newPairingCode()).thenReturn("ABCDEFGHIJK");
+        when(credentialCodec.pairingCodeDigest("ABCDEFGHIJK")).thenReturn(new byte[]{1});
+        when(credentialCodec.keyVersion()).thenReturn(1);
+
+        AmsTenantContext tenantContext = new AmsTenantContext();
+        TerminalPairingManagementService.CreatedPairing replacement;
+        try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
+            replacement = service(tenantContext).replace(PRINTER_ID);
+        }
+
+        assertThat(revokedTerminal.getLifecycleState()).isEqualTo(TerminalLifecycle.REPLACED);
+        assertThat(revokedTerminal.getCredentialDigest()).isNull();
+        assertThat(revokedTerminal.getCredentialKeyVersion()).isNull();
+        assertThat(revokedTerminal.getReplacedByTerminalId()).isEqualTo(replacement.terminalId());
+        verify(pairingRepository, org.mockito.Mockito.never()).transitionPendingPairing(revokedTerminal.getId(), PairingState.REVOKED);
+        verify(pairingRepository).save(any(TerminalPairing.class));
     }
 
     @Test
@@ -104,8 +131,8 @@ class TerminalPairingManagementServiceTest {
         )).thenReturn(Optional.of(pendingTerminal));
         when(pairingRepository.findTopByTerminalIdOrderByCreatedAtDesc(pendingTerminal.getId()))
                 .thenReturn(Optional.of(expiredPairing));
-        when(credentialCodec.newPairingCode()).thenReturn("ABCDEFGHJK");
-        when(credentialCodec.pairingCodeDigest("ABCDEFGHJK")).thenReturn(new byte[]{1});
+        when(credentialCodec.newPairingCode()).thenReturn("ABCDEFGHIJK");
+        when(credentialCodec.pairingCodeDigest("ABCDEFGHIJK")).thenReturn(new byte[]{1});
         when(credentialCodec.keyVersion()).thenReturn(1);
 
         AmsTenantContext tenantContext = new AmsTenantContext();

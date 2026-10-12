@@ -129,7 +129,7 @@ class PrinterManagementControllerTest {
     @Test
     void createsTerminalPairingThroughTheOwnerScopedClient() {
         AmsTerminalManagementClient.Pairing pairing = new AmsTerminalManagementClient.Pairing(
-                UUID.randomUUID(), PRINTER_ID, "ABCDEFGHJK", java.time.Instant.parse("2026-10-10T12:00:00Z")
+                UUID.randomUUID(), PRINTER_ID, "ABCDEFGHIJK", java.time.Instant.parse("2026-10-10T12:00:00Z")
         );
         when(terminalManagementClientProvider.getIfAvailable()).thenReturn(terminalManagementClient);
         when(terminalManagementClient.createPairing(PRINTER_ID)).thenReturn(pairing);

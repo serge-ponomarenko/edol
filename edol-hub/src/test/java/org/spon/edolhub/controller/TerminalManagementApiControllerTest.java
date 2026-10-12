@@ -10,6 +10,7 @@ import org.spon.edolhub.service.AmsTerminalManagementConflictException;
 import org.spon.edolhub.service.PrinterAccessService;
 import org.spon.edolhub.service.TenantOwnerAuthorizationService;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -39,7 +40,7 @@ class TerminalManagementApiControllerTest {
     @Test
     void createsPairingOnlyAfterOwnerAndPrinterAuthorization() {
         AmsTerminalManagementClient.Pairing pairing = new AmsTerminalManagementClient.Pairing(
-                UUID.randomUUID(), PRINTER_ID, "ABCDEFGHJK", Instant.parse("2026-10-10T12:00:00Z")
+                UUID.randomUUID(), PRINTER_ID, "ABCDEFGHIJK", Instant.parse("2026-10-10T12:00:00Z")
         );
         when(terminalManagementClient.createPairing(PRINTER_ID)).thenReturn(pairing);
 
@@ -47,7 +48,7 @@ class TerminalManagementApiControllerTest {
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
-        assertThat(response.getBody().pairingCode()).isEqualTo("ABCDEFGHJK");
+        assertThat(response.getBody().pairingCode()).isEqualTo("ABCDEFGHIJK");
         InOrder order = inOrder(ownerAuthorizationService, printerAccessService, terminalManagementClient);
         order.verify(ownerAuthorizationService).requireCurrentOwner();
         order.verify(printerAccessService).getPrinter(PRINTER_ID);
@@ -82,6 +83,18 @@ class TerminalManagementApiControllerTest {
         order.verify(ownerAuthorizationService).requireCurrentOwner();
         order.verify(printerAccessService).getPrinter(PRINTER_ID);
         order.verify(terminalManagementClient).status(PRINTER_ID);
+    }
+
+    @Test
+    void mapsAPrinterOutsideTheCurrentTenantToHttp404() {
+        when(printerAccessService.getPrinter(PRINTER_ID))
+                .thenThrow(new IllegalArgumentException("Printer is not available to the current tenant"));
+
+        assertThatThrownBy(() -> controller().status(PRINTER_ID))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(exception -> ((ResponseStatusException) exception).getStatusCode().value())
+                .isEqualTo(404);
+        verify(terminalManagementClient, never()).status(PRINTER_ID);
     }
 
     @Test

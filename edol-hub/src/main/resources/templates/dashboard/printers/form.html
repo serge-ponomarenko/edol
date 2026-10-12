@@ -88,14 +88,17 @@
                                 <a class="btn btn-outline-secondary" th:href="@{/printers/{printerId}/edit(printerId=${editingPrinterId})}">
                                     Refresh terminal status
                                 </a>
-                                <form method="post" th:action="@{/printers/{printerId}/terminal/pairings(printerId=${editingPrinterId})}" th:if="${terminalStatus == null or terminalPairingExpired}">
-                                    <button class="btn btn-primary" type="submit" th:text="${terminalStatus == null} ? 'Pair AMS Terminal' : 'Regenerate expired pairing'"></button>
+                                <form method="post" th:action="@{/printers/{printerId}/terminal/pairings(printerId=${editingPrinterId})}" th:if="${terminalStatus == null or terminalPairingExpired or terminalStatus.lifecycleState == 'RESET'}">
+                                    <button class="btn btn-primary" type="submit" th:text="${terminalStatus == null} ? 'Pair AMS Terminal' : (terminalPairingExpired ? 'Regenerate expired pairing' : 'Pair AMS Terminal')"></button>
                                 </form>
                                 <form method="post" onsubmit="return confirm('Rotate this terminal credential? The terminal must enroll again with a new pairing code.');" th:action="@{/printers/{printerId}/terminal/rotate(printerId=${editingPrinterId})}" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">
                                     <button class="btn btn-outline-primary" type="submit">Rotate credential</button>
                                 </form>
-                                <form method="post" onsubmit="return confirm('Replace this terminal? Its current credential will stop working immediately.');" th:action="@{/printers/{printerId}/terminal/replace(printerId=${editingPrinterId})}" th:if="${terminalStatus != null}">
+                                <form method="post" onsubmit="return confirm('Replace this terminal? Its current credential will stop working immediately.');" th:action="@{/printers/{printerId}/terminal/replace(printerId=${editingPrinterId})}" th:if="${terminalStatus != null and (terminalStatus.lifecycleState == 'PENDING' or terminalStatus.lifecycleState == 'ACTIVE')}">
                                     <button class="btn btn-outline-warning" type="submit">Replace terminal</button>
+                                </form>
+                                <form method="post" th:action="@{/printers/{printerId}/terminal/replace(printerId=${editingPrinterId})}" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'REVOKED'}">
+                                    <button class="btn btn-primary" type="submit">Pair replacement terminal</button>
                                 </form>
                                 <form method="post" onsubmit="return confirm('Revoke this terminal enrollment? The device will lose access immediately.');" th:action="@{/printers/{printerId}/terminal/revoke(printerId=${editingPrinterId})}" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">
                                     <button class="btn btn-outline-danger" type="submit">Revoke enrollment</button>

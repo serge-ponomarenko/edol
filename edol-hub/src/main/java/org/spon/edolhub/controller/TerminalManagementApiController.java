@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -91,7 +92,11 @@ public class TerminalManagementApiController {
 
     private void authorizePrinter(UUID printerId) {
         ownerAuthorizationService.requireCurrentOwner();
-        printerAccessService.getPrinter(printerId);
+        try {
+            printerAccessService.getPrinter(printerId);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Printer not found");
+        }
     }
 
     public record PairingResponse(UUID terminalId, UUID printerId, String pairingCode, Instant expiresAt) {

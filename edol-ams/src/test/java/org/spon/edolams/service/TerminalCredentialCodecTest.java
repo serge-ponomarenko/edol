@@ -17,10 +17,14 @@ class TerminalCredentialCodecTest {
     );
 
     @Test
-    void generatesCrockfordPairingCodeWithoutAmbiguousCharacters() {
+    void generatesElevenLetterUppercasePairingCodeWithAtLeastFiftyBitsOfEntropy() {
         String code = codec.newPairingCode();
 
-        assertThat(code).matches("[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{10}");
+        assertThat(code).matches("[A-Z]{11}");
+        assertThat(codec.isValidPairingCode(code)).isTrue();
+        assertThat(codec.isValidPairingCode(code.toLowerCase())).isTrue();
+        assertThat(codec.isValidPairingCode("ABCDEFGHIJ1")).isFalse();
+        assertThat(codec.isValidPairingCode("ABCDEFGHIJ")).isFalse();
     }
 
     @Test
@@ -41,12 +45,12 @@ class TerminalCredentialCodecTest {
                 new AmsTerminalProperties(Map.of(1, previousKey, 2, currentKey), Map.of(2, currentKey), 2)
         );
 
-        TerminalCredentialCodec.PairingCodeDigests digests = rotatingCodec.pairingCodeDigests("ABCDEFGHJK");
+        TerminalCredentialCodec.PairingCodeDigests digests = rotatingCodec.pairingCodeDigests("ABCDEFGHIJK");
 
         assertThat(digests.currentKeyVersion()).isEqualTo(2);
-        assertThat(digests.currentDigest()).isEqualTo(rotatingCodec.pairingCodeDigest(2, "ABCDEFGHJK"));
+        assertThat(digests.currentDigest()).isEqualTo(rotatingCodec.pairingCodeDigest(2, "ABCDEFGHIJK"));
         assertThat(digests.previousKeyVersion()).isEqualTo(1);
-        assertThat(digests.previousDigest()).isEqualTo(rotatingCodec.pairingCodeDigest(1, "ABCDEFGHJK"));
+        assertThat(digests.previousDigest()).isEqualTo(rotatingCodec.pairingCodeDigest(1, "ABCDEFGHIJK"));
     }
 
     @Test

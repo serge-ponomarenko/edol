@@ -31,11 +31,11 @@ class TerminalEnrollmentControllerTest {
     @Test
     void returnsTheCredentialOnceWithNoStoreAfterAValidPairing() {
         when(servletRequest.getRemoteAddr()).thenReturn("192.0.2.91");
-        when(enrollmentService.enroll("ABCDEFGHJK")).thenReturn(
+        when(enrollmentService.enroll("ABCDEFGHIJK")).thenReturn(
                 new TerminalEnrollmentService.EnrollmentResult(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "secret")
         );
 
-        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHJK"), servletRequest);
+        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHIJK"), servletRequest);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
@@ -46,9 +46,9 @@ class TerminalEnrollmentControllerTest {
     @Test
     void rejectsInvalidPairingWithoutLeakingAReasonAndCountsTheFailure() {
         when(servletRequest.getRemoteAddr()).thenReturn("192.0.2.92");
-        when(enrollmentService.enroll("ABCDEFGHJK")).thenThrow(new InvalidTerminalPairingException());
+        when(enrollmentService.enroll("ABCDEFGHIJK")).thenThrow(new InvalidTerminalPairingException());
 
-        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHJK"), servletRequest);
+        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHIJK"), servletRequest);
 
         assertThat(response.getStatusCode().value()).isEqualTo(401);
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
@@ -61,11 +61,11 @@ class TerminalEnrollmentControllerTest {
         when(servletRequest.getRemoteAddr()).thenReturn("192.0.2.93");
         when(rateLimiter.isBlocked("192.0.2.93")).thenReturn(true);
 
-        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHJK"), servletRequest);
+        var response = controller().enroll(new TerminalEnrollmentController.EnrollmentRequest("ABCDEFGHIJK"), servletRequest);
 
         assertThat(response.getStatusCode().value()).isEqualTo(429);
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
-        verify(enrollmentService, never()).enroll("ABCDEFGHJK");
+        verify(enrollmentService, never()).enroll("ABCDEFGHIJK");
     }
 
     private TerminalEnrollmentController controller() {

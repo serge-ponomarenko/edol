@@ -159,8 +159,7 @@ pending pairing by HMAC digest and derives the bound tenant and printer from
 that record; the terminal never supplies tenant or printer identity. A
 successful enrollment returns one random `EDOL-Terminal terminalId.secret`
 credential with `Cache-Control: no-store`, and all operational terminal calls
-authenticate with that credential. Codes are ten Crockford Base32 characters,
-expire in five minutes, and are single-use. Invalid attempts are rate-limited
+authenticate with that credential. Codes are eleven uppercase Latin letters, expire in five minutes, and are single-use. Eleven letters preserve at least the former 50-bit code entropy while avoiding numeric input on the terminal touchscreen. Invalid attempts are rate-limited
 by source without disclosing pairing state. Pairing-code HMAC verification
 accepts only current and immediately previous configured key versions.
 Plaintext codes and credentials are neither persisted nor logged.

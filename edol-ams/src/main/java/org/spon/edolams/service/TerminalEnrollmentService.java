@@ -22,6 +22,9 @@ public class TerminalEnrollmentService {
     }
 
     public EnrollmentResult enroll(String pairingCode) {
+        if (!credentialCodec.isValidPairingCode(pairingCode)) {
+            throw new InvalidTerminalPairingException();
+        }
         String secret = credentialCodec.newTerminalSecret();
         byte[] credentialDigest = credentialCodec.terminalCredentialDigest(credentialCodec.keyVersion(), secret);
         TerminalCredentialCodec.PairingCodeDigests pairingDigests = credentialCodec.pairingCodeDigests(pairingCode);

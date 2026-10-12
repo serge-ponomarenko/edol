@@ -8,7 +8,7 @@ The ordinary workflow uses Hub and the terminal touchscreen only. Do not use bro
 
 ## Security and transport model
 
-Hub creates a random ten-character Crockford Base32 pairing code for one printer. The code is valid for five minutes, is single-use, and is never an operational credential. The terminal submits it once to AMS. AMS finds the persisted pairing by its HMAC digest, derives the tenant and printer from that pairing, and returns a random `terminalId.secret` credential once with `Cache-Control: no-store`.
+Hub creates a random eleven-character uppercase Latin-letter (A-Z) pairing code for one printer. The code is valid for five minutes, is single-use, and is never an operational credential. The terminal submits it once to AMS. AMS finds the persisted pairing by its HMAC digest, derives the tenant and printer from that pairing, and returns a random `terminalId.secret` credential once with `Cache-Control: no-store`.
 
 The terminal stores the returned credential in ESP32 Preferences (NVS). Secure Boot, Flash Encryption, encrypted NVS, eFuse provisioning, and hardware-backed storage are not prerequisites for pairing. Do not print a pairing code or terminal credential in logs.
 
@@ -37,9 +37,11 @@ Never use HTTP on an untrusted or Internet-exposed network.
 
 1. Open **Printers → Edit → AMS Terminal** for the intended printer.
 2. Select **Pair AMS Terminal**. Hub displays one code and a five-minute countdown.
-3. Enter the code in the terminal's **Pairing code** field and select **ENROLL**.
+3. Enter the 11-letter uppercase code in the terminal's **Pairing code** field and select **ENROLL**.
 4. Confirm that the terminal reports enrollment completion after its settings restart.
 5. Refresh the Hub printer page. It must show the terminal identity, lifecycle, enrollment time, and last authenticated time.
+
+After **Revoke enrollment**, Hub shows **Pair replacement terminal**. That action issues a new pairing without restoring the revoked credential. When the terminal next receives HTTP 401 or 403, it clears its local credential and opens Settings; it must be paired again.
 
 The code must succeed exactly once. Do not record it in command history, screenshots, source files, or logs.
 
