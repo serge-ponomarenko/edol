@@ -46,7 +46,7 @@ class TerminalPairingManagementServiceTest {
     @Test
     void replacementRevokesThePreviousPendingPairingAndLinksTheOldTerminal() {
         AmsTerminal previous = liveTerminal();
-        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                 eq(TENANT_ID), eq(PRINTER_ID), org.mockito.ArgumentMatchers.<Collection<TerminalLifecycle>>any()
         )).thenReturn(Optional.of(previous))
                 .thenReturn(Optional.empty());
@@ -78,7 +78,7 @@ class TerminalPairingManagementServiceTest {
         revokedTerminal.setLifecycleState(TerminalLifecycle.REVOKED);
         revokedTerminal.setCredentialDigest(null);
         revokedTerminal.setCredentialKeyVersion(null);
-        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                 eq(TENANT_ID), eq(PRINTER_ID), org.mockito.ArgumentMatchers.<Collection<TerminalLifecycle>>any()
         )).thenReturn(Optional.of(revokedTerminal)).thenReturn(Optional.empty());
         when(credentialCodec.newPairingCode()).thenReturn("ABCDEFGHIJK");
@@ -100,9 +100,49 @@ class TerminalPairingManagementServiceTest {
     }
 
     @Test
+    void replacesTheMostRecentRevokedTerminalAfterMultipleHistoricalRevocations() {
+        AmsTerminal olderRevokedTerminal = liveTerminal();
+        olderRevokedTerminal.setLifecycleState(TerminalLifecycle.REVOKED);
+        olderRevokedTerminal.setCredentialDigest(null);
+        olderRevokedTerminal.setCredentialKeyVersion(null);
+        olderRevokedTerminal.setCreatedAt(Instant.parse("2026-10-10T12:00:00Z"));
+
+        AmsTerminal latestRevokedTerminal = liveTerminal();
+        latestRevokedTerminal.setId(UUID.fromString("00000000-0000-0000-0000-000000000084"));
+        latestRevokedTerminal.setLifecycleState(TerminalLifecycle.REVOKED);
+        latestRevokedTerminal.setCredentialDigest(null);
+        latestRevokedTerminal.setCredentialKeyVersion(null);
+        latestRevokedTerminal.setCreatedAt(Instant.parse("2026-10-10T13:00:00Z"));
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
+                TENANT_ID,
+                PRINTER_ID,
+                List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE, TerminalLifecycle.REVOKED)
+        )).thenReturn(Optional.of(latestRevokedTerminal));
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
+                TENANT_ID,
+                PRINTER_ID,
+                List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
+        )).thenReturn(Optional.empty());
+        when(credentialCodec.newPairingCode()).thenReturn("ABCDEFGHIJK");
+        when(credentialCodec.pairingCodeDigest("ABCDEFGHIJK")).thenReturn(new byte[]{1});
+        when(credentialCodec.keyVersion()).thenReturn(1);
+
+        AmsTenantContext tenantContext = new AmsTenantContext();
+        try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
+            service(tenantContext).replace(PRINTER_ID);
+        }
+
+        assertThat(olderRevokedTerminal.getLifecycleState()).isEqualTo(TerminalLifecycle.REVOKED);
+        assertThat(olderRevokedTerminal.getReplacedByTerminalId()).isNull();
+        assertThat(latestRevokedTerminal.getLifecycleState()).isEqualTo(TerminalLifecycle.REPLACED);
+        assertThat(latestRevokedTerminal.getReplacedByTerminalId()).isNotNull();
+        verify(pairingRepository).save(any(TerminalPairing.class));
+    }
+
+    @Test
     void factoryResetInvalidatesAnyPendingPairingAndRemovesTheCredential() {
         AmsTerminal terminal = liveTerminal();
-        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                 TENANT_ID, PRINTER_ID, List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
         )).thenReturn(Optional.of(terminal));
 
@@ -126,7 +166,7 @@ class TerminalPairingManagementServiceTest {
         expiredPairing.setTerminalId(pendingTerminal.getId());
         expiredPairing.setState(PairingState.PENDING);
         expiredPairing.setExpiresAt(now.minusSeconds(1));
-        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                 TENANT_ID, PRINTER_ID, List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
         )).thenReturn(Optional.of(pendingTerminal));
         when(pairingRepository.findTopByTerminalIdOrderByCreatedAtDesc(pendingTerminal.getId()))
@@ -155,7 +195,7 @@ class TerminalPairingManagementServiceTest {
         activePairing.setTerminalId(pendingTerminal.getId());
         activePairing.setState(PairingState.PENDING);
         activePairing.setExpiresAt(now.plusSeconds(1));
-        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                 TENANT_ID, PRINTER_ID, List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
         )).thenReturn(Optional.of(pendingTerminal));
         when(pairingRepository.findTopByTerminalIdOrderByCreatedAtDesc(pendingTerminal.getId()))
@@ -170,7 +210,7 @@ class TerminalPairingManagementServiceTest {
 
     @Test
     void mapsConcurrentPairingCreationToTheExpectedLifecycleConflict() {
-        when(terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        when(terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                 TENANT_ID, PRINTER_ID, List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
         )).thenReturn(Optional.empty());
         when(terminalRepository.saveAndFlush(any(AmsTerminal.class)))

@@ -10,7 +10,7 @@ import java.util.UUID;
 
 public interface AmsTerminalRepository extends JpaRepository<AmsTerminal, UUID> {
 
-    Optional<AmsTerminal> findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+    Optional<AmsTerminal> findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
             UUID tenantId,
             UUID printerId,
             Collection<TerminalLifecycle> lifecycleStates

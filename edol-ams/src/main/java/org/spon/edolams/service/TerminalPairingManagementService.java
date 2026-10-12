@@ -58,7 +58,7 @@ public class TerminalPairingManagementService {
     public CreatedPairing createPairing(UUID printerId) {
         UUID tenantId = tenantContext.currentTenantId();
         Instant now = clock.instant();
-        terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                         tenantId,
                         printerId,
                         List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)
@@ -107,7 +107,7 @@ public class TerminalPairingManagementService {
 
     @Transactional
     public CreatedPairing replace(UUID printerId) {
-        AmsTerminal replacedTerminal = terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        AmsTerminal replacedTerminal = terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                         tenantContext.currentTenantId(),
                         printerId,
                         List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE, TerminalLifecycle.REVOKED)
@@ -167,7 +167,7 @@ public class TerminalPairingManagementService {
     }
 
     private AmsTerminal retireLiveTerminal(UUID printerId, TerminalLifecycle target) {
-        AmsTerminal terminal = terminalRepository.findByTenantIdAndAllowedPrinterIdAndLifecycleStateIn(
+        AmsTerminal terminal = terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
                         tenantContext.currentTenantId(),
                         printerId,
                         List.of(TerminalLifecycle.PENDING, TerminalLifecycle.ACTIVE)

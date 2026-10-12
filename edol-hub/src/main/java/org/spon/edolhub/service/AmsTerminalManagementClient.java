@@ -68,6 +68,11 @@ public class AmsTerminalManagementClient {
                         "The terminal already has an active pairing or enrollment"
                 );
             }
+            if (exception.getStatusCode().isSameCodeAs(HttpStatus.NOT_FOUND)) {
+                throw new AmsTerminalManagementConflictException(
+                        "The terminal lifecycle changed. Refresh the printer page and try again."
+                );
+            }
             throw exception;
         }
     }

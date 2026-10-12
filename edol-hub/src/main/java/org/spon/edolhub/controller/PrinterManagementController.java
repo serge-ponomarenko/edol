@@ -187,8 +187,7 @@ public class PrinterManagementController {
         try {
             redirectAttributes.addFlashAttribute("terminalPairing", operation.apply(client, printerId));
         } catch (AmsTerminalManagementConflictException exception) {
-            redirectAttributes.addFlashAttribute(TERMINAL_ERROR_ATTRIBUTE,
-                    "A terminal is already pending or active. Use Replace Terminal only when you intend to invalidate it.");
+            redirectAttributes.addFlashAttribute(TERMINAL_ERROR_ATTRIBUTE, exception.getMessage());
         } catch (RuntimeException exception) {
             redirectAttributes.addFlashAttribute(TERMINAL_ERROR_ATTRIBUTE, "AMS Terminal operation could not be completed.");
         }

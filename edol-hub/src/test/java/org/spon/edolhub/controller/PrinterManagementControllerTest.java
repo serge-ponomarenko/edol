@@ -173,6 +173,22 @@ class PrinterManagementControllerTest {
 
         controller.createTerminalPairing(PRINTER_ID, redirectAttributes);
 
-        verify(redirectAttributes).addFlashAttribute(eq("terminalError"), any(String.class));
+        verify(redirectAttributes).addFlashAttribute("terminalError", "already active");
+    }
+
+    @Test
+    void showsTheTerminalLifecycleConflictInsteadOfAGenericErrorWhenReplacing() {
+        when(terminalManagementClientProvider.getIfAvailable()).thenReturn(terminalManagementClient);
+        when(terminalManagementClient.replace(PRINTER_ID))
+                .thenThrow(new AmsTerminalManagementConflictException(
+                        "The terminal lifecycle changed. Refresh the printer page and try again."
+                ));
+
+        controller.replaceTerminal(PRINTER_ID, redirectAttributes);
+
+        verify(redirectAttributes).addFlashAttribute(
+                "terminalError",
+                "The terminal lifecycle changed. Refresh the printer page and try again."
+        );
     }
 }
