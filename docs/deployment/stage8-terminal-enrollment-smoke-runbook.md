@@ -110,8 +110,23 @@ mvn -B -pl edol-ams,edol-hub -am test
 
 The second command requires the approved temporary remote Docker tunnel. A local Testcontainers skip is unexecuted rather than a pass. Verify the firmware separately with the PlatformIO build command above.
 
-## Physical-device acceptance still required
+## Acceptance record and remaining gate
 
-After explicit upload approval, an operator may upload to a confirmed serial target and perform the Hub workflow above. Record only redacted evidence for HTTP/HTTPS transport selection, first enrollment, restart recovery, replay denial, revocation denial, and tenant isolation. Do not flash a device, modify eFuses, or issue printer commands as part of automated validation.
+The physical trusted-LAN enrollment and operational simulator smoke completed on
+2026-10-12. Reuse that evidence; do not repeat provisioning, enrollment, NFC,
+or lifecycle testing unless a relevant change invalidates it.
 
-Stage 8 is not accepted until those real-device checks complete.
+See [the Stage 8 acceptance record](stage8-terminal-acceptance-record.md) for
+immutable revisions, executed checks, the security matrix, and the remaining
+SEC-06 runtime evidence. The earlier conversational declaration of full
+acceptance was premature: TCP connections and a Loading screen alone do not
+prove certificate validation failure or absence of an HTTP retry.
+
+Current status: **FUNCTIONAL SMOKE PASSED — SEC-06 FINAL SECURITY ACCEPTANCE
+PENDING**. The 2026-10-21 closure attempt found no terminal on the previously
+confirmed COM16 port; a different CH340 device must not be assumed to be it.
+
+Only the focused SEC-06 procedure in the acceptance record remains for this
+secure/disposable scope. Home compatibility and production deployment are
+separate gates. Firmware upload still requires an identified device and
+operator authorization; no printer commands or eFuse operations are needed.

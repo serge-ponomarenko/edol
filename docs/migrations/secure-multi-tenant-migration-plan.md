@@ -1554,6 +1554,19 @@ pairing code as an operational credential.
 OAuth Device Authorization Grant, direct terminal-to-Core access, and
 user-delegated OAuth on the ESP32.
 
+### Acceptance reconciliation (2026-10-21)
+
+The 2026-10-12 physical functional smoke passed. Targeted security regressions
+are committed at `73969225f0e5872c42b92bcd946374518b7d10f4`; the firmware CA
+build hook is committed at `fddb88107670e5d9cbdda155777a9bcc3d99893d`.
+SEC-01/02/03/04/05/07 have recorded PASS evidence. SEC-06 remains open because
+the physical TCP/Loading observations did not establish certificate rejection
+or measured absence of HTTP fallback. The earlier conversational acceptance
+declaration is superseded by the
+[Stage 8 acceptance record](../deployment/stage8-terminal-acceptance-record.md).
+Do not repeat completed physical workflows. Home and production remain separate
+gates. Stage 9 discovery may proceed; implementation requires Stage 8 closure.
+
 ## Stage 9: Final Lockdown and Hardening
 
 ### Objective and prerequisites

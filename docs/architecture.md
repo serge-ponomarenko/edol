@@ -169,8 +169,12 @@ and does not require Secure Boot, Flash Encryption, encrypted NVS, eFuses, or
 hardware-backed storage. Its transport is explicit: HTTP is allowed only for a
 trusted LAN and exposes credentials to a network interceptor; HTTPS continues
 to validate its configured CA and never falls back to HTTP after a TLS failure.
-Home retains its existing trusted-network routes. This is source implementation
-pending disposable runtime, firmware build, and physical-terminal acceptance.
+Home retains its existing trusted-network routes. Disposable backend checks,
+firmware builds and the physical trusted-LAN functional smoke have passed.
+Final secure/disposable acceptance remains pending the explicit SEC-06 TLS
+rejection/no-downgrade execution evidence; see the
+[Stage 8 acceptance record](deployment/stage8-terminal-acceptance-record.md).
+Home compatibility and production rollout remain separate gates.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and

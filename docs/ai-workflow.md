@@ -46,6 +46,27 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
+- **Stage 8 acceptance gate:** capture explicit ESP32 TLS validation rejection
+  and measured absence of plaintext fallback under SEC-06 before declaring full
+  acceptance. Follow `deployment/stage8-terminal-acceptance-record.md`; preserve
+  enrollment, identify the serial device and obtain upload authorization.
+- **Stage 8 UX, high priority:** verify immediate authorization-loss feedback
+  and Settings transition while the terminal is running. Distinguish 401/403
+  from network failure; do not clear enrollment for generic connectivity errors.
+- **Stage 8 UX, high priority:** preserve the printer Edit GET context across
+  Hub reauthentication and explain interrupted lifecycle actions without replaying
+  destructive POSTs. The disposable Stage 6 smoke profile sets a 60-second maximum
+  session age; distinguish that setting from production session behavior.
+- **Stage 8 UX, medium priority:** refresh pairing status automatically while
+  visible, including success/expiry and regeneration. Stop polling after
+  completion/navigation and never re-expose consumed pairing secrets.
+- **Stage 8 UX, medium priority:** keep Replace and Refresh prominent, move
+  Revoke into Advanced/Security, remove Rotate/Factory reset from primary UI
+  while retaining backend capabilities, clarify server reset versus physical
+  device erasure, and remove the primary Copy code button.
+- **Stage 8 UX, lower priority:** distinguish unknown NFC spool, network failure,
+  authentication loss and server error with actionable touchscreen feedback.
+
 - **High priority — persistence identity convention:** before the next
   cross-module persistence expansion, assess a shared UUIDv7 identity strategy.
   Hub currently uses its local `PersistableEntity`, AMS Stage 8 generates the
@@ -107,9 +128,6 @@ must never be copied into the repository or a Codex configuration file.
 - Decide separately whether user-facing spool references need a tenant-scoped
   display identifier while retaining the current technical ID. The observed
   global sequence is not evidence of an RLS bypass.
-- Reproduce the suspected short-lived Hub BFF session-expiration behavior before
-  assigning it a defect or changing session handling; the Stage 7 smoke report
-  did not establish a root cause.
 ## Subagent Status
 
 Project-scoped Codex roles are configured under `.codex/agents`. They are
