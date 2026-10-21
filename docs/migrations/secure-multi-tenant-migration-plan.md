@@ -1559,13 +1559,16 @@ user-delegated OAuth on the ESP32.
 The 2026-10-12 physical functional smoke passed. Targeted security regressions
 are committed at `73969225f0e5872c42b92bcd946374518b7d10f4`; the firmware CA
 build hook is committed at `fddb88107670e5d9cbdda155777a9bcc3d99893d`.
-SEC-01/02/03/04/05/07 have recorded PASS evidence. SEC-06 remains open because
-the physical TCP/Loading observations did not establish certificate rejection
-or measured absence of HTTP fallback. The earlier conversational acceptance
-declaration is superseded by the
+SEC-01 through SEC-07 now have PASS evidence. The real ESP32 production-transport
+test on 2026-10-21 closed SEC-06 with trusted HTTPS controls, explicit -9984
+certificate error, three denials, zero measured plaintext on TLS ports and
+deliberate HTTP success. A malformed PEM build hook was fixed with a build-local
+CA header in final firmware `0749cecdf9120dd5f120804bead5cdd3370739a7`.
+Stage 8 is ACCEPTED for this secure/disposable scope; the previous insufficient
+TCP/Loading evidence is superseded by the
 [Stage 8 acceptance record](../deployment/stage8-terminal-acceptance-record.md).
 Do not repeat completed physical workflows. Home and production remain separate
-gates. Stage 9 discovery may proceed; implementation requires Stage 8 closure.
+gates. Stage 9 discovery may proceed; implementation requires its own approval.
 
 ## Stage 9: Final Lockdown and Hardening
 

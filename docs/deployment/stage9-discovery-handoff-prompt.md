@@ -1,4 +1,4 @@
-# Next-session Prompt: Finish Stage 8 Gate, Then Stage 9 Discovery
+# Next-session Prompt: Stage 9 Discovery and Reviewable Plan
 
 Work in EDOL branch EDOL-048 and firmware repository main. Communicate in
 Ukrainian; code and documentation in English. Read AGENTS.md and applicable
@@ -7,7 +7,9 @@ skills, inspect branch/status and preserve unrelated work.
 ## Baseline
 
 - EDOL implementation/security tests: 73969225f0e5872c42b92bcd946374518b7d10f4.
-- Firmware: fddb88107670e5d9cbdda155777a9bcc3d99893d.
+- Final firmware: 0749cecdf9120dd5f120804bead5cdd3370739a7, including the CA
+  newline fix and hardware-only SEC-06 regression. Commit is local; no push
+  is established by the handoff.
 - Discover the latest documentation commit with git log; do not assume HEAD is
   still either baseline or that a firmware commit was pushed.
 - Read docs/deployment/stage8-terminal-acceptance-record.md,
@@ -16,21 +18,23 @@ skills, inspect branch/status and preserve unrelated work.
   docs/adr/0002-secure-multi-tenant-architecture.md and
   docs/migrations/secure-multi-tenant-migration-plan.md (Stages 8 and 9).
 
-## First: complete the sole Stage 8 security evidence gap
+## Stage 8 is accepted; reuse its evidence
 
-Physical functional smoke and SEC-01/02/03/04/05/07 have recorded PASS evidence.
-Reuse it. SEC-06 remains blocked: the earlier TCP/Loading evidence did not prove
-certificate rejection or measured absence of HTTP downgrade. Do not call Stage 8
-accepted until its record contains adequate execution evidence.
+Physical functional smoke and SEC-01 through SEC-07 have recorded PASS evidence.
+The 2026-10-21 real ESP32 test used production HttpService/WiFiClientSecure:
+trusted HTTPS 200 before/after three denials, explicit -9984 verification error,
+zero plaintext arrivals on TLS ports and explicit HTTP 200. The previously
+malformed CA hook is fixed using a build-local header. No source-inspection-only
+or native mocked TLS acceptance is being asserted.
 
-Use the minimal on-device production-TLS procedure in the acceptance record.
-Identify the current COM port; COM16 was absent on 2026-10-21. Preserve the
-existing credential, Wi-Fi and enrollment. Do not flash without operator
-authorization. Finish and commit factual Stage 8 documentation if the gate
-passes; report the precise blocker otherwise. Do not repeat ordinary physical
-enrollment/NFC/lifecycle testing or rebuild disposable infrastructure.
+Normal firmware was restored on confirmed COM16 without erasing settings or
+enrollment. The existing AMS port 18088 was closed at restoration; a fresh
+live state recovery was not observed that day. This is a runtime availability
+limit, not evidence of credential rejection. Start existing disposable services
+only when needed and authorized; do not recreate infrastructure. Do not repeat
+enrollment/NFC/lifecycle testing or flash hardware for Stage 9 discovery.
 
-## Then: Stage 9 discovery and reviewable plan only
+## Stage 9 discovery and reviewable plan only
 
 Inventory remaining legacy HTTP/Basic/shared-credential ingress, MQTT v2/legacy
 fields and consumers, agent/media identity, broker ACLs and transport, service

@@ -46,10 +46,6 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
-- **Stage 8 acceptance gate:** capture explicit ESP32 TLS validation rejection
-  and measured absence of plaintext fallback under SEC-06 before declaring full
-  acceptance. Follow `deployment/stage8-terminal-acceptance-record.md`; preserve
-  enrollment, identify the serial device and obtain upload authorization.
 - **Stage 8 UX, high priority:** verify immediate authorization-loss feedback
   and Settings transition while the terminal is running. Distinguish 401/403
   from network failure; do not clear enrollment for generic connectivity errors.

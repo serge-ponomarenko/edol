@@ -110,7 +110,7 @@ mvn -B -pl edol-ams,edol-hub -am test
 
 The second command requires the approved temporary remote Docker tunnel. A local Testcontainers skip is unexecuted rather than a pass. Verify the firmware separately with the PlatformIO build command above.
 
-## Acceptance record and remaining gate
+## Acceptance record
 
 The physical trusted-LAN enrollment and operational simulator smoke completed on
 2026-10-12. Reuse that evidence; do not repeat provisioning, enrollment, NFC,
@@ -118,15 +118,17 @@ or lifecycle testing unless a relevant change invalidates it.
 
 See [the Stage 8 acceptance record](stage8-terminal-acceptance-record.md) for
 immutable revisions, executed checks, the security matrix, and the remaining
-SEC-06 runtime evidence. The earlier conversational declaration of full
-acceptance was premature: TCP connections and a Loading screen alone do not
-prove certificate validation failure or absence of an HTTP retry.
+SEC-06 runtime evidence. The earlier TCP/Loading observations were insufficient;
+the 2026-10-21 regression records explicit ESP32 verification error -9984,
+trusted HTTPS success, three denied requests, measured zero plaintext on both
+TLS ports and success only after deliberate HTTP selection.
 
-Current status: **FUNCTIONAL SMOKE PASSED — SEC-06 FINAL SECURITY ACCEPTANCE
-PENDING**. The 2026-10-21 closure attempt found no terminal on the previously
-confirmed COM16 port; a different CH340 device must not be assumed to be it.
+Current status: **ACCEPTED — functional and security acceptance completed**
+for this secure/disposable scope. The operator reconnected COM16 for the final
+test and normal firmware was restored. The existing AMS must be running to
+observe normal state recovery (port 18088 was closed at restoration).
 
-Only the focused SEC-06 procedure in the acceptance record remains for this
-secure/disposable scope. Home compatibility and production deployment are
-separate gates. Firmware upload still requires an identified device and
+The focused SEC-06 procedure is retained for relevant future firmware changes;
+do not repeat completed smoke tests. Home compatibility and production deployment
+are separate gates. Firmware upload still requires an identified device and
 operator authorization; no printer commands or eFuse operations are needed.

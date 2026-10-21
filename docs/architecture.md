@@ -171,8 +171,9 @@ trusted LAN and exposes credentials to a network interceptor; HTTPS continues
 to validate its configured CA and never falls back to HTTP after a TLS failure.
 Home retains its existing trusted-network routes. Disposable backend checks,
 firmware builds and the physical trusted-LAN functional smoke have passed.
-Final secure/disposable acceptance remains pending the explicit SEC-06 TLS
-rejection/no-downgrade execution evidence; see the
+Secure/disposable acceptance completed on 2026-10-21 with the real ESP32
+SEC-06 TLS rejection/no-downgrade regression. The optional CA build hook now
+uses a build-local header to preserve PEM newlines on Windows; see the
 [Stage 8 acceptance record](deployment/stage8-terminal-acceptance-record.md).
 Home compatibility and production rollout remain separate gates.
 
