@@ -194,6 +194,22 @@ can overwrite a code with the new Hub's blank-input request. This source change
 does not accept a deployment, change stored credential protection, or remove
 HTTP/MQTT compatibility.
 
+Stage 9.2 prepares secure Hub, Notify, and AMS readers for additive v2 and
+envelope-only v3. V2 still requires a matching legacy `event` marker; v3 does
+not require it, but rejects a contradictory marker if present. Both versions
+retain mandatory envelope identity, timestamp, payload, and the existing
+tenant/ownership checks. Core still publishes additive v2; topics, QoS, Hub
+receipt idempotency, and Home legacy consumers are unchanged.
+
+Each secure reader logs process-local ingress snapshots with a restart-specific
+observation ID and fixed counters for validated v2/v3 deliveries, presence of
+legacy `event`, rejected envelopes, and processing failures. These are log-based
+observations, not a new metrics exporter or proof of a zero-use deployment
+window. Validated delivery counts include duplicates and messages later denied
+by tenant/processing checks. No payload, credential, tenant, printer, or topic
+value is used as a counter dimension. Home does not initialize or record these
+secure observations.
+
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and
 `docs/migrations/secure-multi-tenant-migration-plan.md`. These documents define

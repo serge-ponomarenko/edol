@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.deployment.DeploymentMode;
 import org.spon.edol.mqtt.CoreMqttEventEnvelope;
+import org.spon.edol.mqtt.CoreMqttIngressObservation;
+import jakarta.annotation.PostConstruct;
 import org.spon.edolams.service.AmsSpoolChangerService;
 import org.spon.edolams.service.AmsPrinterTenantResolver;
 import org.spon.edolams.service.AmsTenantContext;
@@ -14,7 +16,6 @@ import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
-import java.time.Instant;
 
 
 @Component
@@ -22,13 +23,24 @@ import java.time.Instant;
 @Slf4j
 public class MqttEventListener {
 
+    private static final String LEGACY_EVENT = "event";
+
     private final AmsSpoolChangerService amsSpoolChangerService;
     private final DeploymentMode deploymentMode;
     private final AmsPrinterTenantResolver tenantResolver;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final CoreMqttIngressObservation ingress = new CoreMqttIngressObservation();
+
+    @PostConstruct
+    void initializeObservations() {
+        if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
+            log.info("Core MQTT ingress initialized: consumer=ams, counters={}", ingress.snapshot());
+        }
+    }
 
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public void handle(Message<?> message) {
+        boolean validatedEnvelope = false;
         try {
             String payload = message.getPayload().toString();
 
@@ -40,28 +52,32 @@ public class MqttEventListener {
             if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
                 CoreMqttEventEnvelope envelope = objectMapper.treeToValue(json, CoreMqttEventEnvelope.class);
                 validateEnvelope(json, envelope);
+                ingress.validated(envelope.schemaVersion(), json.has(LEGACY_EVENT));
+                validatedEnvelope = true;
+                log.info("Core MQTT ingress validated: consumer=ams, counters={}", ingress.snapshot());
                 tenantScope = tenantResolver.openForEnvelope(envelope.printerId(), envelope.tenantId());
                 event = envelope.eventType();
                 printerId = envelope.printerId();
                 eventPayload = json.required("payload");
             } else {
-                event = json.required("event").asText();
+                event = json.required(LEGACY_EVENT).asText();
                 printerId = UUID.fromString(json.required("printerId").asText());
                 eventPayload = json;
             }
 
             try {
-                log.info("EdolCore MQTT EVENT: {}", event);
+                if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
+                    log.info("EdolCore MQTT EVENT: {}", event);
+                }
 
                 switch (event) {
 
-                    case "ams.status.changed" -> handleAmsStatus(eventPayload);
+                    case "ams.status.changed", "ams.slot.unloaded" ->
+                            log.debug("AMS status/unload event does not change staged spools");
 
                     case "ams.slot.changed" -> handleAmsSlot(eventPayload);
 
                     case "ams.slot.loaded" -> handleAmsSlotLoaded(printerId, eventPayload);
-
-                    case "ams.slot.unloaded" -> handleAmsSlotUnloaded(eventPayload);
 
                     default -> log.debug("Unhandled event: {}", event);
                 }
@@ -72,29 +88,25 @@ public class MqttEventListener {
             }
 
         } catch (Exception e) {
-            log.error("Failed to process MQTT message", e);
+            if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
+                if (validatedEnvelope) {
+                    ingress.processingFailed();
+                } else {
+                    ingress.rejectEnvelope();
+                }
+                log.warn("Rejected Core MQTT ingress: consumer=ams, counters={}", ingress.snapshot());
+            } else {
+                log.error("Failed to process MQTT message", e);
+            }
         }
     }
 
     private void validateEnvelope(JsonNode json, CoreMqttEventEnvelope envelope) {
-        if (envelope.schemaVersion() != 2
-                || envelope.eventId() == null
-                || envelope.eventType() == null
-                || envelope.tenantId() == null
-                || envelope.printerId() == null
-                || envelope.timestamp() == null
-                || envelope.payload() == null) {
-            throw new IllegalArgumentException("Incomplete Core MQTT v2 envelope");
+        if (json == null || !json.isObject() || !json.required("schemaVersion").isIntegralNumber()
+                || (json.has(LEGACY_EVENT) && !json.required(LEGACY_EVENT).isTextual())) {
+            throw new IllegalArgumentException("Invalid Core MQTT envelope field types");
         }
-        Instant.parse(envelope.timestamp());
-        if (!envelope.eventType().equals(json.required("event").asText())
-                || !envelope.printerId().equals(UUID.fromString(json.required("printerId").asText()))) {
-            throw new IllegalArgumentException("Core MQTT legacy and envelope identities disagree");
-        }
-    }
-
-    private void handleAmsSlotUnloaded(JsonNode json) {
-
+        envelope.validate(json.has(LEGACY_EVENT) ? json.get(LEGACY_EVENT).asText() : null);
     }
 
     private void handleAmsSlotLoaded(UUID printerId, JsonNode json) {
@@ -102,11 +114,6 @@ public class MqttEventListener {
         amsSpoolChangerService.setAmsSpoolIntoSlot(printerId, slot);
     }
 
-
-    private void handleAmsStatus(JsonNode json) {
-        //JsonNode amsNode = json.get("ams");
-        //log.info("Ams status changed: {}", amsNode);
-    }
 
     private void handleAmsSlot(JsonNode json) {
         log.info("Ams slot changed: {} -> {}", json.get("prev_slot"), json.get("curr_slot"));

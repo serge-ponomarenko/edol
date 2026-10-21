@@ -24,7 +24,7 @@ import org.spon.edolcore.service.printer.management.exception.PrinterNotFoundExc
 import org.spon.edolcore.service.tenant.CoreTenantContext;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockServletContext;
@@ -180,7 +180,7 @@ class CorePrinterHttpAuthorizationTest {
         return state;
     }
 
-    @Configuration
+    @TestConfiguration(proxyBeanMethods = false)
     @EnableWebMvc
     @EnableWebSecurity
     @Import({SecurityConfig.class, CoreTenantContextFilter.class, CoreTenantContext.class,

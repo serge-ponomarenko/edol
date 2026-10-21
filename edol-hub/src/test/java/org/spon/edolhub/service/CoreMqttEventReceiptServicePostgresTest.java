@@ -154,7 +154,11 @@ class CoreMqttEventReceiptServicePostgresTest {
                 envelope(UUID.randomUUID(), envelopeTenantId, printerId, Instant.parse("2026-10-08T12:34:56Z")),
                 () -> {
                 }
-        ))).hasRootCauseMessage("new row violates row-level security policy for table \"core_mqtt_event_receipts\"");
+        ))).rootCause().isInstanceOfSatisfying(java.sql.SQLException.class, error -> {
+            assertThat(error.getSQLState()).isEqualTo("42501");
+            assertThat((Throwable) error).hasMessageContaining("row-level security policy")
+                    .hasMessageContaining("core_mqtt_event_receipts");
+        });
     }
 
     private void createRuntimeRole() {

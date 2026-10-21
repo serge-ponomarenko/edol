@@ -23,6 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.spon.edol.mqtt.CoreMqttIngressObservation;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @ExtendWith(MockitoExtension.class)
 class MqttEventListenerTest {
@@ -38,6 +43,60 @@ class MqttEventListenerTest {
 
     @InjectMocks
     private MqttEventListener listener;
+
+    @Test
+    void acceptsV3WithoutLegacyFieldsAndClosesTheValidatedTenantScope() throws Exception {
+        UUID tenant = UUID.randomUUID();
+        var tenants = new NotifyTenantContext();
+        var secure = secureListener(tenant, tenants);
+        ObjectNode json = (ObjectNode) new ObjectMapper().readTree(v2OnlineEvent(tenant, FIRST_PRINTER));
+        json.put("schemaVersion", 3);
+        json.remove("event");
+        when(printerService.getState(FIRST_PRINTER)).thenAnswer(invocation -> {
+            assertThat(tenants.currentTenantId()).isEqualTo(tenant);
+            return new PrinterState();
+        });
+        secure.handle(new GenericMessage<>(json.toString()));
+        verify(messageService).sendPrinterOnlineMessage(FIRST_PRINTER);
+        assertThatThrownBy(tenants::currentTenantId).isInstanceOf(IllegalStateException.class);
+        assertThat(observation(secure).snapshot().validatedV3()).isEqualTo(1);
+        assertThat(observation(secure).snapshot().withLegacyEvent()).isZero();
+    }
+
+    @Test
+    void rejectsInvalidVersionsBeforeCallingCoreAndCountsUnmappedTenantsSeparately() {
+        UUID tenant = UUID.randomUUID();
+        var secure = secureListener(tenant, new NotifyTenantContext());
+        String v2 = v2OnlineEvent(tenant, FIRST_PRINTER);
+        secure.handle(new GenericMessage<>(v2.replace("\"schemaVersion\":2", "\"schemaVersion\":4")));
+        secure.handle(new GenericMessage<>(v2.replace("\"schemaVersion\":2", "\"schemaVersion\":2.5")));
+        secure.handle(new GenericMessage<>("{\"event\":\"printer.online\"}"));
+        secure.handle(new GenericMessage<>(v2OnlineEvent(UUID.randomUUID(), FIRST_PRINTER)));
+        verifyNoInteractions(printerService, messageService);
+        assertThat(observation(secure).snapshot().rejectedEnvelope()).isEqualTo(3);
+        assertThat(observation(secure).snapshot().processingFailures()).isEqualTo(1);
+    }
+
+    @Test
+    void keepsHomeLegacyMessagesIndependentOfSecureValidationAndObservations() {
+        var home = new MqttEventListener(printerService, messageService, DeploymentMode.HOME, null);
+        home.handle(new GenericMessage<>("{\"event\":\"printer.online\",\"printerId\":\"" + FIRST_PRINTER + "\"}"));
+        verify(messageService).sendPrinterOnlineMessage(FIRST_PRINTER);
+        assertThat(observation(home).snapshot().validatedV2()).isZero();
+        assertThat(observation(home).snapshot().rejectedEnvelope()).isZero();
+    }
+
+    private MqttEventListener secureListener(UUID tenant, NotifyTenantContext context) {
+        var resolver = new NotifyRecipientResolver(DeploymentMode.SECURE_MULTI_TENANT,
+                new NotifyRecipientProperties(List.of(new NotifyRecipientProperties.TenantRecipient(tenant, List.of(101L)))),
+                context, 0);
+        ReflectionTestUtils.invokeMethod(resolver, "validateMappings");
+        return new MqttEventListener(printerService, messageService, DeploymentMode.SECURE_MULTI_TENANT, resolver);
+    }
+
+    private CoreMqttIngressObservation observation(MqttEventListener listener) {
+        return (CoreMqttIngressObservation) ReflectionTestUtils.getField(listener, "ingress");
+    }
 
     @Test
     void routesNotificationsToThePrinterDeclaredByEachMqttEvent() {

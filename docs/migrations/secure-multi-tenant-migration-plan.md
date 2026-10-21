@@ -1605,6 +1605,101 @@ MCP; its only finding was `java:S1598` with an empty file path. Actual package
 paths match, so this is a snippet-analysis artifact, not a suppressed finding
 or a file-level Sonar quality-gate claim.
 
+### Stage 9.2 reader preparation and observations
+
+Secure Hub, Notify, and AMS readers accept additive v2 and envelope-only v3.
+V2 requires a matching legacy `event`; v3 accepts its absence and rejects a
+contradictory marker. Unsupported or nonintegral versions, missing mandatory
+envelope fields, and invalid timestamps are rejected before tenant context is
+opened. Existing tenant/recipient/printer ownership checks still apply after
+format validation. Hub retains the same event-ID receipt ledger and QoS 1
+acknowledgment behavior; a processing rejection is acknowledged once.
+
+Core publication remains additive v2. Home retains the legacy input branch
+without secure mappings, envelope validation, or observation prerequisites.
+No topic, broker, producer configuration, migration, or deployment is changed.
+
+Each secure reader logs an initial zero snapshot, then snapshots at envelope
+validation/rejection or processing failure. The fixed counters are
+`validatedV2`, `validatedV3`, `withLegacyEvent`, `rejectedEnvelope`, and
+`processingFailures`. A new random `observationId` identifies each reader
+instance's counter lifetime. Counters are synchronized, process-local delivery
+counts; they include duplicates and are not counts of unique business effects.
+Format-valid messages rejected by ownership/mapping checks increment a version
+counter and `processingFailures`, not `rejectedEnvelope`. Logs contain no raw
+message or parser exception text at the new observation boundary.
+
+This deliberately uses structured logs rather than introducing MeterRegistry,
+an exporter, an HTTP endpoint, or infrastructure to Notify/AMS. Missing startup
+evidence, missing snapshots, disabled consumers, counter restarts, and missing
+client/version inventory invalidate a continuous observation window; do not
+replace them with numeric zero. `withLegacyEvent` measures field presence in
+incoming messages, not whether an unknown downstream consumer needs that field.
+Core currently supplies that marker on v2, so its count is expected to grow.
+Source tests do not establish live traffic metrics.
+
+Roll out readers before any separately approved v3 producer switch. Record
+release hashes for Core, Hub, Notify, AMS, every external subscriber, and agent
+implementations; inventory reconnect/recovery and infrequent operations too.
+Keep v2 until every consumer is ready. Before a v3 producer switch, rollback
+can restore the preceding readers. After that switch, restore the producer to
+v2 before restoring v2-only readers, or retain dual-version readers throughout
+rollback. Compatibility removal and an agreed real observation window remain
+later gates.
+
+Source verification on 2026-10-21: `mvn -B clean verify` through the existing
+remote Docker wrapper passed 390 tests with zero failures, errors, or skips
+(Core API 10, Core 50, Hub 267, Notify 15, AMS 48). This includes all 48
+Docker-dependent tests previously skipped in the local 9.1 run: Core 10, Hub
+28, AMS 10. Testcontainers used disposable PostgreSQL containers and the
+temporary tunnel was closed. The final reader/API regression after Sonar
+follow-ups passed 26/26 with no skips. Core publication contract tests still
+verify additive v2. No broker traffic or working dev/production database was
+used for this acceptance.
+
+The PostgreSQL receipt rejection test now checks SQLSTATE `42501` and the
+RLS/table error rather than an exact message prefix. The HTTP test fixture is
+marked `@TestConfiguration` so application scanning cannot import its mocks.
+Docker checks were run with reactor dependencies, avoiding an outdated installed
+Core API JAR. These are test-boundary fixes, not migration or runtime changes.
+
+Read-only Sonar snippet analysis covered the 12 changed/added Java files and
+the Core API POM. Literal duplication and old AMS no-op handler findings were
+fixed without changing spool effects. Remaining `java:S1598` findings have an
+empty analyzer file path; actual package paths match. `java:S2201` on
+`Instant.parse(timestamp)` is a validation-by-exception false positive: invalid
+timestamps must throw into the rejection path, as the contract tests verify;
+the parsed value is intentionally unused. Neither finding is suppressed, and
+this is not a file-level Sonar quality-gate claim.
+
+### Development and production migration sequencing
+
+Operator decision on 2026-10-21: working development and production database
+migrations/cutovers wait until Stage 9 implementation and disposable acceptance
+are complete. Development goes first; production follows its acceptance and a
+stable development observation period. No working database migration or cutover
+is authorized by the Stage 9 source work.
+
+At that later gate, rehearse on a restored development copy, then on a fresh
+production backup copy. Establish the actual Flyway delta, ownership,
+role/grant/RLS behavior, data preservation, and coordinated rollback for the
+frozen release. Historical acceptance records are not a current schema audit of
+either working database. Keycloak, service clients/scopes, broker identities/ACLs,
+tenant mappings, transport, secret storage, and port exposure must be ready for
+the selected deployment model. An unused agent path may remain disabled; do not
+enable legacy trust as a shortcut.
+
+Source/disposable completion and live rollout closure are separate records.
+Keep additive v2 and authenticated compatibility during the initial rollout
+where still required; collect real usage evidence before compatibility removal.
+The zero-use gate cannot be inferred from source tests or a database migration.
+If the agreed live window cannot be established before cutover, compatibility
+removal remains a later rollout step rather than weakening that gate. Home has
+its separate deployment model;
+switching an existing Home database to secure mode remains a separately reviewed,
+backup-first migration, not an environment-only toggle. Enterprise hardening
+deferrals require an explicit recorded decision, not silent acceptance.
+
 ### Objective and prerequisites
 
 Remove all migration compatibility after every HTTP and MQTT consumer has used

@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.deployment.DeploymentMode;
 import org.spon.edol.model.PrinterState;
 import org.spon.edol.mqtt.CoreMqttEventEnvelope;
+import org.spon.edol.mqtt.CoreMqttIngressObservation;
+import jakarta.annotation.PostConstruct;
 import org.spon.edolnotify.service.MessageService;
 import org.spon.edolnotify.service.NotifyRecipientResolver;
 import org.spon.edolnotify.service.NotifyTenantContext;
@@ -17,7 +19,6 @@ import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,11 +28,21 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class MqttEventListener {
 
+    private static final String LEGACY_EVENT = "event";
+
     private final PrinterService printerService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final MessageService messageService;
     private final DeploymentMode deploymentMode;
     private final NotifyRecipientResolver recipientResolver;
+    private final CoreMqttIngressObservation ingress = new CoreMqttIngressObservation();
+
+    @PostConstruct
+    void initializeObservations() {
+        if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
+            log.info("Core MQTT ingress initialized: consumer=notify, counters={}", ingress.snapshot());
+        }
+    }
 
     @Value("${telegram.progress-message-step}")
     private int telegramProgressMessageStep;
@@ -40,6 +51,7 @@ public class MqttEventListener {
 
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public void handle(Message<?> message) {
+        boolean validatedEnvelope = false;
         try {
             String payload = message.getPayload().toString();
 
@@ -51,18 +63,23 @@ public class MqttEventListener {
             if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
                 CoreMqttEventEnvelope envelope = objectMapper.treeToValue(json, CoreMqttEventEnvelope.class);
                 validateEnvelope(json, envelope);
+                ingress.validated(envelope.schemaVersion(), json.has(LEGACY_EVENT));
+                validatedEnvelope = true;
+                log.info("Core MQTT ingress validated: consumer=notify, counters={}", ingress.snapshot());
                 tenantScope = recipientResolver.openForEvent(envelope.tenantId());
                 event = envelope.eventType();
                 printerId = envelope.printerId();
                 eventPayload = json.required("payload");
             } else {
-                event = json.required("event").asText();
+                event = json.required(LEGACY_EVENT).asText();
                 printerId = UUID.fromString(json.required("printerId").asText());
                 eventPayload = json;
             }
 
             try {
-                log.info("EdolCore MQTT EVENT: {}", event);
+                if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
+                    log.info("EdolCore MQTT EVENT: {}", event);
+                }
                 PrinterState printerState = printerService.getState(printerId);
 
                 switch (event) {
@@ -98,25 +115,25 @@ public class MqttEventListener {
             }
 
         } catch (Exception e) {
-            log.error("Failed to process MQTT message", e);
+            if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
+                if (validatedEnvelope) {
+                    ingress.processingFailed();
+                } else {
+                    ingress.rejectEnvelope();
+                }
+                log.warn("Rejected Core MQTT ingress: consumer=notify, counters={}", ingress.snapshot());
+            } else {
+                log.error("Failed to process MQTT message", e);
+            }
         }
     }
 
     private void validateEnvelope(JsonNode json, CoreMqttEventEnvelope envelope) {
-        if (envelope.schemaVersion() != 2
-                || envelope.eventId() == null
-                || envelope.eventType() == null
-                || envelope.tenantId() == null
-                || envelope.printerId() == null
-                || envelope.timestamp() == null
-                || envelope.payload() == null) {
-            throw new IllegalArgumentException("Incomplete Core MQTT v2 envelope");
+        if (json == null || !json.isObject() || !json.required("schemaVersion").isIntegralNumber()
+                || (json.has(LEGACY_EVENT) && !json.required(LEGACY_EVENT).isTextual())) {
+            throw new IllegalArgumentException("Invalid Core MQTT envelope field types");
         }
-        Instant.parse(envelope.timestamp());
-        if (!envelope.eventType().equals(json.required("event").asText())
-                || !envelope.printerId().equals(UUID.fromString(json.required("printerId").asText()))) {
-            throw new IllegalArgumentException("Core MQTT legacy and envelope identities disagree");
-        }
+        envelope.validate(json.has(LEGACY_EVENT) ? json.get(LEGACY_EVENT).asText() : null);
     }
 
     private void handlePrintTimelapse(UUID printerId, JsonNode json) {

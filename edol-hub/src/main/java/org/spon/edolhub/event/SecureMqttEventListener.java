@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edol.mqtt.CoreMqttEventEnvelope;
+import org.spon.edol.mqtt.CoreMqttIngressObservation;
+import jakarta.annotation.PostConstruct;
 import org.spon.edolhub.service.CoreMqttEventReceiptService;
 import org.spon.edolhub.service.PrintJobService;
 import org.spon.edolhub.service.PrinterService;
@@ -18,7 +20,6 @@ import org.springframework.integration.acks.SimpleAcknowledgment;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.time.DateTimeException;
 import java.util.UUID;
 
@@ -29,13 +30,19 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "edol-hub.runtime.mqtt-enabled", havingValue = "true")
 public class SecureMqttEventListener {
 
-    private static final int SCHEMA_VERSION = 2;
+    private static final String LEGACY_EVENT = "event";
 
     private final PrinterService printerService;
     private final PrintJobService printJobService;
     private final TenantContext tenantContext;
     private final CoreMqttEventReceiptService receiptService;
     private final ObjectMapper objectMapper;
+    private final CoreMqttIngressObservation ingress = new CoreMqttIngressObservation();
+
+    @PostConstruct
+    void initializeObservations() {
+        log.info("Core MQTT ingress initialized: consumer=hub, counters={}", ingress.snapshot());
+    }
 
     @ServiceActivator(inputChannel = "secureMqttInputChannel")
     public void handle(Message<?> message) {
@@ -44,8 +51,11 @@ public class SecureMqttEventListener {
             JsonNode json = objectMapper.readTree(message.getPayload().toString());
             envelope = objectMapper.treeToValue(json, CoreMqttEventEnvelope.class);
             validateEnvelope(json, envelope);
+            ingress.validated(envelope.schemaVersion(), json.has(LEGACY_EVENT));
+            log.info("Core MQTT ingress validated: consumer=hub, counters={}", ingress.snapshot());
         } catch (JsonProcessingException | IllegalArgumentException | DateTimeException exception) {
-            log.warn("Rejected Core MQTT integration event", exception);
+            ingress.rejectEnvelope();
+            log.warn("Rejected Core MQTT envelope: consumer=hub, counters={}", ingress.snapshot());
             acknowledge(message);
             return;
         }
@@ -53,9 +63,11 @@ public class SecureMqttEventListener {
         try {
             process(envelope);
         } catch (IllegalArgumentException exception) {
-            log.warn("Rejected Core MQTT integration event", exception);
-            acknowledge(message);
+            ingress.processingFailed();
+            log.warn("Rejected Core MQTT processing: consumer=hub, counters={}", ingress.snapshot());
         } catch (Exception exception) {
+            ingress.processingFailed();
+            log.warn("Failed Core MQTT processing: consumer=hub, counters={}", ingress.snapshot());
             throw new IllegalStateException("Could not process Core MQTT integration event", exception);
         }
         acknowledge(message);
@@ -111,19 +123,10 @@ public class SecureMqttEventListener {
     }
 
     private void validateEnvelope(JsonNode json, CoreMqttEventEnvelope envelope) {
-        if (envelope.schemaVersion() != SCHEMA_VERSION
-                || envelope.eventId() == null
-                || envelope.eventType() == null
-                || envelope.tenantId() == null
-                || envelope.printerId() == null
-                || envelope.timestamp() == null
-                || envelope.payload() == null) {
-            throw new IllegalArgumentException("Incomplete Core MQTT v2 envelope");
+        if (json == null || !json.isObject() || !json.required("schemaVersion").isIntegralNumber()
+                || (json.has(LEGACY_EVENT) && !json.required(LEGACY_EVENT).isTextual())) {
+            throw new IllegalArgumentException("Invalid Core MQTT envelope field types");
         }
-        Instant.parse(envelope.timestamp());
-        if (!envelope.eventType().equals(json.required("event").asText())
-                || !envelope.printerId().equals(UUID.fromString(json.required("printerId").asText()))) {
-            throw new IllegalArgumentException("Core MQTT legacy and envelope identities disagree");
-        }
+        envelope.validate(json.has(LEGACY_EVENT) ? json.get(LEGACY_EVENT).asText() : null);
     }
 }

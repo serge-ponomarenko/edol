@@ -14,6 +14,11 @@ import org.springframework.messaging.support.MessageBuilder;
 
 import java.util.Map;
 import java.util.UUID;
+import org.spon.edol.mqtt.CoreMqttIngressObservation;
+import org.springframework.test.util.ReflectionTestUtils;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -24,6 +29,69 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class SecureMqttEventListenerTest {
+
+    @Test
+    void acceptsV3WithoutLegacyFieldsThroughTheExistingReceiptBoundary() throws Exception {
+        PrinterService printers = mock(PrinterService.class);
+        PrintJobService jobs = mock(PrintJobService.class);
+        TenantContext tenants = mock(TenantContext.class);
+        CoreMqttEventReceiptService receipts = mock(CoreMqttEventReceiptService.class);
+        var listener = listener(printers, jobs, tenants, receipts);
+        UUID tenantId = UUID.randomUUID();
+        UUID printerId = UUID.randomUUID();
+        ObjectNode json = (ObjectNode) new ObjectMapper().readTree(envelope(tenantId, printerId, "print.started"));
+        json.put("schemaVersion", 3);
+        json.remove("event");
+        listener.handle(MessageBuilder.withPayload(json.toString()).build());
+
+        verify(tenants).open(tenantId);
+        verify(receipts).process(any(CoreMqttEventEnvelope.class), any(Runnable.class));
+        assertThat(observation(listener).snapshot().validatedV3()).isEqualTo(1);
+        assertThat(observation(listener).snapshot().withLegacyEvent()).isZero();
+    }
+
+    @Test
+    void rejectsInvalidVersionsAndLegacyOnlyMessagesBeforeOpeningTenantContext() throws Exception {
+        PrinterService printers = mock(PrinterService.class);
+        PrintJobService jobs = mock(PrintJobService.class);
+        TenantContext tenants = mock(TenantContext.class);
+        CoreMqttEventReceiptService receipts = mock(CoreMqttEventReceiptService.class);
+        var listener = listener(printers, jobs, tenants, receipts);
+        String v2 = envelope(UUID.randomUUID(), UUID.randomUUID(), "print.started");
+        for (String invalid : new String[]{v2.replace("\"schemaVersion\":2", "\"schemaVersion\":4"),
+                v2.replace("\"schemaVersion\":2", "\"schemaVersion\":2.5"),
+                "{\"event\":\"print.started\"}", "null", "", "{malformed}"}) {
+            var acknowledgment = mock(SimpleAcknowledgment.class);
+            listener.handle(MessageBuilder.withPayload(invalid)
+                    .setHeader(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK, acknowledgment).build());
+            verify(acknowledgment).acknowledge();
+        }
+        verifyNoInteractions(tenants, receipts, printers, jobs);
+        assertThat(observation(listener).snapshot().rejectedEnvelope()).isEqualTo(6);
+    }
+
+    @Test
+    void countsTenantRejectionAndAcknowledgesItOnlyOnce() throws Exception {
+        PrinterService printers = mock(PrinterService.class);
+        PrintJobService jobs = mock(PrintJobService.class);
+        TenantContext tenants = mock(TenantContext.class);
+        CoreMqttEventReceiptService receipts = mock(CoreMqttEventReceiptService.class);
+        doThrow(new IllegalArgumentException("Wrong tenant")).when(receipts)
+                .process(any(CoreMqttEventEnvelope.class), any(Runnable.class));
+        var listener = listener(printers, jobs, tenants, receipts);
+        var acknowledgment = mock(SimpleAcknowledgment.class);
+        listener.handle(MessageBuilder.withPayload(envelope(UUID.randomUUID(), UUID.randomUUID(), "print.started"))
+                .setHeader(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK, acknowledgment).build());
+        verifyNoInteractions(printers, jobs);
+        verify(acknowledgment).acknowledge();
+        assertThat(observation(listener).snapshot().validatedV2()).isEqualTo(1);
+        assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(1);
+        assertThat(observation(listener).snapshot().rejectedEnvelope()).isZero();
+    }
+
+    private CoreMqttIngressObservation observation(SecureMqttEventListener listener) {
+        return (CoreMqttIngressObservation) ReflectionTestUtils.getField(listener, "ingress");
+    }
 
     @Test
     void opensTheEnvelopeTenantAndAppliesAValidatedEventOnce() throws Exception {
