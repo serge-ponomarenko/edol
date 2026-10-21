@@ -61,6 +61,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/api/printers/*/agent/**").hasAuthority("SCOPE_core.agent.manage")
                         .requestMatchers(HttpMethod.POST, "/api/printers").hasAuthority(PRINTER_MANAGE_SCOPE)
                         .requestMatchers(HttpMethod.PATCH, "/api/printers/**").hasAuthority(PRINTER_MANAGE_SCOPE)
                         .requestMatchers(HttpMethod.DELETE, "/api/printers/**").hasAuthority(PRINTER_MANAGE_SCOPE)

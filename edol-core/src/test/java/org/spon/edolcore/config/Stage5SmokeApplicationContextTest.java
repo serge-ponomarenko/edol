@@ -72,6 +72,7 @@ class Stage5SmokeApplicationContextTest {
         JdbcClient jdbc = JdbcClient.create(administratorDataSource);
         jdbc.sql("drop schema if exists core cascade").update();
         jdbc.sql("drop schema if exists hub cascade").update();
+        jdbc.sql("drop role if exists core_agent_authenticator").update();
         jdbc.sql("drop role if exists " + CORE_CATALOG).update();
         jdbc.sql("drop role if exists " + CORE_RUNTIME).update();
         jdbc.sql("drop role if exists " + CORE_FLYWAY).update();
@@ -81,6 +82,9 @@ class Stage5SmokeApplicationContextTest {
         jdbc.sql("drop role if exists hub_schema_owner").update();
 
         jdbc.sql("create role core_schema_owner nologin nosuperuser nocreatedb nocreaterole noinherit nobypassrls").update();
+        // V10 function ownership is prepared by bootstrap, never by the runtime login.
+        jdbc.sql("create role core_agent_authenticator nologin nosuperuser nocreatedb nocreaterole noinherit nobypassrls").update();
+        jdbc.sql("grant core_agent_authenticator to core_schema_owner").update();
         createLoginRole(jdbc, CORE_FLYWAY);
         createLoginRole(jdbc, CORE_RUNTIME);
         createLoginRole(jdbc, CORE_CATALOG);
@@ -110,6 +114,11 @@ class Stage5SmokeApplicationContextTest {
             );
 
             assertThat(context.isActive()).isTrue();
+            assertThat(context.getBean(org.spon.edolcore.service.agent.pairing.AgentPairingService.class)).isNotNull();
+            assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/api/agent/v1/enroll"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{}"))
+                    .build())).isEqualTo(403);
             assertThat(tenantContext.hasCurrentTenant()).isFalse();
             assertThat(requestStatus(HttpRequest.newBuilder(endpoint(context, "/actuator/health"))
                     .GET()
@@ -172,6 +181,9 @@ class Stage5SmokeApplicationContextTest {
                 transactionTemplate.executeWithoutResult(status ->
                         printerRepository.saveAndFlush(printer(printerId))
                 );
+                // Exercises JdbcTemplate through the real tenant-aware JpaTransactionManager.
+                assertThat(context.getBean(org.spon.edolcore.service.agent.pairing.AgentPairingService.class)
+                        .status(printerId)).isNull();
             }
 
             assertThat(JdbcClient.create(administratorDataSource)
@@ -211,6 +223,9 @@ class Stage5SmokeApplicationContextTest {
     private Map<String, Object> applicationProperties() {
         return Map.ofEntries(
                 Map.entry("edol.deployment.mode", "secure-multi-tenant"),
+                Map.entry("edol-core.agent.enabled", "true"),
+                Map.entry("edol-core.agent.pairing-keys[1]", java.util.Base64.getEncoder().encodeToString(new byte[32])),
+                Map.entry("edol-core.agent.credential-keys[1]", java.util.Base64.getEncoder().encodeToString(new byte[32])),
                 Map.entry("server.port", "0"),
                 Map.entry("spring.main.allow-bean-definition-overriding", "true"),
                 Map.entry("spring.datasource.url", POSTGRES.getJdbcUrl()),

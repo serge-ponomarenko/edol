@@ -1760,6 +1760,104 @@ Docker/Flyway cases executed using disposable Testcontainers resources; the
 wrapper closed its temporary Docker tunnel. This does not modify or establish
 acceptance of working development/production databases or live agents.
 
+### Stage 9.3b.1 pairing and HTTPS foundation
+
+Operator clarification: Agent support is required in secure deployment. A
+remote owner connects an agent inside the printer LAN; it initiates outbound
+EDOL connections without exposing printer ports to the internet. Pairing uses
+the AMS terminal user-flow pattern with separate Core-owned agent identities,
+keys, scope and lifecycle. It does not reuse AMS credentials or persistence.
+
+This bounded server increment adds secure-only V10 `core.agents`, atomic
+five-minute code consumption, digest-only credentials, owner-authorized Hub
+pair/replace/revoke UI, dedicated `core.agent.manage` backend authorization,
+and stateless credential-bound HTTPS uploads under `/api/agent/v1`. Runtime
+RLS and the fixed pre-tenant auth functions enforce persisted printer/tenant
+binding. Their NOLOGIN owner has no BYPASSRLS and cannot be assumed by runtime.
+Separate administrative bootstrap prepares role ownership for the restricted
+Flyway login; runtime receives no role-creation privilege. Creation requires
+an enabled AGENT printer, while revoke remains available after disable/mode
+change. Home initializes none of these beans/keys/tables. Both feature flags
+default off. See the complete
+[agent pairing contract](../deployment/stage9-agent-pairing-contract.md).
+
+Firmware, broker users/ACLs, secure MQTT routing and active-session revocation
+are outstanding parts of 9.3b. Enrollment currently issues an HTTPS credential,
+not a provisioned MQTT password. Do not enable the feature on working services
+or equate this increment with full secure-agent acceptance. The chosen device
+pairing flow does not silently waive the remaining transport/certificate
+decision. EDOL-AGENT cleanup/refactor/publication has handed off sanitized
+`main` at `14da63f360d4a288c7207340dc60cd9e78ce7907`; the backend session now
+owns coordinated firmware security changes from that baseline. The original
+local secret-bearing history is retained and must not be pushed.
+
+Source/disposable checks on 2026-10-21: full remote-Docker `mvn -B clean verify`
+passed 287 tests (Core API 10, Core 87, Hub 127, Notify 15, AMS 48), with zero
+failures, errors or skips in the final full rerun. This XML-based aggregate
+corrects the earlier erroneous 433 total. The final role-attribute/real-bean
+changes are included. It verified actual pairing bean initialization, plaintext enrollment
+denial, JDBC through the tenant-aware JPA transaction manager, RLS using a real
+non-superuser login, code replay/expiry/rotation/revocation and concurrent
+enrollment with one winner. It did not establish actual device HTTPS behavior.
+No working DB, broker or firmware was changed; temporary tunnels and disposable
+PostgreSQL were cleaned by the verification workflow.
+
+Read-only Sonar snippet analysis covered all 21 changed/added Java files and
+both HTML templates. Literal duplication, accessibility and CDN integrity
+findings were fixed. Tabler was pinned to the same resolved 1.7.0 asset and its
+SHA-384 verified against that fixed URL; Bootstrap's existing 5.3.2 asset was
+also verified. Only Java `S1598` findings with an empty analyzer path remain;
+actual packages match. SQL is outside the available snippet analyzer's supported
+languages and was instead exercised by PostgreSQL/Flyway tests. This is not a
+file-level Sonar quality-gate or rollout claim.
+
+### Stage 9.3b.2 firmware HTTPS pairing
+
+Implemented in the isolated firmware `stage9-agent-pairing` worktree from the
+sanitized `14da63f` baseline. The existing `lolin_d32` Home profile remains the
+default. Explicit `lolin_d32_secure` requires a certificate-only local CA bundle
+and uses `WiFiClientSecure` for code enrollment and versioned uploads, with
+time/host checks, response bounds, no redirects and no plaintext fallback.
+The new identity uses a separate NVS namespace and a final ready marker;
+Home Preferences keys, endpoints and MQTT contracts retain their meaning.
+The cleanup session's snapshot-status/camera-timeout fixes are preserved.
+
+Operator decision: the existing open setup Wi-Fi AP and connection procedure
+remain unchanged; no AP password or label/card requirement is introduced.
+This is an explicit local-onboarding limitation, not protected setup acceptance.
+The setup form adds code entry for the secure build but never prepopulates the
+issued credential or stores the pairing code. Do not reopen the deferred AP
+decision as an implementation prerequisite.
+
+Five native C++ executables and three Python build-hook cases passed. Native
+enrollment checks compile the real client and JSON parser against fake HTTP/TLS;
+they do not prove TLS behavior. Three actual ESP32 profiles built successfully:
+Home RAM 14.5% / flash 75.6%, secure RAM 14.9% / flash 78.1%, opt-in secure
+smoke RAM 14.9% / flash 78.2%. Both secure builds without a CA failed as required.
+The CA fixture was a public system trust root,
+generated temporarily and removed; no trust/key material was committed.
+Final Python checks passed after explicitly setting the parsing context's
+minimum TLS version. Source C++ did not change after the successful builds.
+
+The available read-only Sonar snippet tool analyzed all three changed/added
+Python files with no remaining findings. Its supported-language list does not
+include C++, so no C++ Sonar result is claimed; compiler/host checks provide the
+available source verification. No source finding was suppressed.
+
+Secure MQTT intentionally remains blocked rather than reusing the HTTPS secret
+on the legacy plaintext transport. Complete broker identity/ACL/revocation and
+secure command routing are the next required parts of 9.3b. There was no device
+flash, serial monitor, live backend/MQTT, printer action, NVS operation or push.
+Physical TLS, power-cycle enrollment and end-to-end operation remain untested.
+
+The operator authorized a separate disposable physical Agent/printer session.
+`docs/deployment/stage9-agent-disposable-smoke-workbook.md` records prerequisites,
+isolated role/TLS setup, one-action-at-a-time cases, observation windows and
+restoration. Only `lolin_d32_secure_smoke` adds USB-triggered production uploads
+and an explicit setup-portal recovery command; normal builds have no console.
+This is preparation, not an executed physical or MQTT gate. Working dev/prod
+database migration remains deferred until Stage 9 completes and rollout is approved.
+
 ### Development and production migration sequencing
 
 Operator decision on 2026-10-21: working development and production database

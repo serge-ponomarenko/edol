@@ -171,10 +171,37 @@ class CorePrinterHttpAuthorizationTest {
                 .header("X-EDOL-Tenant-Id", TENANT_A);
     }
 
+    @Test
+    void requiresDedicatedAgentManagementScopeAndPersistedOwnership() throws Exception {
+        start("secure-multi-tenant", true);
+        var agents = context.getBean(org.spon.edolcore.service.agent.pairing.AgentPairingService.class);
+        var management = context.getBean(PrinterManagementService.class);
+        when(management.getPrinter(PRINTER_A)).thenReturn(printer(PRINTER_A, TENANT_A));
+        String path = "/api/printers/" + PRINTER_A + "/agent/pairings";
+        mvc.perform(authenticated(post(path))).andExpect(status().isForbidden());
+        verifyNoInteractions(agents);
+        Jwt token = Jwt.withTokenValue("synthetic-token").header("alg", "RS256")
+                .claim("azp", "edol-hub-service").claim("scope", "tenant.context core.agent.manage")
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
+        when(context.getBean(JwtDecoder.class).decode("synthetic-token")).thenReturn(token);
+        mvc.perform(authenticated(post(path))).andExpect(status().isOk());
+        verify(agents).create(PRINTER_A, false);
+        org.mockito.Mockito.clearInvocations(agents);
+        when(management.getPrinter(PRINTER_B)).thenReturn(printer(PRINTER_B, TENANT_B));
+        mvc.perform(authenticated(post("/api/printers/" + PRINTER_B + "/agent/revoke")))
+                .andExpect(status().isNotFound());
+        verifyNoInteractions(agents);
+    }
+
     private void start(String mode) {
+        start(mode, false);
+    }
+
+    private void start(String mode, boolean agentEnabled) {
         context = new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext());
         TestPropertyValues.of("edol.deployment.mode=" + mode,
+                "edol-core.agent.enabled=" + agentEnabled,
                 "bot.webAdminName=synthetic-admin", "bot.webAdminPassword={noop}synthetic-password",
                 "camera.store-snapshots=false", "camera.snapshot-dir=target/unused-http-test-snapshots")
                 .applyTo(context);
@@ -200,8 +227,13 @@ class CorePrinterHttpAuthorizationTest {
     @EnableWebMvc
     @EnableWebSecurity
     @Import({SecurityConfig.class, CoreTenantContextFilter.class, CoreTenantContext.class,
-            CorePrinterHttpAuthorizationConfiguration.class})
+            CorePrinterHttpAuthorizationConfiguration.class,
+            org.spon.edolcore.controller.AgentPairingManagementController.class})
     static class WebConfiguration {
+        @Bean
+        org.spon.edolcore.service.agent.pairing.AgentPairingService agents() {
+            return mock(org.spon.edolcore.service.agent.pairing.AgentPairingService.class);
+        }
         @Bean
         DeploymentMode mode(org.springframework.core.env.Environment environment) {
             return "home".equals(environment.getRequiredProperty("edol.deployment.mode"))

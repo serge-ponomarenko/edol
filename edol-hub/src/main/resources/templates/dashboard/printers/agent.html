@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent pairing • EDOL</title>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.7.0/dist/css/tabler.min.css" rel="stylesheet"
+          integrity="sha384-/ZecLhD4wkLsbjdJWUEWeSZJJSEQ3XCPdtLmmm6SW128l+eSNplV12po3tSK7pdy" crossorigin="anonymous">
+</head>
+<body>
+<main class="container-xl py-4">
+    <h1>Printer agent</h1>
+    <p>Connect an agent in your printer's local network. It connects to EDOL automatically.</p>
+    <p>Status: <strong th:text="${agentStatus == null ? 'Not paired' : agentStatus.state}"></strong></p>
+    <p class="alert alert-danger" th:if="${agentError}" th:text="${agentError}"></p>
+    <section class="alert alert-primary" th:if="${agentPairing}">
+        <h2>Enter this code in the agent setup</h2>
+        <p class="display-6 font-monospace" th:text="${agentPairing.pairingCode}"></p>
+        <p>Shown once. Valid until <time th:text="${agentPairing.expiresAt}"></time>. Do not share it.</p>
+    </section>
+    <form method="post" th:action="@{/printers/{id}/agent/pairings(id=${agentPrinterId})}">
+        <button class="btn btn-primary mb-3" type="submit">Pair agent</button>
+    </form>
+    <form method="post" th:action="@{/printers/{id}/agent/rotate(id=${agentPrinterId})}">
+        <button class="btn btn-outline-warning mb-3" type="submit">Replace agent and issue a new code</button>
+        <p>Immediately revokes the previous agent credential.</p>
+    </form>
+    <form method="post" th:action="@{/printers/{id}/agent/revoke(id=${agentPrinterId})}">
+        <button class="btn btn-outline-danger mb-3" type="submit">Revoke agent</button>
+    </form>
+    <a th:href="@{/printers/{id}/edit(id=${agentPrinterId})}">Back to printer</a>
+</main>
+</body>
+</html>

@@ -233,6 +233,36 @@ reject DTDs and external entities. Storage assumes application-owned directories
 with permissions preventing concurrent local replacement by another user;
 remote path/link defenses do not provide a privileged-local-process boundary.
 
+Stage 9.3b.1 adds an opt-in secure agent pairing/HTTPS foundation. Core owns
+`core.agents`; Hub checks OWNER membership/printer access and calls its
+printer-scoped management API with the dedicated `core.agent.manage` scope.
+One-time five-minute codes are atomically exchanged for an agent-specific
+credential; only keyed digests persist. A separate stateless `/api/agent/v1/**`
+chain derives tenant/printer from the active credential before uploads and
+rejects device tenant/agent headers and plaintext requests. Forced RLS and two
+narrow pre-tenant functions protect the new secure-only V10 table; their
+NOLOGIN owner has NOBYPASSRLS and runtime cannot assume it. Home initializes
+none of this. Both service feature flags default off. Firmware pairing,
+broker identity/ACLs and MQTT session revocation are not implemented by this
+foundation; generic agent MQTT remains a separate outstanding boundary, not
+accepted secure ingress. See the
+[agent pairing contract](deployment/stage9-agent-pairing-contract.md).
+
+Stage 9.3b.2 firmware source adds an explicit secure PlatformIO profile for
+one-time HTTPS pairing and credential-bound streamed uploads, with a public CA
+provided through a build-local header and a separate device identity namespace.
+The Home profile remains the default and retains legacy settings/contracts.
+The owner explicitly deferred setup AP hardening: its existing open Wi-Fi and
+portal remain unchanged as a local-trust limitation. Secure agent MQTT is
+still disabled pending the broker identity/ACL contract; this is not complete
+secure-agent or physical TLS acceptance.
+
+The opt-in `lolin_d32_secure_smoke` lab environment adds bounded USB entry points
+into the same production camera/FTPS-to-HTTPS services and an explicit return
+to the existing setup portal without clearing identity/settings. Normal Home
+and secure builds contain no lab console. See the Stage 9 disposable smoke
+workbook; direct USB-triggered uploads do not establish secure MQTT operation.
+
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and
 `docs/migrations/secure-multi-tenant-migration-plan.md`. These documents define
