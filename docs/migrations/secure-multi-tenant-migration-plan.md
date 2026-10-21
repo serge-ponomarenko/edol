@@ -1672,6 +1672,94 @@ timestamps must throw into the rejection path, as the contract tests verify;
 the parsed value is intentionally unused. Neither finding is suppressed, and
 this is not a file-level Sonar quality-gate claim.
 
+### Stage 9.3a upload hardening
+
+Implemented source boundaries (2026-10-21):
+
+- `POST /api/agent/upload` accepts a portable `.3mf` basename, including
+  `.gcode.3mf`. Traversal, absolute paths, separators, Windows device/ADS names,
+  and control characters are rejected. Root, printer, metadata directories and
+  existing targets reject symlinks/reparse-point aliases, including Windows
+  junctions to another printer inside the root.
+- The model body streams to a unique staging file in the destination directory.
+  Validation precedes `ATOMIC_MOVE` replacement; unsupported atomic moves fail
+  closed. Failed copying/validation removes only its own staging file, preserves
+  the previous destination, and emits no model-available event. Events follow
+  successful model promotion; later semantic parsing/event-handler failure is
+  outside this upload-filter guarantee.
+- ZIP structure must include `[Content_Types].xml` and `_rels/.rels`; all names
+  are checked for unsafe segments and case-insensitive duplicates. Selected
+  metadata and package markers are streamed with actual inflated-byte and CRC
+  checks. Other entries are not inflated. These are structural/resource checks,
+  not full 3MF schema or model/G-code content validation. Package layout is
+  consistent with the [BambuStudio writer](https://github.com/bambulab/BambuStudio/blob/master/src/libslic3r/Format/bbs_3mf.cpp).
+- Metadata extraction uses the same limits and an explicit fixed filename
+  allowlist for settings, slice info and plate images/JSON. All selected outputs
+  are staged before promotion. Validation failures preserve prior metadata;
+  promotion is atomic per file, not a batch transaction on subsequent disk I/O
+  failure. All three slice-info XML parser entrypoints reject DTDs, external
+  entities and external schema access.
+- `POST /api/agent/camera/snapshot` bounds bytes, checks JPEG markers, dimensions
+  and decoding (including decoder warnings), then updates the snapshot store.
+  Invalid/oversized images leave its previous value unchanged.
+- Agent resolution precedes body consumption. Unknown agent is generic `404`,
+  unsafe model paths `400`, byte/metadata/count limits `413`, invalid package or
+  JPEG/dimensions `415`. I/O failure remains `500`. Audit logs contain bounded
+  kind/status and accepted printer/byte counts, not raw headers or filenames;
+  snapshot success is debug-level to avoid a frame-rate info log.
+
+The configurable positive limits under `edol-core.upload` are:
+
+| Property | Default |
+| --- | --- |
+| `model-max-bytes` | 268435456 (256 MiB) |
+| `snapshot-max-bytes` | 8388608 (8 MiB) |
+| `metadata-entry-max-bytes` | 16777216 (16 MiB) |
+| `metadata-total-max-bytes` | 67108864 (64 MiB, including package markers) |
+| `archive-max-entries` | 10000 |
+| `snapshot-max-pixels` | 40000000 |
+
+Total metadata capacity must cover one entry. No servlet multipart setting is
+relied on for these raw-stream routes. Same-filesystem atomic move support and
+application-owned storage permissions are prerequisites. Concurrent mutation by
+a privileged local process is outside this filesystem boundary. Old files are
+not retroactively rewritten or deleted. Direct printer transport is unchanged;
+its subsequent metadata extraction shares the new guard.
+
+Home retains its legacy trusted-network caller model and needs no OAuth, client
+certificates or tenant headers for these guards. `X-Agent-Id` remains routing,
+not proof of identity. Secure mode still denies both agent routes even to a
+service token bearing an upload-like scope; Stage 9.3b must define machine
+identity before enabling them. This source change does not claim agent identity
+acceptance, compatibility-removal traffic evidence, or a production rollout.
+
+Rollout requires confirming existing agent filenames, real package layout and
+expected file/image sizes against these defaults in the chosen environment.
+Raise a limit explicitly if necessary; do not disable containment or reopen
+secure ingress. Preserve files/config and use the preceding coordinated Core
+release for rollback; no database migration or file conversion is introduced.
+No manual hardware smoke is required for this source/disposable gate. Actual
+agent compatibility and storage atomic-move behavior on the deployment volume
+remain deployment checks; synthetic tests do not establish either live result.
+
+Focused acceptance: 29 tests passed with no failures, errors or skips. Coverage
+includes handler status/state/event ordering, actual streamed limits, metadata
+inflation/CRC/count limits, malformed/truncated JPEG and pixel bounds, Windows
+junction containment, unsupported atomic move, staging cleanup, XML external
+entity rejection and secure-route denial. The handler tests mock persistence
+and event consumers; they do not establish live agent interoperability.
+Read-only Sonar snippet analysis covered all 16 modified/added Java files.
+The regex style finding was fixed; the only remaining findings are `java:S1598`
+with an empty analyzer path, while actual package paths match. No suppression
+or file-level Sonar quality-gate claim is made.
+
+Final source/disposable acceptance on 2026-10-21:
+`with-remote-docker.ps1 mvn -B clean verify` passed all 414 tests (Core API 10,
+Core 74, Hub 267, Notify 15, AMS 48), with zero failures, errors or skips.
+Docker/Flyway cases executed using disposable Testcontainers resources; the
+wrapper closed its temporary Docker tunnel. This does not modify or establish
+acceptance of working development/production databases or live agents.
+
 ### Development and production migration sequencing
 
 Operator decision on 2026-10-21: working development and production database

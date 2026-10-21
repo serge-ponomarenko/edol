@@ -210,6 +210,29 @@ by tenant/processing checks. No payload, credential, tenant, printer, or topic
 value is used as a counter dimension. Home does not initialize or record these
 secure observations.
 
+Stage 9.3a bounds agent model and snapshot uploads in both deployment modes.
+Core resolves the configured agent before reading the body; Home still uses
+`X-Agent-Id` as trusted-network routing, not authentication. Secure
+`/api/agent/**` remains denied pending a separately accepted machine identity.
+Models use portable basename validation, no-link directory/target checks, and
+same-directory staging with atomic replacement only after package validation.
+Upload-filter rejection preserves the previous model and emits no
+`ModelAvailableEvent`. JPEG snapshots are byte-bounded and decoded only after
+dimension checks, before replacing the in-memory snapshot.
+
+`edol-core.upload` defaults are 256 MiB per model, 8 MiB per snapshot, 16 MiB
+per selected metadata entry, 64 MiB total inflated metadata including package
+markers, 10,000 archive entries, and 40 million snapshot pixels. Limits are
+configurable without enabling OAuth or tenancy. Package checks require ZIP
+structure and the two package markers, safe distinct entry names, and bounded
+CRC-checked reads of selected metadata; they do not validate the full 3MF/XML
+schema or inflate unused model/G-code entries. Metadata extraction stages all
+selected outputs before per-file atomic promotion. It is not a multi-file disk
+transaction if an I/O failure occurs during promotion. Slice-info XML parsers
+reject DTDs and external entities. Storage assumes application-owned directories
+with permissions preventing concurrent local replacement by another user;
+remote path/link defenses do not provide a privileged-local-process boundary.
+
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and
 `docs/migrations/secure-multi-tenant-migration-plan.md`. These documents define

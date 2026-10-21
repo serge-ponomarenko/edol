@@ -11,6 +11,7 @@ import org.w3c.dom.NodeList;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.XMLConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathFactory;
@@ -25,8 +26,7 @@ public class SliceInfoParserService {
 
     public int extractPlateIndex(Path sliceInfoPath) {
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
+            DocumentBuilder builder = secureBuilder();
 
             Document doc = builder.parse(sliceInfoPath.toFile());
 
@@ -50,10 +50,7 @@ public class SliceInfoParserService {
         List<Filament> filaments = new ArrayList<>();
 
         try {
-            Document doc = DocumentBuilderFactory
-                    .newInstance()
-                    .newDocumentBuilder()
-                    .parse(sliceInfoPath.toFile());
+            Document doc = secureBuilder().parse(sliceInfoPath.toFile());
 
             NodeList nodes = doc.getElementsByTagName("filament");
 
@@ -89,10 +86,7 @@ public class SliceInfoParserService {
         List<PrintObject> printObjects = new ArrayList<>();
 
         try {
-            Document doc = DocumentBuilderFactory
-                    .newInstance()
-                    .newDocumentBuilder()
-                    .parse(sliceInfoPath.toFile());
+            Document doc = secureBuilder().parse(sliceInfoPath.toFile());
 
             NodeList nodes = doc.getElementsByTagName("object");
 
@@ -114,5 +108,18 @@ public class SliceInfoParserService {
         }
 
         return printObjects;
+    }
+
+    private DocumentBuilder secureBuilder() throws ParserConfigurationException {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+        return factory.newDocumentBuilder();
     }
 }

@@ -150,6 +150,22 @@ class CorePrinterHttpAuthorizationTest {
         assertThat(context.getBeansOfType(CorePrinterHttpAuthorizationConfiguration.class)).isEmpty();
     }
 
+    @Test
+    void keepsSecureAgentIngressClosedEvenWhenTheServiceTokenHasAnUploadScope() throws Exception {
+        start("secure-multi-tenant");
+        Jwt token = Jwt.withTokenValue("synthetic-token").header("alg", "RS256")
+                .claim("azp", "edol-hub-service").claim("scope", "tenant.context core.agent.upload")
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
+        when(context.getBean(JwtDecoder.class).decode("synthetic-token")).thenReturn(token);
+        mvc.perform(authenticated(post("/api/agent/upload"))
+                        .param("fileName", "part.3mf").contentType(MediaType.APPLICATION_OCTET_STREAM).content("bad"))
+                .andExpect(status().isForbidden());
+        mvc.perform(authenticated(post("/api/agent/camera/snapshot"))
+                        .contentType(MediaType.IMAGE_JPEG).content("bad"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(context.getBean(PrinterManagementService.class), context.getBean(CameraSnapshotStore.class));
+    }
+
     private MockHttpServletRequestBuilder authenticated(MockHttpServletRequestBuilder request) {
         return request.header("Authorization", "Bearer synthetic-token")
                 .header("X-EDOL-Tenant-Id", TENANT_A);
