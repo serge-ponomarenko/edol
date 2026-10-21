@@ -6,7 +6,6 @@ public record PrinterConnectionDto(
         String ftpHost,
         Integer ftpPort,
         String modelDirectory,
-        String accessCode,
         String agentId
 ) {
 }

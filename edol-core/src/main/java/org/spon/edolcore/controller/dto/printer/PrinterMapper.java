@@ -39,7 +39,6 @@ public class PrinterMapper {
                 connection.getFtpHost(),
                 connection.getFtpPort(),
                 connection.getModelDirectory(),
-                connection.getAccessCode(),
                 connection.getAgentId()
         );
     }
@@ -68,7 +67,7 @@ public class PrinterMapper {
 
     public PrinterConnectionConfiguration createConnection(
             Printer printer,
-            PrinterConnectionDto dto) {
+            PrinterConnectionRequest dto) {
         return PrinterConnectionConfiguration.builder()
                 .id(UuidCreator.getTimeOrderedEpoch())
                 .printer(printer)
@@ -85,7 +84,7 @@ public class PrinterMapper {
     public PrinterConnectionConfiguration createConnection(
             Printer printer,
             UpdatePrinterConnectionRequest request) {
-        return createConnection(printer, new PrinterConnectionDto(
+        return createConnection(printer, new PrinterConnectionRequest(
                 request.mqttHost(),
                 request.mqttPort(),
                 request.ftpHost(),
@@ -124,7 +123,9 @@ public class PrinterMapper {
         connection.setFtpHost(request.ftpHost());
         connection.setFtpPort(request.ftpPort());
         connection.setModelDirectory(request.modelDirectory());
-        connection.setAccessCode(request.accessCode());
+        if (request.accessCode() != null && !request.accessCode().isBlank()) {
+            connection.setAccessCode(request.accessCode());
+        }
         connection.setAgentId(normalizeOptionalAgentId(request.agentId()));
     }
 

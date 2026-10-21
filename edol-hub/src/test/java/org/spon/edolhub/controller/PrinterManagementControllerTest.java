@@ -92,7 +92,7 @@ class PrinterManagementControllerTest {
                 new org.spon.edolhub.model.dto.CorePrinterDto(PRINTER_ID, "P1", "Printer", true)
         );
         when(printerManagementService.getConnection(PRINTER_ID)).thenReturn(
-                new org.spon.edolhub.model.dto.CorePrinterConnectionDto(null, null, null, null, null, null, null)
+                new org.spon.edolhub.model.dto.CorePrinterConnectionDto(null, null, null, null, null, null)
         );
 
         String view = controller.editForm(PRINTER_ID, model, response);
@@ -155,7 +155,7 @@ class PrinterManagementControllerTest {
                 new org.spon.edolhub.model.dto.CorePrinterDto(PRINTER_ID, "P1", "Printer", true)
         );
         when(printerManagementService.getConnection(PRINTER_ID)).thenReturn(
-                new org.spon.edolhub.model.dto.CorePrinterConnectionDto(null, null, null, null, null, null, null)
+                new org.spon.edolhub.model.dto.CorePrinterConnectionDto(null, null, null, null, null, null)
         );
         when(terminalManagementClientProvider.getIfAvailable()).thenReturn(terminalManagementClient);
         when(terminalManagementClient.status(PRINTER_ID)).thenReturn(Optional.of(status));

@@ -13,6 +13,6 @@ public record CreatePrinterRequest(
         PrinterConnectionMode connectionMode,
         PrinterCameraProvider cameraProvider,
         boolean enabled,
-        PrinterConnectionDto connection
+        PrinterConnectionRequest connection
 ) {
 }

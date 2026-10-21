@@ -6,7 +6,6 @@ import org.spon.edolhub.model.dto.PrinterForm;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.UUID;
@@ -63,20 +62,9 @@ public class PrinterManagementService {
 
         edolCoreClient.patch()
                 .uri("/api/printers/{printerId}/connection", printerId)
-                .body(new ConnectionRequest(form, existingAccessCode(printerId)))
+                .body(new ConnectionRequest(form))
                 .retrieve()
                 .toBodilessEntity();
-    }
-
-    private String existingAccessCode(UUID printerId) {
-        try {
-            return getConnection(printerId).accessCode();
-        } catch (HttpClientErrorException exception) {
-            if (exception.getStatusCode().isSameCodeAs(org.springframework.http.HttpStatus.NOT_FOUND)) {
-                return null;
-            }
-            throw exception;
-        }
     }
 
     public void deletePrinter(UUID printerId) {
@@ -122,10 +110,6 @@ public class PrinterManagementService {
             String agentId
     ) {
         private ConnectionRequest(PrinterForm form) {
-            this(form, null);
-        }
-
-        private ConnectionRequest(PrinterForm form, String existingAccessCode) {
             this(
                     form.getMqttHost(),
                     form.getMqttPort(),
@@ -133,7 +117,7 @@ public class PrinterManagementService {
                     form.getFtpPort(),
                     form.getModelDirectory(),
                     form.getAccessCode() == null || form.getAccessCode().isBlank()
-                            ? existingAccessCode
+                            ? null
                             : form.getAccessCode(),
                     form.getAgentId()
             );

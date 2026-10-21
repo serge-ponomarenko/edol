@@ -12,11 +12,36 @@ class PrinterMapperTest {
     private final PrinterMapper mapper = new PrinterMapper();
 
     @Test
+    void keepsAccessCodeOnlyInTheWriteContract() throws Exception {
+        var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var request = objectMapper.readValue("{\"accessCode\":\"synthetic-secret\"}", PrinterConnectionRequest.class);
+        var connection = mapper.createConnection(new org.spon.edolcore.persistence.printer.Printer(), request);
+
+        assertThat(connection.getAccessCode()).isEqualTo("synthetic-secret");
+        assertThat(objectMapper.readTree(objectMapper.writeValueAsString(mapper.toDto(connection)))
+                .has("accessCode")).isFalse();
+    }
+
+    @Test
+    void preservesExistingAccessCodeForMissingOrBlankInputAndReplacesItOnlyWhenProvided() {
+        var connection = new org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration();
+        connection.setAccessCode("original-synthetic-secret");
+        for (String input : new String[]{null, "", "  "}) {
+            mapper.updateConnection(connection, new UpdatePrinterConnectionRequest(
+                    null, null, null, null, null, input, null));
+            assertThat(connection.getAccessCode()).isEqualTo("original-synthetic-secret");
+        }
+        mapper.updateConnection(connection, new UpdatePrinterConnectionRequest(
+                null, null, null, null, null, "replacement-synthetic-secret", null));
+        assertThat(connection.getAccessCode()).isEqualTo("replacement-synthetic-secret");
+    }
+
+    @Test
     void generatesVersionSevenIdsForNewPrinterAndConnection() {
         CreatePrinterRequest request = new CreatePrinterRequest(
                 "P1", "Printer", null, null, PrinterModel.BAMBU_P1S,
                 PrinterConnectionMode.DIRECT, PrinterCameraProvider.LEGACY,
-                true, new PrinterConnectionDto(null, null, null, null, null, null, null)
+                true, new PrinterConnectionRequest(null, null, null, null, null, null, null)
         );
 
         var printer = mapper.createPrinter(request);
@@ -28,7 +53,7 @@ class PrinterMapperTest {
 
     @Test
     void normalizesBlankOptionalAgentIdsToNull() {
-        PrinterConnectionDto connectionDto = new PrinterConnectionDto(
+        PrinterConnectionRequest connectionDto = new PrinterConnectionRequest(
                 null, null, null, null, null, null, "  "
         );
         CreatePrinterRequest request = new CreatePrinterRequest(

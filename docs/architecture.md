@@ -177,6 +177,23 @@ uses a build-local header to preserve PEM newlines on Windows; see the
 [Stage 8 acceptance record](deployment/stage8-terminal-acceptance-record.md).
 Home compatibility and production rollout remain separate gates.
 
+Stage 9.1 adds a secure-mode HTTP ownership interceptor for mapped
+`/api/printers/**` handlers with a `printerId` path variable. It resolves the
+persisted printer under the current tenant before runtime, camera, media, or
+command handlers run. The aggregate state endpoint returns only printers visible
+to the current tenant. Background runtime enumeration remains independent of
+this HTTP boundary. Home does not install the interceptor and retains its
+trusted-network state and command access without OAuth or tenant headers.
+
+Connection response DTOs contain no printer access code in either deployment
+mode. Creation and update requests still accept a code. Core preserves the
+existing code when an update omits it or supplies a blank value; a nonblank value
+replaces it. Hub no longer reads the old code before editing a connection.
+Deploy this Core contract before the corresponding Hub change; an older Core
+can overwrite a code with the new Hub's blank-input request. This source change
+does not accept a deployment, change stored credential protection, or remove
+HTTP/MQTT compatibility.
+
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and
 `docs/migrations/secure-multi-tenant-migration-plan.md`. These documents define

@@ -84,7 +84,7 @@ public class PrinterManagementController {
             if (!exception.getStatusCode().isSameCodeAs(org.springframework.http.HttpStatus.NOT_FOUND)) {
                 throw exception;
             }
-            connection = new CorePrinterConnectionDto(null, null, null, null, null, null, null);
+            connection = new CorePrinterConnectionDto(null, null, null, null, null, null);
             model.addAttribute(PRINTER_ERROR_ATTRIBUTE,
                     "Connection configuration is missing. Complete and save the form to recreate it.");
         }

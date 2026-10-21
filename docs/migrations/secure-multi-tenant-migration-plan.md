@@ -1572,6 +1572,39 @@ gates. Stage 9 discovery may proceed; implementation requires its own approval.
 
 ## Stage 9: Final Lockdown and Hardening
 
+### Stage 9.1 bounded source change
+
+The first approved source increment checks persisted tenant ownership before
+printer-scoped Core HTTP handlers and filters aggregate state to visible
+printers. The interceptor is secure-mode only; Home keeps trusted-network
+access without OAuth, secure tenant headers, or new deployment prerequisites.
+
+Connection responses in both modes no longer return `accessCode`. Request JSON
+still accepts it for creation and replacement. For existing connections, omitted,
+null, or blank input preserves the stored code in Core; Hub does not retrieve
+the old code. Explicit secret deletion is not introduced by this change.
+
+Roll out Core before Hub. The new Core supports the previous Hub, but the new
+Hub must not run against an older Core that replaces secrets with null. Rollback
+must restore the matching Hub before restoring that older Core, or stop editing
+traffic throughout the coordinated rollback. No schema migration is required.
+
+HTTP tests use the real security chain with a synthetic JWT decoder and mocked
+printer persistence, runtime, media, and command dependencies. They do not
+establish live database, broker, printer, firmware, or deployment acceptance.
+Stage 8 acceptance is reused. Stage 9 transport, agent identity, encrypted
+storage, rotation, observation windows, and compatibility removal remain separate.
+
+Source verification on 2026-10-21: the targeted Core suite passed 20/20 with
+no skips, including the five real-security-chain HTTP scenarios. The required
+Hub test run and `mvn -B clean verify` passed. The full reactor listed 370 tests:
+322 executed without failures/errors and 48 Docker/Testcontainers skips (Core
+10, Hub 28, AMS 10). No Docker tunnel or external runtime was used. All 14
+modified/added Java files were analyzed through the read-only Sonar snippet
+MCP; its only finding was `java:S1598` with an empty file path. Actual package
+paths match, so this is a snippet-analysis artifact, not a suppressed finding
+or a file-level Sonar quality-gate claim.
+
 ### Objective and prerequisites
 
 Remove all migration compatibility after every HTTP and MQTT consumer has used
