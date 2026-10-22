@@ -79,10 +79,11 @@ services:
     restart: unless-stopped
 
   mqtt:
-    image: emqx/nanomq:latest
-    container_name: nanomq
+    image: eclipse-mosquitto:2.0.22
+    volumes:
+      - ./mosquitto/home.conf:/mosquitto/config/mosquitto.conf:ro
     healthcheck:
-      test: [ "CMD", "nanomq", "--help" ]
+      test: [ "CMD", "mosquitto", "-h" ]
       interval: 10s
       timeout: 5s
       retries: 10

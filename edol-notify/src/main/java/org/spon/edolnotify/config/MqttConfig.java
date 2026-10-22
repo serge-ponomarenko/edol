@@ -28,12 +28,18 @@ public class MqttConfig {
 
     @Value("${edol-notify.mqtt.password:}")
     private String password;
+    @Value("${edol.deployment.mode:home}")
+    private String mode;
 
     @Bean
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
         mqttConnectOptions.setServerURIs(new String[]{mqttServerUrl});
+        org.spon.edolcoreapi.security.SecureMqttEndpoint.validate("secure-multi-tenant".equals(mode),
+                mqttServerUrl, username, password);
+        mqttConnectOptions.setHttpsHostnameVerificationEnabled(true);
+        mqttConnectOptions.setConnectionTimeout(10);
         if (!username.isBlank()) {
             mqttConnectOptions.setUserName(username);
             mqttConnectOptions.setPassword(password.toCharArray());

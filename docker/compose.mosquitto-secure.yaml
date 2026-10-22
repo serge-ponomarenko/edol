@@ -1,0 +1,38 @@
+# Source rollout template, not authorization to replace an existing broker.
+# Apply with compose.yaml only after the Stage 9 rollout gate.
+services:
+  mqtt:
+    image: eclipse-mosquitto:2.0.22
+    ports:
+      - "${EDOL_MQTT_TLS_PORT:?EDOL_MQTT_TLS_PORT is required}:8883"
+    volumes:
+      - ./mosquitto/secure.conf:/mosquitto/config/mosquitto.conf:ro
+      - ${EDOL_MQTT_CERT_DIR:?EDOL_MQTT_CERT_DIR is required}:/mosquitto/certs:ro
+      - ${EDOL_MQTT_AUTH_DIR:?EDOL_MQTT_AUTH_DIR is required}:/mosquitto/data
+  edolcore:
+    environment:
+      MQTTSERVER_URL: ssl://mqtt:8883
+      EDOL_CORE_MQTT_INTEGRATION_USERNAME: core-events
+      EDOL_CORE_MQTT_INTEGRATION_PASSWORD: ${EDOL_MQTT_CORE_EVENTS_PASSWORD:?required}
+      EDOL_CORE_AGENT_MQTT_ADMIN_USERNAME: core-agent-control
+      EDOL_CORE_AGENT_MQTT_ADMIN_PASSWORD: ${EDOL_MQTT_CONTROL_PASSWORD:?required}
+      EDOL_CORE_AGENT_MQTT_INGRESS_USERNAME: core-agent-ingress
+      EDOL_CORE_AGENT_MQTT_INGRESS_PASSWORD: ${EDOL_MQTT_INGRESS_PASSWORD:?required}
+      EDOL_CORE_AGENT_MQTT_COMMAND_USERNAME: core-agent-commands
+      EDOL_CORE_AGENT_MQTT_COMMAND_PASSWORD: ${EDOL_MQTT_COMMAND_PASSWORD:?required}
+      EDOL_CORE_AGENT_MQTT_ENABLED: ${EDOL_CORE_AGENT_MQTT_ENABLED:-false}
+  edolhub:
+    environment:
+      MQTTSERVER_URL: ssl://mqtt:8883
+      EDOL_HUB_MQTT_USERNAME: hub-events
+      EDOL_HUB_MQTT_PASSWORD: ${EDOL_MQTT_HUB_PASSWORD:?required}
+  edolnotify:
+    environment:
+      MQTTSERVER_URL: ssl://mqtt:8883
+      EDOL_NOTIFY_MQTT_USERNAME: notify-events
+      EDOL_NOTIFY_MQTT_PASSWORD: ${EDOL_MQTT_NOTIFY_PASSWORD:?required}
+  edolams:
+    environment:
+      MQTTSERVER_URL: ssl://mqtt:8883
+      EDOL_AMS_MQTT_USERNAME: ams-events
+      EDOL_AMS_MQTT_PASSWORD: ${EDOL_MQTT_AMS_PASSWORD:?required}

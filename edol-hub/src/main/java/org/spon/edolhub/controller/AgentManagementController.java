@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
@@ -21,6 +22,7 @@ import java.util.UUID;
 @RequestMapping("/printers/{printerId}/agent")
 @ConditionalOnExpression("'${edol.deployment.mode:}' == 'secure-multi-tenant' && ${edol-hub.agent.enabled:false}")
 public class AgentManagementController {
+    private static final String AGENT_ERROR = "agentError";
     private static final String PAGE = "dashboard/printers/agent";
     private static final String STATUS = "agentStatus";
     private final TenantOwnerAuthorizationService owners;
@@ -54,7 +56,12 @@ public class AgentManagementController {
     @PostMapping("/revoke")
     public String revoke(@PathVariable UUID printerId, Model model, HttpServletResponse response) {
         authorize(printerId, model, response);
-        agents.revoke(printerId);
+        try {
+            agents.revoke(printerId);
+        } catch (HttpServerErrorException.ServiceUnavailable exception) {
+            response.setStatus(503);
+            model.addAttribute(AGENT_ERROR, "Access is revoked in Core. MQTT disconnection is pending; retry when the broker is available.");
+        }
         model.addAttribute(STATUS, agents.status(printerId));
         return PAGE;
     }
@@ -68,7 +75,10 @@ public class AgentManagementController {
                 throw exception;
             }
             response.setStatus(409);
-            model.addAttribute("agentError", "An active agent or unexpired pairing already exists.");
+            model.addAttribute(AGENT_ERROR, "An active agent or unexpired pairing already exists.");
+        } catch (HttpServerErrorException.ServiceUnavailable exception) {
+            response.setStatus(503);
+            model.addAttribute(AGENT_ERROR, "MQTT disconnection is pending. No replacement code was issued; retry when the broker is available.");
         }
         model.addAttribute(STATUS, agents.status(printerId));
         return PAGE;

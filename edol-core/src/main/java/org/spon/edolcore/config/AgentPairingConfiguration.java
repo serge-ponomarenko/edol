@@ -49,7 +49,8 @@ public class AgentPairingConfiguration {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/agent/v1/enroll").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
-                                "/api/agent/v1/upload", "/api/agent/v1/camera/snapshot").hasAuthority("AGENT_UPLOAD")
+                                "/api/agent/v1/upload", "/api/agent/v1/camera/snapshot",
+                                "/api/agent/v1/mqtt/credentials").hasAuthority("AGENT_UPLOAD")
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) ->
                         response.setStatus(401)))

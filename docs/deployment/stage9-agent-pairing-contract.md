@@ -2,6 +2,11 @@
 
 ## Scope and acceptance boundary
 
+Current continuation (2026-10-22): the approved single-Mosquitto secure MQTT
+increment is described in [the MQTT contract](stage9-agent-mqtt-contract.md).
+It supersedes the MQTT-disabled implementation boundary recorded below for
+9.3b.1/9.3b.2. Working rollout and physical acceptance remain open.
+
 Stage 9.3b.1 implements the server-side pairing and HTTPS upload foundation.
 It is not complete secure-agent acceptance or a deployment recipe. Agent
 firmware, broker authentication/topic ACLs, active-session revocation, secure

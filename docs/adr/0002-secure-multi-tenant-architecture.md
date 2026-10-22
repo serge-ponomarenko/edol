@@ -317,6 +317,17 @@ QoS 1 duplicate delivery. Producer and subscriber identities, TLS, and broker
 ACLs are introduced without breaking older consumers and are required before
 legacy event fields are removed.
 
+MQTT decision clarification, accepted 2026-10-22: use one Mosquitto broker for
+internal service events and Core/Agent communication, with independent client
+credentials and least-privilege topic ACLs. Server-authenticated TLS is required;
+per-Agent client certificates are not mandatory for this deployment model.
+Pairing provisions a distinct MQTT secret rather than reusing the HTTPS
+credential. Dynamic Security provides targeted disconnection of revoked active
+sessions; Core persists lifecycle intent and does not report broker completion
+while it is pending. Home retains its independent trusted-network contracts.
+This decision does not authorize a working-broker cutover or waive database
+TLS/service asymmetric-authentication decisions. See the Stage 9 MQTT contract.
+
 ### AMS Terminal identity
 
 AMS owns the terminal and pairing registry. An authenticated Hub `OWNER`

@@ -12,6 +12,9 @@
     <h1>Printer agent</h1>
     <p>Connect an agent in your printer's local network. It connects to EDOL automatically.</p>
     <p>Status: <strong th:text="${agentStatus == null ? 'Not paired' : agentStatus.state}"></strong></p>
+    <p class="alert alert-warning" th:if="${agentStatus != null and agentStatus.mqttState == 'REVOKE_PENDING'}">
+        Access is revoked in Core. MQTT disconnection is pending while the broker is unavailable.
+    </p>
     <p class="alert alert-danger" th:if="${agentError}" th:text="${agentError}"></p>
     <section class="alert alert-primary" th:if="${agentPairing}">
         <h2>Enter this code in the agent setup</h2>

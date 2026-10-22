@@ -1858,6 +1858,24 @@ and an explicit setup-portal recovery command; normal builds have no console.
 This is preparation, not an executed physical or MQTT gate. Working dev/prod
 database migration remains deferred until Stage 9 completes and rollout is approved.
 
+### Stage 9.3b secure MQTT continuation
+
+Operator decision on 2026-10-22: use one Mosquitto for service events and Agent
+traffic, with server-authenticated TLS and independent per-client credentials;
+per-Agent mTLS is not mandatory. The local source increment adds secure-only
+V11 authority/tombstone metadata, separate one-time MQTT provisioning, persisted
+Core ingress/command routing, targeted broker disconnection and reconciliation,
+and firmware TLS/reconnect storage. Home contracts remain independent.
+
+Remote-Docker full reactor passed 294 tests with no failures/errors/skips;
+real broker and PostgreSQL acceptance ran. Firmware eight native executables,
+three Python tests and Home/secure/secure_smoke builds passed; missing CA blocks
+both secure builds. See [the contract](../deployment/stage9-agent-mqtt-contract.md)
+for exact scope, image digest, limitations and rollback. The combined physical
+workbook supersedes the former USB-only sequencing; all physical observations
+remain NOT RUN. No working infrastructure, database, publication or device was
+changed, and no legacy-use observation window has been established.
+
 ### Development and production migration sequencing
 
 Operator decision on 2026-10-21: working development and production database
@@ -1904,7 +1922,10 @@ end-to-end operational tests.
   credential paths.
 - Remove legacy MQTT top-level fields and reject unsupported envelope versions
   according to an announced contract schedule.
-- Require per-client MQTT TLS identities and least-privilege ACLs.
+- Require server-authenticated MQTT TLS, independent per-client credentials and
+  least-privilege ACLs. On 2026-10-22 the operator selected this model with one
+  Mosquitto broker; per-Agent mTLS is not mandatory. See
+  [the MQTT contract](../deployment/stage9-agent-mqtt-contract.md).
 - Move high-value service clients to `private_key_jwt`, with documented key
   overlap and rotation procedures.
 - Require TLS for database connections and remove unnecessary public service

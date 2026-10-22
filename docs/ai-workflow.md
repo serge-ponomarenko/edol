@@ -46,6 +46,15 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
+- Stage 9.3b source now implements the approved single-Mosquitto MQTT path;
+  see `docs/deployment/stage9-agent-mqtt-contract.md`. Earlier MQTT-disabled
+  notes below describe the HTTPS foundation. The operator-requested combined
+  Agent/AMS real-printer session is prepared in
+  `docs/deployment/stage9-disposable-hardware-runbook.md`; physical observations
+  remain NOT RUN. Keep that session, working dev/prod migrations, live broker cutover and operator-led
+  credential rotation separate from source/disposable acceptance. No legacy
+  compatibility removal is justified by synthetic traffic.
+
 - **Stage 8 UX, high priority:** verify immediate authorization-loss feedback
   and Settings transition while the terminal is running. Distinguish 401/403
   from network failure; do not clear enrollment for generic connectivity errors.
@@ -84,43 +93,20 @@ must never be copied into the repository or a Codex configuration file.
   configuration, then migrate direct `now()` calls consistently. Preserve the
   current `Europe/Kyiv` business-time behavior until a persistence-time
   strategy is explicitly decided.
-- Restore and test AGENT camera visibility as an explicit end-to-end contract.
-  Stage 9.3b.1 now supplies opt-in Core/Hub pairing and HTTPS upload APIs; finish
-  the coordinated EDOL-AGENT firmware and broker identity/ACL/lifecycle work
-  under `docs/deployment/stage9-agent-pairing-contract.md`. Pairing alone is not
-  secure MQTT acceptance. Keep both feature flags off until those gates pass;
-  preserve Home and NVS, never flash/publish or migrate working DBs implicitly.
-  The sanitized firmware baseline is private GitHub `serge-ponomarenko/EDOL-AGENT`
-  `main`, commit `14da63f360d4a288c7207340dc60cd9e78ce7907`, checked out at
-  `C:\Users\Ponomarenko\Documents\PlatformIO\Projects\EDOL-AGENT-publication-20261021`.
-  That working tree was verified clean at handoff. The original
-  `C:\Users\Ponomarenko\Documents\PlatformIO\Projects\EDOL-AGENT` retains
-  secret-bearing local ancestors and must not be used as a push source.
-  Publication/remote-SHA verification and credential-rotation needs were reported
-  by the cleanup session; no live credential is rotated by Stage 9 source work.
-  The backend session owns the coordinated secure implementation after this
-  handoff. Its isolated firmware worktree is `.worktrees/edol-agent-stage9`,
-  branch `stage9-agent-pairing`; it does not modify the published `main` checkout.
-  The firmware HTTPS pairing/upload increment is now implemented there; MQTT
-  authorization/lifecycle and physical acceptance remain pending. The owner
-  explicitly keeps the existing open setup Wi-Fi AP unchanged for this stage;
-  do not reintroduce an AP password/label requirement without a later request.
-  The operator-authorized real Agent/printer disposable smoke is prepared in
-  `docs/deployment/stage9-agent-disposable-smoke-workbook.md`, not executed.
-  The opt-in lab USB console triggers production HTTPS uploads; full secure
-  MQTT and normal secure re-pair UX remain separate open gates. Confirm the
-  physical Agent port before upload; do not assume the AMS terminal's COM16.
-  The external agent implementation is not in this repository. Its existing
-  Home contract uploads JPEG snapshots to `POST /api/agent/camera/snapshot`
-  with `X-Agent-Id`; Core
-  resolves that ID to its printer and Hub reads the printer-scoped snapshot.
-  The legacy connection form accepts manually entered `agentId`; the new
-  secure identity is separate and is not yet provisioned onto firmware.
-  Determine from agent
-  HTTP and MQTT evidence whether its configured ID matches Core, whether it
-  receives `ENABLE_SNAPSHOT_SCHEDULER`, and whether it uses a removed legacy
-  camera-read route. Do not publish commands or change a live device merely to
-  diagnose this; establish contract coverage before changing either side.
+- Verify AGENT camera, telemetry and controlled commands in the combined physical
+  session under `docs/deployment/stage9-agent-disposable-smoke-workbook.md`.
+  Source/disposable secure MQTT now uses one Mosquitto with independent service
+  and Agent identities, persisted Core routing and active-session revocation;
+  see `docs/deployment/stage9-agent-mqtt-contract.md`. Physical observations,
+  normal secure re-pair/recovery UX, live credential rotation, working broker
+  cutover and dev/prod migrations remain separate gates. Keep feature flags off
+  in working installations. Preserve Home/NVS and the existing open setup AP.
+  Firmware work belongs in `.worktrees/edol-agent-stage9` on
+  `stage9-agent-pairing`, not the sanitized publication checkout's `main`.
+  The original EDOL-AGENT checkout retains secret-bearing ancestors and must
+  never be a publication/push source. Confirm the actual Agent USB port; do not
+  assume the AMS terminal's COM16. Source tests do not authorize flash, serial,
+  printer commands, migration, production changes or push.
 - Perform and record an isolated restore drill of the 2026-09-28 Stage 3
   production backup under the backup-recovery procedure. The backup was created,
   checksummed, and parsed successfully, but no full restore was performed. This

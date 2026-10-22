@@ -37,6 +37,9 @@ public class SecureMqttConfig {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions options = new MqttConnectOptions();
         options.setServerURIs(new String[]{mqttServerUrl});
+        org.spon.edolcoreapi.security.SecureMqttEndpoint.validate(true, mqttServerUrl, username, password);
+        options.setHttpsHostnameVerificationEnabled(true);
+        options.setConnectionTimeout(10);
         if (!username.isBlank()) {
             options.setUserName(username);
             options.setPassword(password.toCharArray());

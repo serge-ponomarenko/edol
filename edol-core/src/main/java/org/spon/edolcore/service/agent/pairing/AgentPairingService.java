@@ -31,6 +31,7 @@ public class AgentPairingService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Agent already has a live pairing or enrollment");
         }
         retire(printerId);
+        requireMqttRetired(printerId);
         UUID agentId = UUID.randomUUID();
         String code = codec.newCode();
         Instant expiry = jdbc.queryForObject("""
@@ -48,6 +49,16 @@ public class AgentPairingService {
     }
 
     @Transactional(readOnly = true)
+    public void requireMqttRetired(UUID printerId) {
+        if (Boolean.TRUE.equals(jdbc.queryForObject("""
+                select exists(select 1 from core.agent_mqtt_authorities
+                    where printer_id = ? and tenant_id = ? and state = 'REVOKE_PENDING')
+                """, Boolean.class, printerId, tenants.getCurrentTenantId()))) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "MQTT disconnection is pending");
+        }
+    }
+
+    @Transactional(readOnly = true)
     public Status status(UUID printerId) {
         // RLS plus explicit ownership: an empty result does not disclose another tenant.
         UUID tenant = tenants.getCurrentTenantId();
@@ -57,11 +68,13 @@ public class AgentPairingService {
         }
         return jdbc.query("""
                 select id, case when state = 'PENDING' and expires_at <= now() then 'EXPIRED' else state end,
-                    created_at, expires_at, activated_at from core.agents
+                    created_at, expires_at, activated_at,
+                    (select m.state from core.agent_mqtt_authorities m where m.agent_id = core.agents.id)
+                    from core.agents
                 where printer_id = ? order by created_at desc, id desc limit 1
                 """, (rs, row) -> new Status(rs.getObject(1, UUID.class), rs.getString(2),
                 rs.getTimestamp(3).toInstant(), rs.getTimestamp(4).toInstant(),
-                rs.getTimestamp(5) == null ? null : rs.getTimestamp(5).toInstant()), printerId)
+                rs.getTimestamp(5) == null ? null : rs.getTimestamp(5).toInstant(), rs.getString(6)), printerId)
                 .stream().findFirst().orElse(null);
     }
 
@@ -124,7 +137,8 @@ public class AgentPairingService {
     }
 
     public record Identity(UUID agentId, UUID tenantId, UUID printerId) { }
-    public record Status(UUID agentId, String state, Instant createdAt, Instant expiresAt, Instant activatedAt) { }
+    public record Status(UUID agentId, String state, Instant createdAt, Instant expiresAt, Instant activatedAt,
+                         String mqttState) { }
     public record Pairing(UUID agentId, String pairingCode, Instant expiresAt) {
         @Override public String toString() { return "AgentPairing[REDACTED]"; }
     }

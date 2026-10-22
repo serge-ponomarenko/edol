@@ -21,6 +21,11 @@ spring:
           issuer-uri: ${EDOL_KEYCLOAK_ISSUER_URI}
 
 edol-core:
+  agent:
+    mqtt:
+      enabled: ${EDOL_CORE_AGENT_MQTT_ENABLED:false}
+      admin-username: ${EDOL_CORE_AGENT_MQTT_ADMIN_USERNAME:}
+      admin-password: ${EDOL_CORE_AGENT_MQTT_ADMIN_PASSWORD:}
   catalog-datasource:
     url: ${CORE_CATALOG_DB_URL}
     username: ${CORE_CATALOG_DB_USER}

@@ -20,18 +20,28 @@ public class MqttSubscribeConfig {
 
     @Value("${mqttServer.url}")
     private String mqttServerUrl;
+    @Value("${edol.deployment.mode:home}")
+    private String mode;
+    @Value("${edol-core.agent.mqtt.ingress-username:}")
+    private String username;
+    @Value("${edol-core.agent.mqtt.ingress-password:}")
+    private String password;
 
     @Bean
-    @ConditionalOnProperty(
-            name = "edol-core.runtime.mqtt-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("${edol-core.runtime.mqtt-enabled:true} && ('${edol.deployment.mode:home}' != 'secure-multi-tenant' || (${edol-core.agent.enabled:false} && ${edol-core.agent.mqtt.enabled:false}))")
     public MqttPahoClientFactory mqttInboundClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
 
         MqttConnectOptions options = new MqttConnectOptions();
         options.setServerURIs(new String[]{mqttServerUrl});
+        boolean secure = "secure-multi-tenant".equals(mode);
+        org.spon.edolcoreapi.security.SecureMqttEndpoint.validate(secure, mqttServerUrl, username, password);
+        if (secure) {
+            options.setUserName(username);
+            options.setPassword(password.toCharArray());
+            options.setHttpsHostnameVerificationEnabled(true);
+        }
+        options.setConnectionTimeout(10);
 
         factory.setConnectionOptions(options);
 
@@ -44,20 +54,18 @@ public class MqttSubscribeConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(
-            name = "edol-core.runtime.mqtt-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("${edol-core.runtime.mqtt-enabled:true} && ('${edol.deployment.mode:home}' != 'secure-multi-tenant' || (${edol-core.agent.enabled:false} && ${edol-core.agent.mqtt.enabled:false}))")
     public MqttPahoMessageDrivenChannelAdapter mqttInbound() {
 
+        String prefix = "secure-multi-tenant".equals(mode)
+                ? org.spon.edolcore.service.agent.mqtt.AgentMqttTopics.PREFIX : TOPIC_PREFIX;
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(
                         "edolcore-subscriber",
                         mqttInboundClientFactory(),
-                        TOPIC_PREFIX + "+/printer/report",
-                        TOPIC_PREFIX + "+/heartbeat",
-                        TOPIC_PREFIX + "+/events"
+                        prefix + "+/printer/report",
+                        prefix + "+/heartbeat",
+                        prefix + "+/events"
                 );
 
         adapter.setOutputChannel(mqttInboundChannel());

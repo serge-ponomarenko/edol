@@ -43,5 +43,6 @@ public class CoreAgentManagementClient {
     public record Pairing(UUID agentId, String pairingCode, Instant expiresAt) {
         @Override public String toString() { return "AgentPairing[REDACTED]"; }
     }
-    public record Status(UUID agentId, String state, Instant createdAt, Instant expiresAt, Instant activatedAt) { }
+    public record Status(UUID agentId, String state, Instant createdAt, Instant expiresAt, Instant activatedAt,
+                         String mqttState) { }
 }

@@ -21,6 +21,12 @@ public class MqttPublishConfig {
 
     @Value("${mqttServer.url}")
     private String mqttServerUrl;
+    @Value("${edol.deployment.mode:home}")
+    private String mode;
+    @Value("${edol-core.agent.mqtt.command-username:}")
+    private String commandUsername;
+    @Value("${edol-core.agent.mqtt.command-password:}")
+    private String commandPassword;
 
     @Value("${edol-core.mqtt.integration.username:}")
     private String integrationUsername;
@@ -32,15 +38,19 @@ public class MqttPublishConfig {
     private String integrationClientId;
 
     @Bean
-    @ConditionalOnProperty(
-            name = "edol-core.runtime.mqtt-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
+    @ConditionalOnExpression("${edol-core.runtime.mqtt-enabled:true} && ('${edol.deployment.mode:home}' != 'secure-multi-tenant' || (${edol-core.agent.enabled:false} && ${edol-core.agent.mqtt.enabled:false}))")
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
         mqttConnectOptions.setServerURIs(new String[]{mqttServerUrl});
+        boolean secure = "secure-multi-tenant".equals(mode);
+        org.spon.edolcoreapi.security.SecureMqttEndpoint.validate(secure, mqttServerUrl, commandUsername, commandPassword);
+        if (secure) {
+            mqttConnectOptions.setUserName(commandUsername);
+            mqttConnectOptions.setPassword(commandPassword.toCharArray());
+            mqttConnectOptions.setHttpsHostnameVerificationEnabled(true);
+        }
+        mqttConnectOptions.setConnectionTimeout(10);
         factory.setConnectionOptions(mqttConnectOptions);
         return factory;
     }
@@ -57,11 +67,7 @@ public class MqttPublishConfig {
 
     @Bean
     @ServiceActivator(inputChannel = "mqttOutboundChannel")
-    @ConditionalOnProperty(
-            name = "edol-core.runtime.mqtt-enabled",
-            havingValue = "true",
-            matchIfMissing = true
-    )
+    @ConditionalOnExpression("${edol-core.runtime.mqtt-enabled:true} && ('${edol.deployment.mode:home}' != 'secure-multi-tenant' || (${edol-core.agent.enabled:false} && ${edol-core.agent.mqtt.enabled:false}))")
     public MessageHandler mqttOutbound() {
         MqttPahoMessageHandler handler =
                 new MqttPahoMessageHandler("edolcore-publisher", mqttClientFactory());
@@ -88,6 +94,10 @@ public class MqttPublishConfig {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions options = new MqttConnectOptions();
         options.setServerURIs(new String[]{mqttServerUrl});
+        org.spon.edolcoreapi.security.SecureMqttEndpoint.validate("secure-multi-tenant".equals(mode),
+                mqttServerUrl, integrationUsername, integrationPassword);
+        options.setHttpsHostnameVerificationEnabled(true);
+        options.setConnectionTimeout(10);
         if (!integrationUsername.isBlank()) {
             options.setUserName(integrationUsername);
             options.setPassword(integrationPassword.toCharArray());

@@ -2,24 +2,81 @@
 
 ## Purpose and current gate
 
+The [combined Agent + AMS hardware runbook](stage9-disposable-hardware-runbook.md)
+controls the operator-requested 2026-10-22 session, including separate device
+flashes and real-printer AMS acceptance. Use this workbook as its detailed
+Agent HTTPS appendix; the combined runbook takes precedence for launch settings,
+sequencing and restoration.
+
 This workbook prepares a supervised physical Agent-to-printer-to-disposable-Core
 test. The operator authorized real Agent firmware and a real printer for this
 test on 2026-10-21. Execute one operator action at a time, inspect its result,
 and stop on an unexpected result. Preparation is not execution or acceptance.
 No hardware, listener, realm, database or printer was changed while writing it.
 
-The implemented gate is **9.3b HTTPS enrollment and uploads**. Secure EDOL MQTT
-currently fails closed in firmware. It cannot carry telemetry, receive remote
-commands, or establish broker ACL/session-revocation acceptance. The lab console
-below invokes production upload services directly; label its evidence **USB
-trigger → real printer read → real HTTPS upload**, never MQTT end-to-end PASS.
-Full Stage 9 remains open even if every executable case here passes.
+Current gate (2026-10-22): source now implements secure MQTT and HTTPS together,
+using one Mosquitto broker for internal services and Agent traffic. The operator
+postponed the former USB-only session until this combined path is ready. Follow
+the combined sequence below before executing hardware actions. The detailed
+HTTPS cases later in this document remain applicable; their old all-MQTT-off
+preparation is an HTTPS-isolation reference, not the combined runtime setup.
+USB-triggered uploads alone must never be labelled MQTT end-to-end PASS.
 
 Home remains supported without pairing/CA prerequisites. Keep its existing open
 setup AP and connection procedure unchanged. Local printer certificate checks
 remain disabled in MQTT/FTPS/camera clients. Neither local trust limitation is
 evidence of server-authenticated printer transport. Login/registration UX is
-outside this gate. Reuse accepted Stage 8 evidence; do not flash the AMS terminal.
+outside this gate. Reuse accepted Stage 8 evidence. The newly requested AMS
+terminal flash follows only the combined runbook and its separately confirmed
+USB port and identity-restoration plan.
+
+## Combined physical session — prepared, all observations NOT RUN
+
+First finish source/disposable acceptance under the
+[single-broker MQTT contract](stage9-agent-mqtt-contract.md). Do not start this
+session automatically after a build passes. Confirm the actual Agent USB port,
+approved firmware binary/hash, real printer, disposable service/broker endpoints,
+operator restoration target and safe command before the first device action.
+
+Use one run-owned Mosquitto with the production TLS-only configuration and
+authority generator. Never reuse accepted Stage 7 clients, credentials or
+listeners. Prepare its certificate with SANs for the actual external Agent host
+and internal service host, and supply public trust to firmware and all services.
+Keep broker authority data outside Git with broker-only write access. Record
+the image digest and the resolved, redacted configuration. No second permanent
+broker or MQTT bridge is required.
+
+Unlike the historical HTTPS-only setup, combined Core needs
+`edol-core.runtime.mqtt-enabled=true`, `integration-mqtt-enabled=true`,
+`printer-runtime-enabled=true`, `edol-core.agent.enabled=true` and
+`edol-core.agent.mqtt.enabled=true`. All service MQTT URLs must resolve to this
+one TLS broker, with their independent accounts from the MQTT contract.
+Enable Hub/Notify/AMS MQTT only in their isolated run-owned configurations;
+disable real external notifications and use synthetic service-event inputs.
+Core's catalog must contain only the approved AGENT-mode printer(s), with no
+enabled DIRECT printer that could initiate an unintended LAN connection.
+Inspect effective settings before starting anything. Existing disposable
+HTTPS/IdP/tenant/scope preparation still applies, including `core.agent.manage`.
+
+Execute one operator action at a time and record these actual observations:
+
+| Case | Required observation | Status |
+| --- | --- | --- |
+| COMBINED-01 | Owner pairing, separate MQTT provisioning, retained identity, TLS broker session for issued Agent UUID | NOT RUN |
+| COMBINED-02 | Real printer report reaches Agent, authorized topic, persisted Core printer/tenant state and expected service event | NOT RUN |
+| COMBINED-03 | One approved Core snapshot command reaches only this Agent and causes real camera read plus authenticated HTTPS upload; no motion/print command | NOT RUN |
+| COMBINED-04 | Existing model read/upload and snapshot validation cases below, distinguishing Core MQTT triggers from USB triggers | NOT RUN |
+| COMBINED-05 | Wi-Fi interruption and recovery, broker restart and Core restart, followed by telemetry/subscription recovery | NOT RUN |
+| COMBINED-06 | Owner revoke while connected: actual Agent session closes; no further command delivery; old MQTT reconnect and HTTPS calls denied | NOT RUN |
+| COMBINED-07 | Replace waits for old broker retirement, then lab SETUP opens the existing portal without erase; new pairing restores the real path | NOT RUN |
+| COMBINED-08 | Unknown CA, wrong SAN and expired certificate reject MQTT and HTTPS without plaintext fallback; trusted recovery after each | NOT RUN |
+| COMBINED-09 | Deliberate single power cycle preserves identity/MQTT authority and restores reports; avoid repeated short boots/reset detector | NOT RUN |
+| COMBINED-10 | Restore the approved ordinary firmware/settings, verify normal operation, then retire only disposable authority/resources | NOT RUN |
+
+Retain the source/disposable foreign/wildcard/spoofing evidence; do not send
+attack topics or printer commands through a working broker. Missing metrics,
+absent observation windows and unexecuted cases remain NOT RUN, never numeric
+zero. The session does not authorize production or working DB migration.
 
 ## Execution worksheet — complete before starting
 
@@ -67,7 +124,7 @@ existing test Docker Engine is preferable to sharing cluster-wide roles.
 
 Run repository checks before flashing. Expected source checks are a full
 `mvn -B clean verify` through the remote-Docker skill, zero skipped migration
-tests, five native firmware executables, three Python cases, Home/secure/lab
+tests, eight native firmware executables, three Python cases, Home/secure/lab
 ESP32 builds and `git diff --check`. Tests do not establish physical TLS.
 Use the sanitized firmware worktree, never publish the original secret-bearing
 repository history. No push is part of this workbook.
@@ -81,7 +138,12 @@ Infrastructure-specific addresses/secrets are deliberately not invented here;
 if an isolated prerequisite is unavailable, mark PREP BLOCKED and resolve that
 single prerequisite before connecting hardware.
 
-### 2. Prepare PostgreSQL and V10 function-owner prerequisites
+### 2. Prepare PostgreSQL and V10/V11 prerequisites
+
+For the combined session use a fresh isolated cluster and migrate Core through
+V11. Also verify forced RLS and restricted access on MQTT authority metadata,
+durable retirement state and authentication function ownership. The V10 setup
+below remains a prerequisite, not the final migration target.
 
 Use a fresh isolated cluster, not merely a new database in a shared Stage 7
 cluster: PostgreSQL roles are cluster-wide. Pin and record the approved PG
@@ -333,7 +395,7 @@ or FTPS stage must not be diagnosed as Core authentication failure.
 | UP-02 | Send `MODEL <approved-existing-basename.3mf>` once | Real FTPS read, HTTP 200 and `SMOKE model=PASS`; `models/<printerA>/<basename>` in run-owned Core cwd; byte count/hash matches source; no staged temp file remains |
 | ENROLL-02 | Use `SETUP`, then submit the already-consumed code once | Enrollment 401, ACTIVE identity unchanged; no new identity; existing secret not exposed or cleared |
 | RECOVER-01 | After that failed setup attempt, perform one deliberate restart, keeping boot alive >15s | Existing saved identity reloads; `SNAPSHOT` again succeeds without new code; no factory reset |
-| RESTART-01 | Power-cycle once, wait for successful boot | Identity/settings retained; Wi-Fi/time and real HTTPS snapshot recover; secure EDOL MQTT remains disabled |
+| RESTART-01 | Power-cycle once, wait for successful boot | Identity/settings retained; Wi-Fi/time, secure MQTT reconnect/subscriptions, real telemetry and HTTPS snapshot recover in the combined session |
 | REVOKE-01 | Owner A clicks revoke | Status REVOKED; no live credential digest; only A affected |
 | REVOKE-02 | Send `SNAPSHOT` with the unchanged revoked Agent | HTTP 401 and FAIL; A's last accepted snapshot unchanged across full window, no B changes |
 | ROTATE-01 | Owner A requests replacement, then use USB `SETUP` and submit the new code | Old identity stays revoked; new row ACTIVE, same owner/printer; identity not leaked |
@@ -444,12 +506,12 @@ their required observations. Record unsupported camera/model cases explicitly;
 they leave the corresponding gate open. Record upload-limit live cases separately
 from automated boundary coverage. The lab console trigger is part of the label.
 
-These remain **BLOCKED / future gates**, not waived requirements:
+These remain **unexecuted / separately gated**, not waived requirements:
 
-- Secure agent MQTT connect, per-agent broker identity and transport choice,
-  topic ACLs, foreign/wildcard topic denial and live-session revocation.
-- Secure Core MQTT ingress/command egress bound to persisted agent identity,
-  actual telemetry forwarding/reconnect and coordinated v2/v3 rollout.
+- Physical secure Agent MQTT/HTTPS, actual telemetry forwarding, command scope,
+  reconnect, live-session revoke/replace and real AMS terminal/printer behavior
+  under the combined hardware runbook; all observations remain NOT RUN.
+- Coordinated v2/v3 rollout and real compatibility observation windows.
 - Normal secure-firmware re-pair/recovery UX, service credential rotation,
   database TLS deployment choice and private_key_jwt assessment/acceptance.
 - Production/accepted Stage 7 changes, final dev then prod DB migration and
@@ -466,8 +528,8 @@ Restore the exact previously agreed normal firmware to the confirmed Agent
 port without erase. If the agreed target is Home, explicitly verify its stored
 Home broker/Core destinations first: rollback may resume legacy connections.
 If those settings are uncertain, keep the Agent offline until the operator
-resolves them. If the target is ordinary secure firmware, remember MQTT remains
-disabled; a restored image is not complete bridge recovery. Record binary SHA,
+resolves them. If the target is ordinary secure firmware, verify its retained
+MQTT authority and approved broker destination. Record binary SHA,
 boot/Wi-Fi outcome and observed live state separately. Do not claim restored
 availability from a successful flash or a closed test server.
 
@@ -480,5 +542,5 @@ remaining resources and follow-up approval needed for cleanup.
 
 Publish a redacted acceptance record with exact commits/binary hashes, actual
 executed cases, counters/windows, failures, restoration status and open gates.
-Only then decide the next secure MQTT increment; this source/disposable gate
+Only then assess combined physical acceptance; this source/disposable gate
 does not authorize a production rollout or the planned dev/prod migration.

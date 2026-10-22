@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 @Service
+@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("'${edol.deployment.mode:home}' != 'secure-multi-tenant'")
 @RequiredArgsConstructor
 @Slf4j
 public class AgentTelemetryMessageHandler {

@@ -2,7 +2,7 @@
 
 ## System Map
 
-EDOL is a Java 21, Spring Boot 4 Maven reactor deployed as four services with PostgreSQL and NanoMQ. The root `pom.xml` is the build entry point; Docker Compose is the local/self-hosted runtime composition.
+EDOL is a Java 21, Spring Boot 4 Maven reactor with four services, PostgreSQL and MQTT. Source composition now selects Mosquitto; replacing an existing NanoMQ installation remains a separately approved rollout. The root `pom.xml` is the build entry point; Docker Compose is the local/self-hosted runtime composition.
 
 | Module | Responsibility | Main boundaries |
 | --- | --- | --- |
@@ -254,7 +254,7 @@ provided through a build-local header and a separate device identity namespace.
 The Home profile remains the default and retains legacy settings/contracts.
 The owner explicitly deferred setup AP hardening: its existing open Wi-Fi and
 portal remain unchanged as a local-trust limitation. Secure agent MQTT is
-still disabled pending the broker identity/ACL contract; this is not complete
+implemented by the following coordinated increment; this is not complete
 secure-agent or physical TLS acceptance.
 
 The opt-in `lolin_d32_secure_smoke` lab environment adds bounded USB entry points
@@ -262,6 +262,25 @@ into the same production camera/FTPS-to-HTTPS services and an explicit return
 to the existing setup portal without clearing identity/settings. Normal Home
 and secure builds contain no lab console. See the Stage 9 disposable smoke
 workbook; direct USB-triggered uploads do not establish secure MQTT operation.
+
+Stage 9.3b secure MQTT source uses one Mosquitto/Dynamic Security broker for
+service events and Agent traffic, with independent identities/ACLs. The approved
+transport is server-authenticated TLS plus distinct client credentials, not
+mandatory Agent mTLS. Secure Paho clients require TLS/credentials; Home remains
+trusted-network and uses its legacy contracts. Authenticated HTTPS provisioning
+issues a separate MQTT secret once. Secure-only V11 stores authority lifecycle
+metadata and durable revocation tombstones with forced RLS. Core resolves
+`edol/agent/v1/{agentId}/...` through persisted active Agent/printer/tenant
+bindings for ingress and commands. Retirement, printer disable/mode changes and
+deletion invalidate routing and enqueue broker disconnection; failed operations
+remain pending and are retried. Replace waits for confirmed broker retirement.
+Pending retirement also blocks successful revoke and new codes when the MQTT
+feature is disabled after authority issuance; feature disable is not revocation.
+Firmware keeps separate MQTT readiness/attempt markers, verifies TLS and
+restores subscriptions on reconnect. See the
+[MQTT contract](deployment/stage9-agent-mqtt-contract.md) for configuration,
+failure windows, compatibility and rollback. This is source/disposable work,
+not working-broker replacement, database rollout or physical acceptance.
 
 See `docs/adr/0002-secure-multi-tenant-architecture.md`,
 `docs/migrations/tenant-ownership-matrix.md`, and
