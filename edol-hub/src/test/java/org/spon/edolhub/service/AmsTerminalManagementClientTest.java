@@ -8,10 +8,27 @@ import org.springframework.web.client.RestClient;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 class AmsTerminalManagementClientTest {
+
+    @Test
+    void representsAnUnpairedTerminalAsEmptyAndDoesNotHideAuthenticationFailure() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://ams.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AmsTerminalManagementClient client = new AmsTerminalManagementClient(builder.build());
+        UUID printer = UUID.randomUUID();
+        server.expect(requestTo("http://ams.test/internal/terminals/" + printer))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+        server.expect(requestTo("http://ams.test/internal/terminals/" + printer))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        assertThat(client.status(printer)).isEmpty();
+        assertThatThrownBy(() -> client.status(printer))
+                .isInstanceOf(org.springframework.web.client.HttpClientErrorException.Unauthorized.class);
+        server.verify();
+    }
 
     @Test
     void mapsAReplacementLifecycleNotFoundToARecoverableConflict() {

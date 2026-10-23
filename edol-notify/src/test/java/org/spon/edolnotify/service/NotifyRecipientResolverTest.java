@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.spon.edol.deployment.DeploymentMode;
 import org.spon.edolnotify.config.NotifyRecipientProperties;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,6 +13,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NotifyRecipientResolverTest {
+
+    @Test
+    void enabledHomeTelegramStillRequiresAnAdminAndRejectsOtherChats() {
+        var missing = new NotifyRecipientResolver(DeploymentMode.HOME,
+                new NotifyRecipientProperties(List.of()), new NotifyTenantContext(), 0);
+        assertThatThrownBy(missing::validateMappings).isInstanceOf(IllegalStateException.class);
+        var configured = new NotifyRecipientResolver(DeploymentMode.HOME,
+                new NotifyRecipientProperties(List.of()), new NotifyTenantContext(), 123);
+        configured.validateMappings();
+        assertThatThrownBy(() -> configured.openForChat(456)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void disabledTelegramAllowsNoRecipientsButGrantsNoTenantOrChatAccess() {
+        var resolver = new NotifyRecipientResolver(DeploymentMode.SECURE_MULTI_TENANT,
+                new NotifyRecipientProperties(List.of()), new NotifyTenantContext(), 0);
+        ReflectionTestUtils.setField(resolver, "telegramEnabled", false);
+        resolver.validateMappings();
+        assertThatThrownBy(() -> resolver.openForEvent(UUID.randomUUID()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> resolver.openForChat(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> resolver.openForChat(123)).isInstanceOf(IllegalArgumentException.class);
+    }
 
     @Test
     void bindsAConfiguredChatToItsTenant() {

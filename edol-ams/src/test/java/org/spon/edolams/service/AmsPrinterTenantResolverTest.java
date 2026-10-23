@@ -42,7 +42,7 @@ class AmsPrinterTenantResolverTest {
     }
 
     @Test
-    void failsSpringBeanInitializationWhenSecureMappingsAreMissing() {
+    void startsWithNoPrintersAndRejectsAllUnknownPrintersAndEnvelopes() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         context.registerBean(AmsPrinterTenantResolver.class, () -> new AmsPrinterTenantResolver(
                 DeploymentMode.SECURE_MULTI_TENANT,
@@ -50,9 +50,14 @@ class AmsPrinterTenantResolverTest {
                 new AmsTenantContext()
         ));
 
-        assertThatThrownBy(context::refresh)
-                .hasRootCauseInstanceOf(IllegalStateException.class)
-                .hasRootCauseMessage("secure-multi-tenant AMS requires printer tenant mappings");
+        context.refresh();
+        AmsPrinterTenantResolver resolver = context.getBean(AmsPrinterTenantResolver.class);
+        AtomicBoolean workRan = new AtomicBoolean();
+        assertThatThrownBy(() -> resolver.withPrinter(UUID.randomUUID(), () -> workRan.set(true)))
+                .isInstanceOf(UnmappedAmsPrinterException.class);
+        assertThatThrownBy(() -> resolver.openForEnvelope(UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(UnmappedAmsPrinterException.class);
+        assertThat(workRan).isFalse();
         context.close();
     }
 

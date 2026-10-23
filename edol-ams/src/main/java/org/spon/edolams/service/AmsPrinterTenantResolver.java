@@ -40,9 +40,6 @@ public class AmsPrinterTenantResolver {
                 throw new IllegalStateException("AMS printer tenant mappings must be complete and unique");
             }
         }
-        if (mappings.isEmpty()) {
-            throw new IllegalStateException("secure-multi-tenant AMS requires printer tenant mappings");
-        }
         tenantsByPrinter = Map.copyOf(mappings);
     }
 

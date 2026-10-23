@@ -21,6 +21,13 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor with four services, PostgreSQL an
 
 Core runtime is per printer. New printer, connection and session identifiers use UUID v7; historical UUID v4 values are retained. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints; default-printer HTTP endpoints are not supported. Hub, AMS and Notify use only explicit printer endpoints. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
 
+DIRECT Paho report/disconnect callbacks restore the tenant from the trusted
+runtime registry on the callback thread. Direct connection and camera
+configuration reads use the transactional printer-management service so the
+secure RLS tenant setting is established; network I/O remains outside that
+configuration transaction. Transport connectivity alone is not proof of
+processed telemetry: overview readiness waits for usable printer state.
+
 Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. In `secure-multi-tenant` mode, Hub is an OIDC BFF: a validated OIDC identity discovers active memberships before a request establishes the fail-closed `TenantContext`. The historical default-tenant request bridge is removed. Stage 5 establishes authenticated Hub-to-Core tenant propagation. The `stage5-smoke` profile deliberately keeps Core printer runtime, Hub MQTT, catalog, recovery, AMS, and Notify disabled; later MQTT and consumer stages must not infer a tenant. AMS retains only its separately trusted three-route internal compatibility ingress. Home uses its independent installation-owned tenant scope. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 
 ## Accepted Multi-Tenant Direction
@@ -124,6 +131,11 @@ independent client-credentials contracts and restricts their secure MQTT topic
 sets. Notify establishes its tenant from a deployment-managed tenant-to-chat
 mapping; AMS establishes it from a deployment-managed printer-to-tenant mapping
 or the validated v2 envelope, never from an untrusted terminal parameter.
+AMS can start with an empty printer mapping; unknown printers/envelopes are
+still rejected before downstream work. Notify can start with Telegram disabled
+and no recipients; an empty mapping authorizes no tenant or chat. Enabling
+Telegram requires a bot token and, in secure mode, nonempty validated recipient
+mappings. Disabling Telegram never starts polling.
 Core accepts the tenant header only from allowlisted service clients, and Hub
 accepts AMS service JWT ingress only on the exact spool routes. Keycloak
 clients, broker identities/ACLs, and mappings were provisioned only in an

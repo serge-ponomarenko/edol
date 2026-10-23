@@ -6,6 +6,7 @@ import org.eclipse.paho.client.mqttv3.*;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
 import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityStateService;
 import org.spon.edolcore.service.printer.telemetry.BambuTelemetryConsumer;
+import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
 import org.spon.edolcore.util.SslUtil;
 
 import java.util.UUID;
@@ -21,6 +22,7 @@ public class BambuMqttConnection implements MqttCallback {
     private final BambuMqttConfiguration mqttConfiguration;
     private final BambuTelemetryConsumer telemetryConsumer;
     private final PrinterConnectivityStateService connectivityStateService;
+    private final CoreRuntimeTenantExecutor runtimeTenantExecutor;
 
     @Getter
     private MqttClient client;
@@ -30,13 +32,15 @@ public class BambuMqttConnection implements MqttCallback {
             PrinterConnectionConfiguration configuration,
             BambuMqttConfiguration bambuMqttConfiguration,
             BambuTelemetryConsumer telemetryConsumer,
-            PrinterConnectivityStateService connectivityStateService
+            PrinterConnectivityStateService connectivityStateService,
+            CoreRuntimeTenantExecutor runtimeTenantExecutor
     ) {
         this.printerId = printerId;
         this.configuration = configuration;
         this.mqttConfiguration = bambuMqttConfiguration;
         this.telemetryConsumer = telemetryConsumer;
         this.connectivityStateService = connectivityStateService;
+        this.runtimeTenantExecutor = runtimeTenantExecutor;
     }
 
     public synchronized void connect() {
@@ -96,10 +100,7 @@ public class BambuMqttConnection implements MqttCallback {
             String topic,
             MqttMessage message
     ) {
-        telemetryConsumer.consume(
-                printerId,
-                message.getPayload()
-        );
+        runtimeTenantExecutor.execute(printerId, () -> telemetryConsumer.consume(printerId, message.getPayload()));
     }
 
     @Override
@@ -113,9 +114,7 @@ public class BambuMqttConnection implements MqttCallback {
                 .addKeyValue(PRINTER_ID_KEY, printerId)
                 .log("MQTT connection lost");
 
-        connectivityStateService.setDisconnected(
-                printerId
-        );
+        runtimeTenantExecutor.execute(printerId, () -> connectivityStateService.setDisconnected(printerId));
     }
 
     public void disconnect() {

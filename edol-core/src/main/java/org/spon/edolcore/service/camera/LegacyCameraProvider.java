@@ -2,7 +2,7 @@ package org.spon.edolcore.service.camera;
 
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
-import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.spon.edolcore.util.SslUtil;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +26,7 @@ class LegacyCameraProvider implements CameraProvider {
 
     private static final int PORT = 6000;
 
-    private final PrinterConnectionConfigurationRepository configurationRepository;
+    private final PrinterManagementService printerManagementService;
 
     @Override
     public byte[] capture(UUID printerId)
@@ -128,13 +128,6 @@ class LegacyCameraProvider implements CameraProvider {
     private PrinterConnectionConfiguration configuration(
             UUID printerId
     ) {
-        return configurationRepository
-                .findByPrinterId(printerId)
-                .orElseThrow(() ->
-                        new IllegalStateException(
-                                "Configuration not found for printer "
-                                        + printerId
-                        )
-                );
+        return printerManagementService.getConnection(printerId);
     }
 }

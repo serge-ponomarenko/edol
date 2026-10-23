@@ -13,6 +13,6 @@ mqttServer:
 
 telegram:
   enable: ${TELEGRAM_ENABLE:true}
-  bot-token: ${TELEGRAM_BOT_TOKEN}
-  admin-id: ${TELEGRAM_ADMIN_ID}
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
+  admin-id: ${TELEGRAM_ADMIN_ID:0}
   progress-message-step: ${PROGRESS_MESSAGE_STEP:20}

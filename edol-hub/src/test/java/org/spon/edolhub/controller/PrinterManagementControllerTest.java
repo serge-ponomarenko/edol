@@ -2,7 +2,7 @@ package org.spon.edolhub.controller;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.spon.edolhub.model.dto.PrinterForm;
@@ -12,6 +12,8 @@ import org.spon.edolhub.service.PrinterManagementService;
 import org.spon.edolhub.service.AmsTerminalManagementClient;
 import org.spon.edolhub.service.AmsTerminalManagementConflictException;
 import org.spon.edolhub.service.TenantOwnerAuthorizationService;
+import org.spon.edolhub.service.CoreAgentManagementClient;
+import org.spon.edol.deployment.DeploymentMode;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ui.Model;
 import org.springframework.web.client.HttpClientErrorException;
@@ -49,6 +51,9 @@ class PrinterManagementControllerTest {
     private ObjectProvider<AmsTerminalManagementClient> terminalManagementClientProvider;
 
     @Mock
+    private ObjectProvider<CoreAgentManagementClient> agentManagementClientProvider;
+
+    @Mock
     private AmsTerminalManagementClient terminalManagementClient;
 
     @Mock
@@ -60,8 +65,46 @@ class PrinterManagementControllerTest {
     @Mock
     private HttpServletResponse response;
 
-    @InjectMocks
     private PrinterManagementController controller;
+
+    @BeforeEach
+    void setUp() {
+        controller = new PrinterManagementController(printerAccessService, printerManagementService,
+                printerCatalogSyncService, ownerAuthorizationService, terminalManagementClientProvider,
+                agentManagementClientProvider, DeploymentMode.SECURE_MULTI_TENANT);
+    }
+
+    @Test
+    void exposesAgentNavigationAndDisabledPrinterPrerequisiteForAnOwner() {
+        var secure = new PrinterManagementController(printerAccessService, printerManagementService,
+                printerCatalogSyncService, ownerAuthorizationService, terminalManagementClientProvider,
+                agentManagementClientProvider, DeploymentMode.SECURE_MULTI_TENANT);
+        when(printerManagementService.getPrinter(PRINTER_ID)).thenReturn(
+                new org.spon.edolhub.model.dto.CorePrinterDto(PRINTER_ID, "P1", "Printer", null, null,
+                        "BAMBU_P1S", "AGENT", "LEGACY", false));
+        when(printerManagementService.getConnection(PRINTER_ID)).thenReturn(
+                new org.spon.edolhub.model.dto.CorePrinterConnectionDto(null, null, null, null, null, null));
+        when(agentManagementClientProvider.getIfAvailable()).thenReturn(org.mockito.Mockito.mock(CoreAgentManagementClient.class));
+        secure.editForm(PRINTER_ID, model, response);
+        verify(model).addAttribute("agentManagementAvailable", true);
+        verify(model).addAttribute("agentManagementNotice",
+                "Enable this AGENT printer and save before issuing a pairing code. Disabling it revokes Agent access.");
+    }
+
+    @Test
+    void distinguishesAmsAuthenticationFailureFromAnUnpairedTerminal() {
+        when(printerManagementService.getPrinter(PRINTER_ID)).thenReturn(
+                new org.spon.edolhub.model.dto.CorePrinterDto(PRINTER_ID, "P1", "Printer", true));
+        when(printerManagementService.getConnection(PRINTER_ID)).thenReturn(
+                new org.spon.edolhub.model.dto.CorePrinterConnectionDto(null, null, null, null, null, null));
+        when(terminalManagementClientProvider.getIfAvailable()).thenReturn(terminalManagementClient);
+        when(terminalManagementClient.status(PRINTER_ID)).thenThrow(
+                HttpClientErrorException.create(org.springframework.http.HttpStatus.UNAUTHORIZED,
+                        "Unauthorized", org.springframework.http.HttpHeaders.EMPTY, "secret diagnostic".getBytes(), null));
+        controller.editForm(PRINTER_ID, model, response);
+        verify(model).addAttribute("terminalStatusUnavailable", true);
+        verify(model).addAttribute("terminalError", "AMS Terminal rejected service authentication. Check token issuer and audience.");
+    }
 
     @Test
     void scopesUpdateToTheCurrentTenantAndSynchronizesProjection() {

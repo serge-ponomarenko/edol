@@ -3,6 +3,7 @@ package org.spon.edolnotify.telegram;
 
 import io.github.natanimn.telebof.BotClient;
 import io.github.natanimn.telebof.BotContext;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,13 @@ public class TelegramBotService {
 
     private final CommandHandler commandHandler;
     private final CallbackHandler callbackHandler;
+
+    @PostConstruct
+    void validateConfiguration() {
+        if (telegramServiceEnable && (botToken == null || botToken.isBlank())) {
+            throw new IllegalStateException("Enabled Telegram requires a bot token");
+        }
+    }
 
     public BotContext getContext() {
         return bot == null ? null : bot.context;

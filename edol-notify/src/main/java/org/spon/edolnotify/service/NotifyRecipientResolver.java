@@ -18,6 +18,8 @@ public class NotifyRecipientResolver {
     private final NotifyRecipientProperties properties;
     private final NotifyTenantContext tenantContext;
     private final long homeAdminChatId;
+    @Value("${telegram.enable:true}")
+    private boolean telegramEnabled = true;
     private Map<UUID, List<Long>> recipientsByTenant = Map.of();
     private Map<Long, UUID> tenantsByRecipient = Map.of();
 
@@ -36,6 +38,7 @@ public class NotifyRecipientResolver {
     @PostConstruct
     void validateMappings() {
         if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
+            validateHomeAdmin();
             return;
         }
         Map<UUID, List<Long>> byTenant = new HashMap<>();
@@ -53,11 +56,17 @@ public class NotifyRecipientResolver {
                 }
             }
         }
-        if (byTenant.isEmpty()) {
+        if (telegramEnabled && byTenant.isEmpty()) {
             throw new IllegalStateException("secure-multi-tenant Notify requires recipient mappings");
         }
         recipientsByTenant = Map.copyOf(byTenant);
         tenantsByRecipient = Map.copyOf(byRecipient);
+    }
+
+    private void validateHomeAdmin() {
+        if (telegramEnabled && homeAdminChatId == 0) {
+            throw new IllegalStateException("Enabled Home Telegram requires an admin chat ID");
+        }
     }
 
     public NotifyTenantContext.Scope openForEvent(UUID tenantId) {

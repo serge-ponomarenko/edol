@@ -2,8 +2,16 @@
 
 ## Gate and scope
 
+**Resume after the 2026-10-23 failed preparation:** follow
+[hardware remediation and short resume procedure](stage9-hardware-remediation.md)
+first. Reuse the running `edol-stage9-hardware` environment; do not execute PREP
+again. Operator evidence records FLASH-A PASS on COM9, setup AP accessible,
+pairing/telemetry NOT RUN, terminal acceptance NOT RUN. Service/browser workflow
+blockers were found after the source gate; the earlier readiness statement
+below did not establish full application/deployment readiness.
+
 The source/disposable MQTT gate is ready for supervised hardware acceptance.
-Physical acceptance is **NOT RUN**. On 2026-10-22 the operator requested one
+Combined physical acceptance is **INCOMPLETE**. On 2026-10-22 the operator requested one
 combined session with separate Agent and AMS terminal firmware flashes and a
 real printer. This document controls that session. Execute one action, inspect
 the result, then continue. Do not start hardware from a successful build alone.
@@ -259,7 +267,7 @@ broker, accepted services or their data.
 | Case | Required evidence | Status |
 | --- | --- | --- |
 | PREP | Isolated resources, resolved config, TLS, RLS, scopes and restoration plan | NOT RUN |
-| FLASH-A | Confirmed Agent port, secure_smoke image/hash, successful boot | NOT RUN |
+| FLASH-A | Operator report 2026-10-23: COM9, secure_smoke `97e64b1`, firmware SHA256 `0C339ABD39073FBE6F25F893B58AE11D0868AE37601D593E64485D47770E4238`, setup boot successful | PASS (operator report) |
 | AGENT-STATE | Real printer telemetry routed to the bound tenant/printer | NOT RUN |
 | AGENT-UPLOAD | MQTT snapshot trigger, real camera and HTTPS/model upload | NOT RUN |
 | FLASH-T | Confirmed terminal port, operational secure esp32dev image/hash | NOT RUN |

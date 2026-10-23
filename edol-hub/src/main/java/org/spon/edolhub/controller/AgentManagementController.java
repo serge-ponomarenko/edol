@@ -2,6 +2,7 @@ package org.spon.edolhub.controller;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.spon.edolhub.service.CoreAgentManagementClient;
+import org.spon.edolhub.service.ManagementFailureMessage;
 import org.spon.edolhub.service.PrinterAccessService;
 import org.spon.edolhub.service.TenantOwnerAuthorizationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
@@ -39,7 +41,7 @@ public class AgentManagementController {
     @GetMapping
     public String page(@PathVariable UUID printerId, Model model, HttpServletResponse response) {
         authorize(printerId, model, response);
-        model.addAttribute(STATUS, agents.status(printerId));
+        populateStatus(printerId, model, response);
         return PAGE;
     }
 
@@ -62,7 +64,7 @@ public class AgentManagementController {
             response.setStatus(503);
             model.addAttribute(AGENT_ERROR, "Access is revoked in Core. MQTT disconnection is pending; retry when the broker is available.");
         }
-        model.addAttribute(STATUS, agents.status(printerId));
+        populateStatus(printerId, model, response);
         return PAGE;
     }
 
@@ -71,17 +73,26 @@ public class AgentManagementController {
         try {
             model.addAttribute("agentPairing", agents.pair(printerId, rotate));
         } catch (HttpClientErrorException exception) {
-            if (!exception.getStatusCode().isSameCodeAs(HttpStatus.CONFLICT)) {
-                throw exception;
-            }
-            response.setStatus(409);
-            model.addAttribute(AGENT_ERROR, "An active agent or unexpired pairing already exists.");
+            response.setStatus(exception.getStatusCode().value());
+            model.addAttribute(AGENT_ERROR, exception.getStatusCode().isSameCodeAs(HttpStatus.CONFLICT)
+                    ? "An active agent or unexpired pairing already exists."
+                    : ManagementFailureMessage.describe(exception, "EDOL Core Agent"));
         } catch (HttpServerErrorException.ServiceUnavailable exception) {
             response.setStatus(503);
             model.addAttribute(AGENT_ERROR, "MQTT disconnection is pending. No replacement code was issued; retry when the broker is available.");
         }
-        model.addAttribute(STATUS, agents.status(printerId));
+        populateStatus(printerId, model, response);
         return PAGE;
+    }
+
+    private void populateStatus(UUID printerId, Model model, HttpServletResponse response) {
+        try {
+            model.addAttribute(STATUS, agents.status(printerId));
+        } catch (RestClientException exception) {
+            response.setStatus(502);
+            model.addAttribute(AGENT_ERROR, ManagementFailureMessage.describe(exception, "EDOL Core Agent"));
+            model.addAttribute("agentStatusUnavailable", true);
+        }
     }
 
     private void authorize(UUID printerId, Model model, HttpServletResponse response) {

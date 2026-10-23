@@ -2,6 +2,11 @@
 
 ## Purpose and current gate
 
+For the existing 2026-10-23 session, use the
+[remediation resume procedure](stage9-hardware-remediation.md). Reuse prepared
+infrastructure and the successfully flashed Agent. The preparation sections
+below are historical setup references, not a checklist to restart on resume.
+
 The [combined Agent + AMS hardware runbook](stage9-disposable-hardware-runbook.md)
 controls the operator-requested 2026-10-22 session, including separate device
 flashes and real-printer AMS acceptance. Use this workbook as its detailed

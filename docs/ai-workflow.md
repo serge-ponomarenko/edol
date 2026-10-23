@@ -46,6 +46,14 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
+- Stage 9 hardware preparation failed on Hub navigation, service audiences and
+  disabled Notify startup after the earlier source gate. Continue via
+  `docs/deployment/stage9-hardware-remediation.md` and `tools/stage9/resume.py`,
+  preserving the existing run and checkpoints. A future fresh-environment
+  bootstrap should reuse these exact contracts, but must not recreate this
+  operator's realm, DB, authorities or certificates. No redeploy/hardware
+  operation or cleanup is implicit in source regression checks.
+
 - Stage 9.3b source now implements the approved single-Mosquitto MQTT path;
   see `docs/deployment/stage9-agent-mqtt-contract.md`. Earlier MQTT-disabled
   notes below describe the HTTPS foundation. The operator-requested combined

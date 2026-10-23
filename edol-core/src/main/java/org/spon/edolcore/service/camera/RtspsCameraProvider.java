@@ -6,7 +6,7 @@ import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
-import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -22,7 +22,7 @@ class RtspsCameraProvider implements CameraProvider {
 
     private static final int RTSP_PORT = 322;
 
-    private final PrinterConnectionConfigurationRepository configurationRepository;
+    private final PrinterManagementService printerManagementService;
 
     @Override
     public boolean supports(UUID printerId) {
@@ -98,14 +98,7 @@ class RtspsCameraProvider implements CameraProvider {
     private PrinterConnectionConfiguration configuration(
             UUID printerId
     ) {
-        return configurationRepository
-                .findByPrinterId(printerId)
-                .orElseThrow(() ->
-                        new IllegalStateException(
-                                "Configuration not found for printer "
-                                        + printerId
-                        )
-                );
+        return printerManagementService.getConnection(printerId);
     }
 
 }

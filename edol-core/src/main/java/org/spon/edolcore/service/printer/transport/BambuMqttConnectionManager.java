@@ -1,7 +1,8 @@
 package org.spon.edolcore.service.printer.transport;
 
 import lombok.RequiredArgsConstructor;
-import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
+import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
 import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityStateService;
 import org.spon.edolcore.service.printer.telemetry.BambuTelemetryConsumer;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +20,8 @@ public class BambuMqttConnectionManager {
 
     private final BambuTelemetryConsumer telemetryConsumer;
     private final PrinterConnectivityStateService connectivityStateService;
-    private final PrinterConnectionConfigurationRepository connectionConfigurationRepository;
+    private final PrinterManagementService printerManagementService;
+    private final CoreRuntimeTenantExecutor runtimeTenantExecutor;
 
     private final Map<UUID, BambuMqttConnection> connections =
             new ConcurrentHashMap<>();
@@ -35,18 +37,14 @@ public class BambuMqttConnectionManager {
                 printerId,
                 id -> new BambuMqttConnection(
                         id,
-                        connectionConfigurationRepository
-                                .findByPrinterId(id)
-                                .orElseThrow(() ->
-                                        new IllegalStateException(
-                                                "Missing connection configuration for printer " + id
-                                        )),
+                        printerManagementService.getConnection(id),
                         new BambuMqttConfiguration(
                                 clientId,
                                 connectionTimeout
                         ),
                         telemetryConsumer,
-                        connectivityStateService
+                        connectivityStateService,
+                        runtimeTenantExecutor
                 )
         );
     }

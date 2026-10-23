@@ -32,8 +32,6 @@ public class BambuTelemetryConsumer {
             UUID printerId,
             byte[] payload
     ) {
-        printerConnectivityStateService.setConnected(printerId);
-
         try {
             JsonNode root = mapper.readTree(payload);
 
@@ -60,6 +58,7 @@ public class BambuTelemetryConsumer {
                         printerId,
                         root.get("print")
                 );
+                printerConnectivityStateService.setConnected(printerId);
             }
 
         } catch (Exception e) {

@@ -1,6 +1,10 @@
 package org.spon.edolhub.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.spon.edol.deployment.DeploymentMode;
+import org.spon.edolhub.service.CoreAgentManagementClient;
+import org.spon.edolhub.service.ManagementFailureMessage;
 import org.spon.edolhub.model.dto.CorePrinterDto;
 import org.spon.edolhub.model.dto.CorePrinterConnectionDto;
 import org.spon.edolhub.model.dto.PrinterForm;
@@ -31,18 +35,24 @@ import java.util.UUID;
 @Controller
 @RequestMapping("/printers")
 @RequiredArgsConstructor
+@Slf4j
 public class PrinterManagementController {
 
     private static final String PRINTER_ERROR_ATTRIBUTE = "printerError";
     private static final String TERMINAL_ERROR_ATTRIBUTE = "terminalError";
     private static final String TERMINAL_MANAGEMENT_AVAILABLE_ATTRIBUTE = "terminalManagementAvailable";
     private static final String PRINTER_EDIT_REDIRECT = "redirect:/printers/";
+    private static final String CORE_DEPENDENCY = "EDOL Core";
+    private static final String AMS_DEPENDENCY = "AMS Terminal";
+    private static final String AGENT_MODE = "AGENT";
 
     private final PrinterAccessService printerAccessService;
     private final PrinterManagementService printerManagementService;
     private final PrinterCatalogSyncService printerCatalogSyncService;
     private final TenantOwnerAuthorizationService ownerAuthorizationService;
     private final ObjectProvider<AmsTerminalManagementClient> terminalManagementClientProvider;
+    private final ObjectProvider<CoreAgentManagementClient> agentManagementClientProvider;
+    private final DeploymentMode deploymentMode;
 
     @GetMapping
     public String list(Model model) {
@@ -54,8 +64,9 @@ public class PrinterManagementController {
     public String createForm(Model model) {
         model.addAttribute("printerForm", new PrinterForm());
         model.addAttribute("newPrinterForm", true);
+        model.addAttribute("secureDeployment", deploymentMode == DeploymentMode.SECURE_MULTI_TENANT);
         model.addAttribute("models", new String[]{"BAMBU_A1", "BAMBU_A1_MINI", "BAMBU_P1P", "BAMBU_P1S", "BAMBU_X1", "BAMBU_X1C", "BAMBU_H2D", "UNKNOWN"});
-        model.addAttribute("connectionModes", new String[]{"DIRECT", "AGENT"});
+        model.addAttribute("connectionModes", new String[]{"DIRECT", AGENT_MODE});
         model.addAttribute("cameraProviders", new String[]{"LEGACY", "RTSPS"});
         return "dashboard/printers/form";
     }
@@ -67,7 +78,8 @@ public class PrinterManagementController {
             printerCatalogSyncService.synchronize(printer.printerId());
             return PRINTER_EDIT_REDIRECT + printer.printerId();
         } catch (RuntimeException exception) {
-            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, "Unable to create printer in EDOL Core");
+            reportFailure(exception, "create printer", null);
+            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, ManagementFailureMessage.describe(exception, CORE_DEPENDENCY));
             return "redirect:/printers/new";
         }
     }
@@ -94,9 +106,11 @@ public class PrinterManagementController {
         );
         model.addAttribute("newPrinterForm", false);
         model.addAttribute("editingPrinterId", printerId);
+        model.addAttribute("secureDeployment", deploymentMode == DeploymentMode.SECURE_MULTI_TENANT);
         model.addAttribute("models", new String[]{"BAMBU_A1", "BAMBU_A1_MINI", "BAMBU_P1P", "BAMBU_P1S", "BAMBU_X1", "BAMBU_X1C", "BAMBU_H2D", "UNKNOWN"});
-        model.addAttribute("connectionModes", new String[]{"DIRECT", "AGENT"});
+        model.addAttribute("connectionModes", new String[]{"DIRECT", AGENT_MODE});
         model.addAttribute("cameraProviders", new String[]{"LEGACY", "RTSPS"});
+        populateAgentManagement(printer, model);
         populateTerminalManagement(printerId, model);
         return "dashboard/printers/form";
     }
@@ -137,7 +151,8 @@ public class PrinterManagementController {
             printerManagementService.updatePrinter(printerId, printerForm);
             printerCatalogSyncService.synchronize(printerId);
         } catch (RuntimeException exception) {
-            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, "Unable to update printer in EDOL Core");
+            reportFailure(exception, "update printer", printerId);
+            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, ManagementFailureMessage.describe(exception, CORE_DEPENDENCY));
         }
         return PRINTER_EDIT_REDIRECT + printerId + "/edit";
     }
@@ -149,9 +164,29 @@ public class PrinterManagementController {
             printerManagementService.deletePrinter(printerId);
             printerCatalogSyncService.synchronize();
         } catch (RuntimeException exception) {
-            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, "Unable to decommission printer in EDOL Core");
+            reportFailure(exception, "decommission printer", printerId);
+            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE, ManagementFailureMessage.describe(exception, CORE_DEPENDENCY));
         }
         return "redirect:/printers";
+    }
+
+    private void populateAgentManagement(CorePrinterDto printer, Model model) {
+        model.addAttribute("agentManagementAvailable", false);
+        if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT || !AGENT_MODE.equals(printer.connectionMode())) {
+            return;
+        }
+        try {
+            ownerAuthorizationService.requireCurrentOwner();
+        } catch (AccessDeniedException exception) {
+            return;
+        }
+        boolean available = agentManagementClientProvider.getIfAvailable() != null;
+        model.addAttribute("agentManagementAvailable", available);
+        if (!available) {
+            model.addAttribute("agentManagementNotice", "Agent management is disabled for this installation. Ask the administrator to enable it.");
+        } else if (!printer.enabled()) {
+            model.addAttribute("agentManagementNotice", "Enable this AGENT printer and save before issuing a pairing code. Disabling it revokes Agent access.");
+        }
     }
 
     private void populateTerminalManagement(UUID printerId, Model model) {
@@ -174,7 +209,9 @@ public class PrinterManagementController {
             model.addAttribute(TERMINAL_MANAGEMENT_AVAILABLE_ATTRIBUTE, false);
         } catch (RuntimeException exception) {
             model.addAttribute(TERMINAL_MANAGEMENT_AVAILABLE_ATTRIBUTE, true);
-            model.addAttribute(TERMINAL_ERROR_ATTRIBUTE, "AMS Terminal status is temporarily unavailable. Try again shortly.");
+            reportFailure(exception, "read AMS terminal status", printerId);
+            model.addAttribute(TERMINAL_ERROR_ATTRIBUTE, ManagementFailureMessage.describe(exception, AMS_DEPENDENCY));
+            model.addAttribute("terminalStatusUnavailable", true);
         }
     }
 
@@ -189,7 +226,8 @@ public class PrinterManagementController {
         } catch (AmsTerminalManagementConflictException exception) {
             redirectAttributes.addFlashAttribute(TERMINAL_ERROR_ATTRIBUTE, exception.getMessage());
         } catch (RuntimeException exception) {
-            redirectAttributes.addFlashAttribute(TERMINAL_ERROR_ATTRIBUTE, "AMS Terminal operation could not be completed.");
+            reportFailure(exception, "pair AMS terminal", printerId);
+            redirectAttributes.addFlashAttribute(TERMINAL_ERROR_ATTRIBUTE, ManagementFailureMessage.describe(exception, AMS_DEPENDENCY));
         }
         return terminalRedirect(printerId);
     }
@@ -205,7 +243,8 @@ public class PrinterManagementController {
             operation.accept(client, printerId);
             redirectAttributes.addFlashAttribute("terminalInfo", successMessage);
         } catch (RuntimeException exception) {
-            redirectAttributes.addFlashAttribute(TERMINAL_ERROR_ATTRIBUTE, "AMS Terminal operation could not be completed.");
+            reportFailure(exception, "manage AMS terminal", printerId);
+            redirectAttributes.addFlashAttribute(TERMINAL_ERROR_ATTRIBUTE, ManagementFailureMessage.describe(exception, AMS_DEPENDENCY));
         }
         return terminalRedirect(printerId);
     }
@@ -222,5 +261,10 @@ public class PrinterManagementController {
 
     private String terminalRedirect(UUID printerId) {
         return PRINTER_EDIT_REDIRECT + printerId + "/edit";
+    }
+
+    private void reportFailure(RuntimeException error, String operation, UUID printerId) {
+        log.warn("Management request failed: operation={}, printer={}, type={}, status={}",
+                operation, printerId, error.getClass().getSimpleName(), ManagementFailureMessage.status(error));
     }
 }

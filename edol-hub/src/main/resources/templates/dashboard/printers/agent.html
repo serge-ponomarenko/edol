@@ -11,7 +11,8 @@
 <main class="container-xl py-4">
     <h1>Printer agent</h1>
     <p>Connect an agent in your printer's local network. It connects to EDOL automatically.</p>
-    <p>Status: <strong th:text="${agentStatus == null ? 'Not paired' : agentStatus.state}"></strong></p>
+    <p>Pairing requires an enabled AGENT printer. Configure and save this on the printer edit page first. Disabling a paired printer revokes its Agent access.</p>
+    <p>Status: <strong th:text="${agentStatusUnavailable == true ? 'Unavailable' : (agentStatus == null ? 'Not paired' : agentStatus.state)}"></strong></p>
     <p class="alert alert-warning" th:if="${agentStatus != null and agentStatus.mqttState == 'REVOKE_PENDING'}">
         Access is revoked in Core. MQTT disconnection is pending while the broker is unavailable.
     </p>

@@ -34,7 +34,8 @@
                             </div>
                             <hr>
                             <h4>Connection</h4>
-                            <div class="row row-cards">
+                            <p id="secureAgentConnectionNote" th:attr="hidden=${secureDeployment != true or printerForm.connectionMode != 'AGENT' ? 'hidden' : null}">Configure printer LAN access in the Agent setup portal. EDOL assigns its identity during pairing; no Agent ID is entered here.</p>
+                            <div class="row row-cards" id="printerConnectionFields" th:attr="hidden=${secureDeployment == true and printerForm.connectionMode == 'AGENT' ? 'hidden' : null}">
                                 <div class="col-md-4"><label class="form-label" for="mqttHost">MQTT Host</label><input id="mqttHost" class="form-control" th:field="*{mqttHost}"></div>
                                 <div class="col-md-2"><label class="form-label" for="mqttPort">MQTT Port</label><input id="mqttPort" class="form-control" min="1" max="65535" th:field="*{mqttPort}" type="number"></div>
                                 <div class="col-md-4"><label class="form-label" for="ftpHost">FTP Host</label><input id="ftpHost" class="form-control" th:field="*{ftpHost}"></div>
@@ -45,6 +46,7 @@
                             </div>
                             <div class="mt-4"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-secondary" href="/printers">Cancel</a></div>
                         </form>
+                        <p class="alert alert-warning mt-4" th:if="${agentManagementNotice}" th:text="${agentManagementNotice}"></p>
                         <section class="mt-4" th:if="${!newPrinterForm and agentManagementAvailable == true}">
                             <a class="btn btn-outline-primary" th:href="@{/printers/{id}/agent(id=${editingPrinterId})}">Manage printer agent</a>
                         </section>
@@ -55,7 +57,8 @@
                                     <h4 class="mb-0">AMS Terminal</h4>
                                     <div class="text-secondary">Owner-managed terminal enrollment</div>
                                 </div>
-                                <span class="badge bg-secondary" th:if="${terminalStatus == null}">Not enrolled</span>
+                                <span class="badge bg-secondary" th:if="${terminalStatusUnavailable == true}">Status unavailable</span>
+                                <span class="badge bg-secondary" th:if="${terminalStatus == null and terminalStatusUnavailable != true}">Not enrolled</span>
                                 <span class="badge bg-secondary" th:if="${terminalStatus != null and terminalPairingExpired}">Pairing expired</span>
                                 <span class="badge bg-success" th:if="${terminalStatus != null and !terminalPairingExpired and terminalStatus.lifecycleState == 'ACTIVE'}">Active</span>
                                 <span class="badge bg-warning text-dark" th:if="${terminalStatus != null and !terminalPairingExpired and terminalStatus.lifecycleState == 'PENDING'}">Pairing pending</span>
@@ -93,7 +96,7 @@
                                 <a class="btn btn-outline-secondary" th:href="@{/printers/{printerId}/edit(printerId=${editingPrinterId})}">
                                     Refresh terminal status
                                 </a>
-                                <form method="post" th:action="@{/printers/{printerId}/terminal/pairings(printerId=${editingPrinterId})}" th:if="${terminalStatus == null or terminalPairingExpired or terminalStatus.lifecycleState == 'RESET'}">
+                                <form method="post" th:action="@{/printers/{printerId}/terminal/pairings(printerId=${editingPrinterId})}" th:if="${terminalStatusUnavailable != true and (terminalStatus == null or terminalPairingExpired or terminalStatus.lifecycleState == 'RESET')}">
                                     <button class="btn btn-primary" type="submit" th:text="${terminalStatus == null} ? 'Pair AMS Terminal' : (terminalPairingExpired ? 'Regenerate expired pairing' : 'Pair AMS Terminal')"></button>
                                 </form>
                                 <form method="post" onsubmit="return confirm('Rotate this terminal credential? The terminal must enroll again with a new pairing code.');" th:action="@{/printers/{printerId}/terminal/rotate(printerId=${editingPrinterId})}" th:if="${terminalStatus != null and terminalStatus.lifecycleState == 'ACTIVE'}">
@@ -119,7 +122,16 @@
         </div>
     </div>
 </div>
-<script>
+<script th:inline="javascript">
+    const secureDeployment = /*[[${secureDeployment == true}]]*/ false;
+    const connectionMode = document.getElementById('connectionMode');
+    function updateConnectionFields() {
+        const pairedAgent = secureDeployment && connectionMode.value === 'AGENT';
+        document.getElementById('printerConnectionFields').hidden = pairedAgent;
+        document.getElementById('secureAgentConnectionNote').hidden = !pairedAgent;
+    }
+    connectionMode.addEventListener('change', updateConnectionFields);
+    updateConnectionFields();
     const pairingCode = document.getElementById('terminalPairingCode');
     const countdown = document.getElementById('terminalPairingCountdown');
     const copyButton = document.getElementById('copyTerminalPairingCode');
