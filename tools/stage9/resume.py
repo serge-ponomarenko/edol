@@ -161,7 +161,7 @@ def ready(report):
             and checks.get("agent_status", {}).get("http") in [200, 204, 404]
             and checks.get("terminal_status", {}).get("http") in [200, 404]
             and isinstance(checks.get("agent_https"), dict)
-            and checks["agent_https"].get("http") in [403, 405]
+            and checks["agent_https"].get("http") in [401, 403, 405]
             and all(checks.get(key, "").lower() == "true" for key in
                     ["EDOL_HUB_AGENT_ENABLED", "EDOL_CORE_AGENT_ENABLED", "EDOL_CORE_AGENT_MQTT_ENABLED"]))
 

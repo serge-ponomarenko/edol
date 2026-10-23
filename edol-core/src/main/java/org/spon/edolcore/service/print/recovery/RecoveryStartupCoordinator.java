@@ -10,6 +10,7 @@ import org.spon.edolcore.service.printer.command.PrinterCommandGateway;
 import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.spon.edolcore.service.printer.runtime.PrinterRuntimeQueryService;
 import org.spon.edolcore.service.printer.runtime.RecoveryRuntimeState;
+import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class RecoveryStartupCoordinator {
     private final PrinterRuntimeQueryService runtimeQueryService;
     private final LogContextFactory logContextFactory;
     private final ExecutorService virtualThreadExecutor;
+    private final CoreRuntimeTenantExecutor runtimeTenantExecutor;
 
     public void startRecoveryIfNeeded(UUID printerId) {
         RecoveryRuntimeState runtimeState = runtimeQueryService
@@ -52,7 +54,7 @@ public class RecoveryStartupCoordinator {
                         "Starting recovery after printer connectivity established"
                 );
 
-        virtualThreadExecutor.submit(() -> runRecoveryWorkflow(printerId));
+        virtualThreadExecutor.submit(() -> runtimeTenantExecutor.execute(printerId, () -> runRecoveryWorkflow(printerId)));
     }
 
     private void runRecoveryWorkflow(UUID printerId) {

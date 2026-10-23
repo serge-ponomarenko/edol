@@ -11,6 +11,16 @@ import resume
 
 
 class ResumeTest(unittest.TestCase):
+    def test_verified_https_authentication_denial_is_ready_for_owner_action_not_enrollment_success(self):
+        checks = {"required_authority": "PASS", "printer": {"http": 200, "connectionMode": "AGENT"},
+                  "agent_status": {"http": 404}, "terminal_status": {"http": 404},
+                  "agent_https": {"tls": "verified", "http": 401}}
+        for key in ["EDOL_HUB_AGENT_ENABLED", "EDOL_CORE_AGENT_ENABLED", "EDOL_CORE_AGENT_MQTT_ENABLED"]:
+            checks[key] = "true"
+        self.assertTrue(resume.ready({"checks": checks}))
+        checks["agent_https"] = "BLOCKED: TLS verification failed"
+        self.assertFalse(resume.ready({"checks": checks}))
+
     def test_existing_audiences_are_not_duplicated_on_rerun(self):
         clients = {name: name for name in resume.AUDIENCES}
         writes = []

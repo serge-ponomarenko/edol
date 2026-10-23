@@ -52,7 +52,14 @@ must never be copied into the repository or a Codex configuration file.
   preserving the existing run and checkpoints. A future fresh-environment
   bootstrap should reuse these exact contracts, but must not recreate this
   operator's realm, DB, authorities or certificates. No redeploy/hardware
-  operation or cleanup is implicit in source regression checks.
+    operation or cleanup is implicit in source regression checks.
+  The current operator checkpoint has DIRECT telemetry/live camera PASS and
+  Agent enrollment blocked by TLS -9984. Source fixes now wrap asynchronous
+  recovery and reconnect checks in the trusted runtime tenant executor. Lab-only
+  Agent TIME/TLS diagnostics are ready for an explicitly approved upload; obtain
+  actual clock/verifier evidence before changing endpoint certificates. Do not
+  bootstrap the run again, infer zero verifier flags from unavailable state,
+  bypass TLS/RLS or reset existing identities to make acceptance pass.
 
 - Stage 9.3b source now implements the approved single-Mosquitto MQTT path;
   see `docs/deployment/stage9-agent-mqtt-contract.md`. Earlier MQTT-disabled

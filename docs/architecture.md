@@ -22,7 +22,10 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor with four services, PostgreSQL an
 Core runtime is per printer. New printer, connection and session identifiers use UUID v7; historical UUID v4 values are retained. Its HTTP API exposes a printer catalog and explicit `{printerId}` state, command, and media endpoints; default-printer HTTP endpoints are not supported. Hub, AMS and Notify use only explicit printer endpoints. Any change that carries printer identity through MQTT or HTTP must be coordinated across every producer and consumer.
 
 DIRECT Paho report/disconnect callbacks restore the tenant from the trusted
-runtime registry on the callback thread. Direct connection and camera
+runtime registry on the callback thread. Asynchronous startup recovery and scheduled connectivity checks
+execute within that same trusted runtime tenant boundary. Recovery and reconnect
+do not inherit a scheduler/caller tenant or resolve one from printer payloads.
+Direct connection and camera
 configuration reads use the transactional printer-management service so the
 secure RLS tenant setting is established; network I/O remains outside that
 configuration transaction. Transport connectivity alone is not proof of

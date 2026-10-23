@@ -33,11 +33,9 @@ public class PrinterTelemetryReconnectScheduler {
     public void reconnect() {
         for (UUID printerId :
                 runtimeQueryService.getActivePrinterIds()) {
-            if (!telemetryProvider.isConnected(
-                    printerId
-            )) {
-                virtualThreadExecutor.submit(() ->
-                    runtimeTenantExecutor.execute(printerId, () -> {
+            virtualThreadExecutor.submit(() ->
+                runtimeTenantExecutor.execute(printerId, () -> {
+                    if (!telemetryProvider.isConnected(printerId)) {
                         logContextFactory
                                 .printer(
                                         log.atInfo(),
@@ -48,9 +46,9 @@ public class PrinterTelemetryReconnectScheduler {
                                 );
 
                         telemetryProvider.connect(printerId);
-                    })
-                );
-            }
+                    }
+                })
+            );
         }
     }
 

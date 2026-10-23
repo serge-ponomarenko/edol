@@ -2,11 +2,18 @@
 
 ## Current state: resume, do not bootstrap
 
-The operator report is the physical evidence baseline. Agent secure firmware
-`97e64b1` was flashed on confirmed COM9 and booted into its setup AP: **FLASH-A
-PASS**. Enrollment, MQTT session, telemetry and AMS hardware acceptance are
-NOT RUN. Portal endpoint values were not confirmed saved. Do not flash again
-or repeat PostgreSQL/RLS/realm/certificate preparation to resume this session.
+The latest operator report supersedes the original checkpoint below. Backend
+`1444970` was deployed, service audiences corrected and the existing HTTPS proxy
+reloaded. DIRECT telemetry and live camera updates are **physical PASS**. Agent
+`65b1fd9` was flashed on COM9, booted into setup and displayed the intended
+endpoints. Enrollment was attempted and **failed TLS verification (-9984)**;
+Agent MQTT/telemetry/uploads and AMS hardware acceptance remain **NOT RUN**.
+
+The current source increment fixes two DIRECT background tenant boundaries and
+adds Agent clock/TLS diagnostics. It has **not been deployed or flashed**.
+The next operator procedure and rollback are in the final section. Do not repeat
+bootstrap, identity preparation or historical checks. Earlier deployment/flash
+instructions below are historical, not instructions to repeat now.
 
 The existing Debian run is `/home/serge/edol-stage9-hardware`, Compose project
 `edol-stage9-hardware`, base `compose.backend.yaml`. Preserve its database,
@@ -80,7 +87,8 @@ starting them (reuse existing Docker/Maven caches):
 
 ```sh
 for service in core hub ams notify; do
-  docker build -f docker/edol-$service.Dockerfile -t edol-stage9-$service:stage9-remediation . || break
+  docker build -f docker/edol-$service.Dockerfile -t edol-stage9-$service:stage9-remediation . || exit 1
+  docker image inspect edol-stage9-$service:stage9-remediation --format '{{.Id}}' || exit 1
 done
 ```
 
@@ -276,3 +284,208 @@ the known pathless Java S1598 artifact remains. The touched overview template
 also gained pinned, SHA384-verified CDN dependencies and small analyzer-driven
 equivalent JavaScript changes. No suppression was added. Physical DIRECT and
 Agent observations await the approved deployment and operator session.
+
+## Follow-up checkpoint: DIRECT background tasks and Agent TLS (-9984)
+
+This section is the current resumption procedure. Previous sections preserve
+historical source/disposable evidence; they are not a new preparation checklist.
+
+### Evidence and root causes
+
+- **DIRECT-RECOVERY-01, confirmed code defect:** `RecoveryStartupCoordinator.
+  startRecoveryIfNeeded` submitted `runRecoveryWorkflow` directly. A new virtual
+  thread does not inherit the trusted tenant scope. It now executes through
+  `CoreRuntimeTenantExecutor` before synchronization, printer lookup or commands.
+- **DIRECT-RECONNECT-01, confirmed code defect:** `PrinterTelemetryReconnectScheduler.
+  reconnect` called `isConnected` on the scheduler thread, outside that executor.
+  Provider selection can read printer configuration. Both the check and optional
+  connect now run inside the worker's trusted runtime scope. Unknown bindings and
+  foreign active scopes still fail closed; no payload-derived tenant or RLS bypass.
+- **Helper readiness, confirmed code defect:** a verified HTTPS authentication
+  denial HTTP 401 was excluded from the expected probe statuses. `resume.py`
+  now accepts 401 alongside 403/405, only with verified TLS. Device-management
+  404 is an unpaired state. READY_FOR_OWNER_ACTION is not enrolled/physical PASS.
+- **Agent clock readiness, confirmed code weakness, physical causality unknown:**
+  the old lower-bound-only epoch check could skip synchronization. Secure firmware
+  now requires an observed SNTP callback during this boot and checks clock
+  continuity against its monotonic anchor. Timeout remains fail closed. It does
+  not authenticate NTP or bypass certificate validity checks.
+- **AGENT-ENROLLMENT-01 remains P0 / unresolved physical cause.** Arduino
+  2.0.17 / local mbedTLS 2.28.7 reports aggregate -9984 and clears TLS state on
+  failed-connect cleanup. The lab-only client captures available verification
+  flags before cleanup. TIME/TLS and enrollment failures report public endpoint,
+  numeric UTC epoch, NTP state and embedded public CA PEM hash; never credentials
+  or response bodies. Unavailable flags stay unavailable, not numeric zero.
+- An IP-only SAN is a candidate name-check incompatibility: upstream mbedTLS
+  2.28.7's [SAN verifier](https://github.com/Mbed-TLS/mbedtls/blob/v2.28.7/library/x509_crt.c)
+  handles DNS names there. This is an inference, not proof of the deployed vendor
+  verifier or the certificate received by the ESP32. Collect device flags and
+  actual SAN before proposing a DNS/certificate change. Do not regenerate CA,
+  disable hostname checking or treat Debian OpenSSL success as ESP32 success.
+- DIRECT overview initialization later reached Ready/IDLE: no persistent UI
+  defect established, no UI change. First-use NVS NOT_FOUND and an unmatched
+  WebServer request are unclassified observations, with no proven blocking effect.
+
+### Targeted verification of this increment
+
+PASS: 7 Java tests (BackgroundRuntimeTenantTest 4,
+DirectMqttTenantCallbackTest 3), zero failures/errors/skips; 10 resume-helper
+Python tests; 9 firmware native executables; 3 CA-hook Python tests; Home,
+secure and secure_smoke ESP32 builds. Both secure environments without the CA
+failed as required. These are source/build results, not hardware acceptance.
+
+The initial Maven run encountered stale generated reactor artifacts; scoped
+`clean test` passed. The remote-Docker wrapper failed SSH with exit 255 before
+Maven. The three DirectRuntimePersistenceTest PostgreSQL/RLS cases were **NOT
+RUN this increment**; retain their previous accepted evidence without counting
+them again. No full reactor, live TLS handshake, deployment, serial or flash
+was performed. Read-only Sonar checked all 8 supported changed sources (3 Java,
+5 Python): only the known pathless Java S1598 snippet artifact; no suppression.
+C++ is unsupported by the available analyzer.
+
+Maintainer commands (already executed, not operator prerequisites):
+
+```text
+mvn -B -pl edol-core -am -Dtest=BackgroundRuntimeTenantTest,DirectMqttTenantCallbackTest -Dsurefire.failIfNoSpecifiedTests=false clean test
+py tools/stage9/test_resume.py
+py scripts/run_host_tests.py
+py test/test_secure_trust.py
+pio run -e lolin_d32
+pio run -e lolin_d32_secure
+pio run -e lolin_d32_secure_smoke
+```
+
+Firmware commands run from the Agent worktree; secure builds require its existing
+public CA file environment variable. The preserved pre-build smoke binary is
+`stage9-restoration/pre-verification-secure-smoke-firmware.bin`, SHA256
+`5b9c36167864237dd7c869901088d56380cf0161ec412004c569224a2c665cc9`.
+This is a local build artifact, not a dump of installed firmware.
+Verified new smoke build SHA256:
+`1a853c1fbc7257f382c3acab58570fb5ce27db32924e37319cedd4f9fdb9a723`.
+A fresh build may differ because build epoch is embedded.
+
+### Operator resumption: one action, one observation
+
+**No action is authorized by this document alone.** Review the source increment,
+then obtain explicit deployment/flash approval. Do not rerun prepare, identity,
+all-service deployment, historical RLS checks or proxy reload.
+
+1. Update only the clean existing backend checkout to the reviewed fix commit
+   after it is published. Build **Core only**, with an explicit unique tag.
+   These shell commands stop on failure and preserve the currently running
+   image as a rollback tag before changing anything:
+
+   ```sh
+   cd /home/serge/edol-stage9-hardware/backend
+   (
+     set -eu
+     stage9_revision=$(git rev-parse --short HEAD)
+     stage9_tag="stage9-runtime-$stage9_revision"
+     if docker image inspect "edol-stage9-core:before-$stage9_tag" >/dev/null 2>&1; then
+       echo "Rollback tag already exists; review the previous attempt before continuing" >&2
+       exit 1
+     fi
+     stage9_core=$(docker compose -p edol-stage9-hardware -f ../compose.backend.yaml -f ../remediation/compose.resume.yaml ps -q edolcore)
+     test -n "$stage9_core"
+     stage9_previous=$(docker inspect --format '{{.Image}}' "$stage9_core")
+     docker image tag "$stage9_previous" "edol-stage9-core:before-$stage9_tag"
+     docker build --pull=false -f docker/edol-core.Dockerfile -t "edol-stage9-core:$stage9_tag" .
+     docker image inspect "edol-stage9-core:$stage9_tag" --format '{{.Id}}'
+     stage9_override="../remediation/compose.$stage9_tag.yaml"
+     set -C
+     printf 'services:\n  edolcore:\n    image: edol-stage9-core:%s\n' "$stage9_tag" > "$stage9_override"
+     docker compose -p edol-stage9-hardware -f ../compose.backend.yaml -f ../remediation/compose.resume.yaml -f "$stage9_override" config --quiet
+     docker compose -p edol-stage9-hardware -f ../compose.backend.yaml -f ../remediation/compose.resume.yaml -f "$stage9_override" up -d --no-deps --pull never edolcore
+   )
+   ```
+
+   If the override already exists, stop and review it; do not overwrite it.
+   Record the new tag/override and rollback tag in the session checkpoint. The
+   explicit `-t` and image inspection avoid the previous latest/tag mismatch;
+   no retagging of unrelated images or rebuilding four applications is needed.
+   Observe DIRECT telemetry and camera on its existing dashboard and one
+   reconnect interval; capture only any new recovery/reconnect exception.
+   Use `python3 tools/stage9/resume.py check` only if a named readiness question
+   remains; its result does not replace physical enrollment.
+
+2. Prepare the new Agent lab image in the existing worktree. The previous
+   flashed firmware lacks TIME/TLS diagnostics; this is a source change requiring
+   a separately approved upload. Keep previous build artifacts in the ignored
+   restoration directory; never commit binaries or the public CA copy.
+
+   ```powershell
+   Set-Location C:\Users\Ponomarenko\IdeaProjects\edol\.worktrees\edol-agent-stage9
+   $env:EDOL_AGENT_ROOT_CA_FILE = (Resolve-Path stage9-restoration/stage9-ca.pem).Path
+   pio run -e lolin_d32_secure_smoke
+   if ($LASTEXITCODE -ne 0) { throw "Secure smoke build failed" }
+   Get-FileHash .pio/build/lolin_d32_secure_smoke/firmware.bin -Algorithm SHA256
+   ```
+
+   Confirm the actual Agent port with the operator (last confirmed COM9; COM16
+   was an AMS port). Only then, on explicit approval:
+
+   ```powershell
+   pio run -e lolin_d32_secure_smoke -t upload --upload-port COM9
+   ```
+
+   No erase-flash, filesystem upload or NVS reset. Clear the process-local CA
+   variable afterward if it was introduced for this build.
+
+3. On the already configured Wi-Fi connection, open the existing lab console
+   at 115200/LF. Send **TIME**, then **TLS**. TLS only contacts configured Core
+   `192.168.0.200:18443`; it sends no HTTP request/pairing code. If Wi-Fi is not
+   connected, use the existing portal connection procedure first. Capture only
+   the bounded SMOKE clock/TLS lines and numeric errors.
+   - NTP timeout: investigate the device network's UDP 123 reachability; stop
+     enrollment attempts. Do not accept a guessed epoch.
+   - expired/future flags: compare recorded device UTC with actual certificate
+     validity. Name flag: inspect the public certificate SAN against the configured
+     host and SDK verifier. Trust flag: compare embedded CA PEM SHA256 with the
+     existing public CA and actual chain. More than one flag can be set.
+   - Unknown/unavailable flags: retain the exact error; do not infer success or
+     change certificates speculatively.
+   - For a name/date question only, an operator can inspect the public server
+     certificate without any key or credential dump:
+
+     ```sh
+     openssl s_client -connect 192.168.0.200:18443 -CAfile /home/serge/edol-stage9-hardware/certs/ca.pem -verify_return_error </dev/null 2>/dev/null | openssl x509 -noout -dates -ext subjectAltName
+     ```
+
+4. Only after the device TLS probe is verified, open the existing AGENT printer
+   in Hub. Confirm its intended enabled state through the UI; explicitly enable
+   and Save if still disabled. Issue a **fresh** Agent pairing code, enter it
+   privately in the existing setup portal and Save & Reboot once. Keep Core
+   host/port 192.168.0.200/18443 and MQTT host/port 192.168.0.200/18884.
+   Legacy upload path is ignored in secure mode. Observe ACTIVE and MQTT READY,
+   then genuine telemetry. A TLS probe, status404 or startup log cannot mark
+   these PASS. If TLS still fails, stop at its diagnostics rather than issuing
+   repeated codes.
+
+5. Continue the existing combined runbook from HTTPS uploads, then AMS FLASH-T
+   and read-only management. Confirm the terminal's actual USB port separately.
+   Metadata write/inverse, remaining security/revoke/replace/recovery cases and
+   restoration each retain their existing operator approval boundaries. Do not
+   mark AMS or any unexecuted physical case PASS.
+
+### Rollback and cleanup obligations
+
+Core rollback changes only the image: create a new small override referencing
+the recorded `edol-stage9-core:before-stage9-runtime-<revision>` tag, validate it
+with the same base/resume files, then `up -d --no-deps --pull never edolcore`.
+Do not rerun identity, restore a database snapshot or reset Dynamic Security.
+A source-only rollback cannot restore consumed pairing codes; use normal owner
+lifecycle when needed. No DB migration or API/topic change was introduced here.
+
+Agent rollback requires explicit upload approval and the preserved known
+previous binary with its recorded hash, or the reviewed previous source/CA
+build. Confirm port; use PlatformIO's bounded upload procedure or the existing
+workbook's binary restoration procedure. Do not invent raw flash offsets.
+Reflashing alone preserves NVS and does not undo issued/revoked backend authority.
+Retain the agreed normal-firmware/settings restoration obligations for both
+devices. No erase, secret extraction or silent authority recreation.
+
+Cleanup remains **NOT STARTED**. Preserve the existing proxy container, both
+proxy config/backup paths, HTTPS server certificate/key/CSR, CA, realm/mappers,
+volumes, service env files, generated resume overrides and restoration artifacts.
+Add the unique Core override/tag, redacted checkpoint and local pre-build binary
+to the existing cleanup journal; none are authorization to delete resources.
