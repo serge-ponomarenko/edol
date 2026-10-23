@@ -489,3 +489,68 @@ proxy config/backup paths, HTTPS server certificate/key/CSR, CA, realm/mappers,
 volumes, service env files, generated resume overrides and restoration artifacts.
 Add the unique Core override/tag, redacted checkpoint and local pre-build binary
 to the existing cleanup journal; none are authorization to delete resources.
+
+## Setup UX follow-up: single automatic provisioning session
+
+The subsequent firmware source change supersedes the separate TIME/TLS-first
+operator sequence above for normal first-time setup. No deployment, flash,
+reset or existing Stage 9 change was performed for this increment.
+
+After a separately approved build/upload of this new source, the operator uses
+one form: Wi-Fi, existing printer LAN settings, Core/MQTT endpoints and a fresh
+owner-issued code, then **Save & Reboot**. Saving returns the same form with
+progress; the device performs Wi-Fi → NTP → Core TLS verification → enrollment
+→ MQTT credentials → MQTT TLS/subscriptions automatically, then reboots after
+success. There is no separate unpaired configuration pass or required console
+command. Keep the setup page open; bounded network calls may delay status
+updates for tens of seconds. Reconnect to the same AP if STA association changes
+its radio channel, then reopen http://192.168.4.1 without resetting anything.
+
+For the existing disposable run use Core 192.168.0.200:18443 and MQTT
+192.168.0.200:18884. Keep real printer credentials private. Legacy upload path
+remains irrelevant in secure mode. The single form prefills saved settings and
+masks Wi-Fi/access-code fields. Pairing code is never prefilled or returned in
+progress responses. Local setup still has its deliberately open trust boundary.
+
+The code remains only in RAM for up to five minutes from entry; authoritative
+server expiry can occur earlier. Blank resubmission does not extend its lease.
+Pre-send Wi-Fi/NTP/TLS failures retry automatically after 15 seconds; Retry
+saved settings offers an immediate bounded retry. Correct fields on the same
+form without re-entering unchanged values. Success/rejection/uncertain enrollment
+clears the pending code. A code expiring during a network step is cleared when
+the bounded call returns to the flow; the backend still enforces actual expiry.
+Power loss before enrollment loses the code, preserving settings; enter a fresh
+code in the same form. With an existing identity, blank code retains it.
+
+MQTT provisioning now establishes verified TLS before setting the persistent
+one-time attempt marker. A failed pre-send handshake is retryable. After a
+request could have reached Core, lost/malformed responses or storage failure
+still require owner replacement; the marker is never silently cleared. Restart
+with a marker but no usable secret opens setup with the replacement explanation.
+No HTTP credential is reused as an MQTT password; existing routes/topics/NVS
+keys and Home provisioning semantics are preserved.
+
+TLS -9984 remains **unresolved physical cause**: no new TIME/TLS output was
+provided with this request, and device access is explicitly prohibited. New
+secure_smoke setup TLS/enrollment paths emit the existing safe clock/verification
+diagnostics automatically. If the automatic sequence fails TLS, collect only
+SMOKE clock/TLS lines and numeric errors; TIME/TLS are optional lab diagnostics,
+not an extra setup prerequisite. Do not guess time/name/trust causes, regenerate
+certificates, disable verification or repeatedly consume pairing codes.
+
+Resume physical observations only after reviewing and approving this firmware
+increment. ACTIVE/MQTT READY, genuine Agent telemetry/uploads and AMS remain
+NOT RUN. Existing backend Core-only deployment/rollback instructions still
+apply if that increment is not yet deployed. Firmware rollback uses the
+preserved reviewed previous artifact/source and normal approved upload; no
+erase/NVS reset or authority/database rollback. An already consumed code cannot
+be restored by firmware rollback. All existing cleanup obligations remain.
+
+Source verification for this setup increment: 10 native executables passed,
+3 CA-hook Python tests passed, all three ESP32 environments built successfully.
+The native runner's final Windows temporary-directory cleanup failed after all
+executables passed; this is a runner limitation, not a clean runner exit or
+hardware result. The verification record in firmware docs includes the retained
+local build artifact and rollback-source limitations. Sonar checked the changed
+Python runner plus extracted portal HTML/JS, with no remaining findings; C++ is
+unsupported. No backend application code changed or Maven checks were repeated.

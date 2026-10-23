@@ -268,7 +268,15 @@ one-time HTTPS pairing and credential-bound streamed uploads, with a public CA
 provided through a build-local header and a separate device identity namespace.
 The Home profile remains the default and retains legacy settings/contracts.
 The owner explicitly deferred setup AP hardening: its existing open Wi-Fi and
-portal remain unchanged as a local-trust limitation. Secure agent MQTT is
+local portal trust boundary remain. Secure setup now uses one Save & Reboot form
+with bounded progress/retry through Wi-Fi, NTP, verified TLS, enrollment and MQTT
+provisioning/connection, then reboots into normal operation. Pending pairing codes
+exist only in RAM with a five-minute local limit; server expiry remains authoritative.
+Pre-send transport failures are retryable, but uncertain one-time responses require
+owner recovery. Existing identity and persistent MQTT attempt markers survive
+restart; an attempted issuance without a usable secret reopens setup without
+replaying provisioning. No backend route, MQTT topic or NVS key is changed.
+Secure agent MQTT is
 implemented by the following coordinated increment; this is not complete
 secure-agent or physical TLS acceptance.
 
