@@ -40,6 +40,13 @@ persisted AGENT connections. Core's camera background loop requests an Agent
 snapshot through the existing `UPLOAD_SNAPSHOT` command; the asynchronous,
 credential-bound HTTPS upload stores the image. This path does not depend on
 metadata parsing and does not enable a second Agent snapshot scheduler.
+Secure background snapshot requests require both a usable persisted MQTT
+binding in the current tenant and the printer's online runtime state. Unpaired,
+revoked or offline Agents are skipped; ordinary commands still reject missing
+authority. A replacement binding and new online state allow capture to resume
+without restarting Core. MQTT disconnect/authentication failure is not an
+authenticated revocation notification to firmware; re-enrollment currently uses
+the existing operator-opened setup portal.
 
 Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. In `secure-multi-tenant` mode, Hub is an OIDC BFF: a validated OIDC identity discovers active memberships before a request establishes the fail-closed `TenantContext`. The historical default-tenant request bridge is removed. Stage 5 establishes authenticated Hub-to-Core tenant propagation. The `stage5-smoke` profile deliberately keeps Core printer runtime, Hub MQTT, catalog, recovery, AMS, and Notify disabled; later MQTT and consumer stages must not infer a tenant. AMS retains only its separately trusted three-route internal compatibility ingress. Home uses its independent installation-owned tenant scope. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 

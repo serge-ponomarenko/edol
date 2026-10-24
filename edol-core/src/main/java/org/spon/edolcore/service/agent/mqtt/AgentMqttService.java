@@ -98,12 +98,16 @@ public class AgentMqttService {
     }
 
     public String commandTopic(UUID printer, String suffix) {
+        return availableCommandTopic(printer, suffix)
+                .orElseThrow(() -> new IllegalStateException("No active agent MQTT binding"));
+    }
+
+    public java.util.Optional<String> availableCommandTopic(UUID printer, String suffix) {
         if (!AgentMqttTopics.COMMANDS.contains(suffix)) throw new IllegalArgumentException("Invalid command type");
         UUID tenant = tenants.getCurrentTenantId();
         return catalog().stream().filter(binding -> binding.usable() && binding.tenantId().equals(tenant)
                         && binding.printerId().equals(printer))
-                .findFirst().map(binding -> AgentMqttTopics.topic(binding.agentId(), suffix))
-                .orElseThrow(() -> new IllegalStateException("No active agent MQTT binding"));
+                .findFirst().map(binding -> AgentMqttTopics.topic(binding.agentId(), suffix));
     }
 
     public void flushRevocations(UUID printer) {

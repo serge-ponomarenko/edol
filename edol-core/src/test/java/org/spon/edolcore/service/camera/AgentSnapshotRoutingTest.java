@@ -29,14 +29,14 @@ class AgentSnapshotRoutingTest {
         var cameras = new DefaultCameraProvider(printers, mock(LegacyCameraProvider.class), mock(RtspsCameraProvider.class), agent);
         assertThat(cameras.supports(id)).isTrue();
         assertThat(cameras.capture(id)).isNull();
-        verify(publisher).publish(id, "{\"command\":\"UPLOAD_SNAPSHOT\"}");
+        verify(publisher).publishSnapshotIfAvailable(id, "{\"command\":\"UPLOAD_SNAPSHOT\"}");
     }
 
     @Test
     void unavailableAgentAuthorityAndForeignPrinterStillFailClosed() {
         UUID id = configured(PrinterConnectionMode.AGENT);
-        doThrow(new IllegalStateException("No active binding")).when(publisher).publish(eq(id), anyString());
-        assertThatThrownBy(() -> gateway.uploadSnapshot(id)).isInstanceOf(IllegalStateException.class);
+        gateway.uploadSnapshot(id);
+        verify(publisher).publishSnapshotIfAvailable(eq(id), anyString());
         UUID foreign = UUID.randomUUID();
         when(printers.getPrinter(foreign)).thenThrow(new IllegalArgumentException("Unavailable printer"));
         assertThatThrownBy(() -> gateway.disableSnapshotScheduler(foreign)).isInstanceOf(IllegalArgumentException.class);

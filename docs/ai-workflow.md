@@ -64,6 +64,15 @@ must never be copied into the repository or a Codex configuration file.
   CA/certificates and endpoints must stay unchanged. Do not
   bootstrap the run again, infer zero verifier flags from unavailable state,
   bypass TLS/RLS or reset existing identities to make acceptance pass.
+  The subsequent `5aba847` hardware report confirms new pairing, automatic Hub
+  status updates and real JPEG capture, but upload fails with NOT_TRUSTED (flag
+  0x8). Source now corrects SDK repeated-stop descriptor ownership and timeout
+  units; the exact trust-flag cause needs peer fingerprint/chain-depth evidence
+  from the bounded lab diagnostics. Do not declare the upload physically fixed.
+  Automatic re-enrollment after revoke is deferred: first define an explicit
+  authenticated revocation confirmation protocol. MQTT disconnect, auth failure
+  and generic HTTPS 401 must not erase credentials or open setup automatically.
+  Preserve saved Wi-Fi/LAN/endpoints/NVS; current recovery uses explicit SETUP.
 
 - Stage 9.3b source now implements the approved single-Mosquitto MQTT path;
   see `docs/deployment/stage9-agent-mqtt-contract.md`. Earlier MQTT-disabled

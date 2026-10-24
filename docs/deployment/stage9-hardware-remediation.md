@@ -9,11 +9,15 @@ DIRECT and AGENT real telemetry and independent Hub print jobs, DIRECT live
 camera. The IPv4 SAN TLS correction is physically verified; **TLS -9984 is no
 longer the blocker**. Both logical printers intentionally observe one P1S.
 
-Current blockers are model acquisition, metadata retries, Agent camera,
-overview printing/progress and DIRECT snapshot command routing. The current
-source remediation has **not been deployed or flashed**. See the final
-October 24 section for A–G causes, verification and the next operator procedure.
-The complete print lifecycle and AMS hardware acceptance remain **NOT RUN**.
+The latest camera/revoke report supersedes that checkpoint: backend `9d42b1c`
+and Agent `5aba847` were tested. Firmware flash, previous-identity revocation,
+new enrollment, ACTIVE/MQTT READY and automatic pairing-page status update are
+**operator-confirmed PASS**. Camera captures real JPEGs (about 81 KB), but
+snapshot HTTPS upload fails with `NOT_TRUSTED` (`0x00000008`), not CN_MISMATCH.
+Agent camera display is therefore **BLOCKED**, not PASS. New full print lifecycle,
+model transfers and AMS hardware acceptance are **NOT RUN**. The final
+camera/revoke section records this increment; its source has **not been deployed
+or flashed**. Earlier sections are historical evidence.
 Do not repeat bootstrap, enrollment, identity preparation or historical checks.
 Earlier deployment/flash instructions are historical, not instructions to repeat.
 
@@ -797,3 +801,185 @@ not exist immediately before this increment's builds; no pre-build binary
 backup is claimed. Existing restoration files remain ignored and untouched.
 Isolated Testcontainers verification completed and its tunnel closed; it is not
 part of the live Stage 9 run. Cleanup is **NOT STARTED**.
+
+## October 24 — snapshot TLS and revoke follow-up
+
+### Current hardware checkpoint
+
+Operator evidence at backend `9d42b1c` and Agent `5aba847` establishes:
+firmware flash, old identity revoked, fresh enrollment, ACTIVE/MQTT READY,
+automatic pairing-page update, Bambu MQTT and real camera JPEG capture PASS.
+It does **not** establish HTTPS snapshot upload or a displayed Agent camera.
+Upload failed twice with `-9984`, `verify_flags=0x00000008` (NOT_TRUSTED),
+with no name/time flags. NTP and the embedded public CA match the report.
+New printing lifecycle, model transfers and AMS hardware acceptance are NOT RUN.
+
+### Defect 1 — confirmed lifecycle defects; trust cause remains bounded
+
+The installed Arduino-ESP32 2.0.17 source has these exact semantics:
+
+* `WiFiClientSecure.cpp::stop` closes an owned socket, assigns -1, then calls
+  `ssl_client.cpp::stop_ssl_socket`. That function frees TLS state and finally
+  `memset`s the entire context, changing the descriptor back to **0**.
+* `HttpUploadClient::connect` first aborts the previous upload; preparation then
+  calls `setTimeout`, and `SecureTransport::Client::connect` stops the client
+  again. Unlike a freshly constructed enrollment client (socket -1), this path
+  can configure an invalid descriptor or close descriptor 0 owned by another
+  connection. It explains the reported `setSocketOption errno=9` and is unsafe
+  with simultaneous camera/MQTT connections.
+* `WiFiClientSecure::setTimeout(uint32_t seconds)` takes **seconds**. Preparation
+  passed 10000 (intended milliseconds), configuring 10,000 seconds. It now passes
+  10; HTTPClient's own timeout API remains in milliseconds and is unchanged.
+
+The secure subclass now always overrides `stop`, including the normal secure
+build, restores socket -1 after SDK cleanup, and uses that override before
+every new connection. Repeated abort/end/failed-connect cleanup is safe.
+The SDK's `_CA_cert` pointer survives stop; the parsed CA chain is freed and
+reloaded from that pointer on connect. `prepare` still installs the same CA.
+Enrollment's HTTPClient references the transport; uploads own one transport
+member by value; AgentService holds a reference, not a copy, to the uploader.
+There is no CA replacement or shared TLS context introduced by this change.
+
+**The supplied evidence does not prove that descriptor misuse caused the
+NOT_TRUSTED flag.** That flag may indicate failure to build/validate a trusted
+chain; errno=9 and the prior name mismatch are not proof of that cause.
+Accordingly the source fix is not labelled a proven snapshot-TLS resolution.
+The lab-only verifier now reports numeric flags at each certificate depth and
+SHA-256 of the received leaf DER certificate, allowing the actual peer seen
+during upload to be compared with the working TLS probe/enrollment. It prints
+neither the certificate body nor request/response bodies or credentials.
+Unavailable flags remain unavailable, never invented zeroes.
+
+The IPv4 callback still changes **only** the leaf CN_MISMATCH decision for an
+exact binary IPv4 SAN. DNS uses native identity validation. NOT_TRUSTED, time,
+signature and other flags are preserved. The smoke observer delegates that same
+decision and cannot accept a failed chain; normal secure builds omit the extra
+certificate diagnostics. Strict CA verification and plaintext rejection remain.
+
+### Defect 2 — lifecycle-aware background camera
+
+`DefaultAgentCommandGateway.uploadSnapshot` previously checked only connection
+mode; a revoked/unpaired Agent therefore reached the throwing `commandTopic`
+every 15 seconds. `AgentMqttService.availableCommandTopic` now offers the same
+validated suffix, usable binding and current-tenant filter as ordinary command
+routing, returning empty when no usable authority exists. Only background
+snapshot publication uses this optional path. `AgentCommandPublisher` also
+requires the printer runtime's online state and safely skips if the secure MQTT
+component is disabled. Home keeps its existing snapshot topic/behavior.
+
+Revocation removes usability even before heartbeat expiry, so stale online state
+does not permit snapshots for the retired identity. Replacement READY authority
+plus online state resumes requests without a Core restart. Tenant context is
+still required; missing/foreign tenant cannot publish, and ordinary commands
+retain their missing-binding exception. No authority creation or provisioning
+occurs on this path. The broker still enforces revocation for any message that
+was already in flight; a source test is not new broker-revocation evidence.
+
+### Defect 3 — authenticated revocation signal is not implemented
+
+The broker disconnects/denies the old credential, but MQTT does not distinguish
+owner revocation from all authentication/network/configuration failures.
+`AgentPairingService.authenticate` and `core.find_agent_credential` intentionally
+reject retired credentials with the same unauthorized outcome as invalid ones;
+there is no credential-bound firmware lifecycle/status response confirming
+revocation. A generic HTTPS 401 is therefore insufficient too.
+
+Automatic Setup Mode is **not implemented**: inferring revocation from those
+signals would break recovery from temporary TLS/MQTT outages. An explicit,
+authenticated revocation-confirmation protocol is recorded as deferred work in
+`docs/ai-workflow.md`. Until that separate contract exists, use the lab `SETUP`
+command after an operator-confirmed revoke, then the existing portal and a fresh
+owner code. Wi-Fi, printer settings, endpoints, CA and existing NVS are retained;
+no erase/reset is needed. Source regression failures do not clear identity.
+
+### Automated verification for this increment
+
+| Check | Actual result and limit |
+| --- | --- |
+| AgentCameraLifecycleTest | 4 PASS: ACTIVE → REVOKED/unpaired → replacement/offline → online, foreign/missing tenant, absent secure MQTT component and Home compatibility |
+| AgentSnapshotRoutingTest, SecureAgentRoutingTest, SecureAgentHttpTest | 7 PASS combined; final distinct Java total **11**, 0 failures/errors/skips |
+| Native production-code host executables | 12 distinct PASS, including the new combined enrollment/upload lifecycle executable; fake sockets/TLS are not real TLS acceptance |
+| Exact audited Espressif mbedTLS 2.28.7 | 16 real-vendor certificate cases PASS, including foreign CA, damaged signature, expired/future, wrong IP and DNS negatives |
+| Python CA-hook tests | 3 PASS |
+| ESP32 Home / secure / secure_smoke | Three successful builds, existing CA reused for secure environments |
+| Read-only Sonar | All five changed Java files and one Python file analyzed; only the known pathless Java S1598 snippet artifact remains, no suppression. C++ unsupported |
+| Physical verified snapshot upload/dashboard and revoke/reconnect retest | NOT RUN for this source increment |
+
+The secure transport test models the audited SDK's zeroed descriptor and verifies
+25 repeated cleanup/reconnect cycles without descriptor-0 closes/options. The
+combined test uses the production enrollment, upload and secure transport code,
+then repeats JPEG uploads, rejects four TLS failure categories before HTTP
+transmission and recovers without clearing identity. Certificate-depth logging
+does not alter trust/time flags. Vendor certificate tests establish the verifier
+controls separately; neither these nor fakes establish a live ESP32 handshake.
+
+Initial Maven incremental/clean attempts and PlatformIO attempts were blocked
+by local build/cache permissions. Repeating with authorized access succeeded;
+the final results above replace those blocked attempts. No application code was
+changed to work around the sandbox. Maintainer reproduction:
+
+```powershell
+mvn -B -pl edol-core -am clean test '-Dtest=AgentCameraLifecycleTest,AgentSnapshotRoutingTest,SecureAgentRoutingTest,SecureAgentHttpTest' -Dsurefire.failIfNoSpecifiedTests=false
+# In the Agent worktree; standalone tests avoid the known Windows runner cleanup issue:
+py -c "from pathlib import Path; from scripts.run_host_tests import run_test; run_test(Path.cwd(),'secure_transport','src/security/SecureTransport.cpp',secure=True,smoke=True); run_test(Path.cwd(),'tls_lifecycle','src/http/HttpUploadClient.cpp',secure=True,smoke=True)"
+py -m unittest discover -s test -p 'test_secure_trust.py'
+```
+
+Exact-vendor reproduction and the three build environments are documented in
+Agent `docs/verification.md`. Full historical reactor, Stage 7/8 and live-broker
+audits were not repeated. Both working trees pass `git diff --check`.
+
+### Operator steps (after separate approvals)
+
+1. Approve and deploy **Core only** from the reviewed source using the existing
+   Compose run and Core-only image/rollback procedure above. Hub, proxy, realm,
+   database and broker configuration need no changes. Do not run bootstrap,
+   prepare, identity, migrations or historical audits.
+2. Approve firmware upload separately. Confirm the actual Agent USB port;
+   preserve the current artifact, build `lolin_d32_secure_smoke` using the same
+   `EDOL_AGENT_ROOT_CA_FILE`, and upload firmware only. Do not reset NVS,
+   re-provision MQTT or replace the current working identity just for TLS testing.
+3. With the saved identity/endpoints, run the existing lab `TLS` command once,
+   then `SNAPSHOT`, followed by one more snapshot after completion. Check HTTP
+   200 and an actually changing Agent dashboard image. A JPEG capture alone is
+   not upload/display PASS. A successful probe is not upload PASS either.
+4. If upload still rejects trust, stop repeated attempts. Record only stage,
+   verification flags/depth, leaf SHA-256 and numeric HTTP/TLS results. Compare
+   the probe/upload leaf hashes. If needed, a separately approved read-only
+   TLS 1.2 peer check on Debian can fingerprint the existing endpoint:
+
+   ```sh
+   cd /home/serge/edol-stage9-hardware
+   openssl s_client -connect 192.168.0.200:18443 -servername 192.168.0.200 -tls1_2 -CAfile certs/ca.pem -verify_ip 192.168.0.200 -verify_return_error </dev/null 2>remediation/snapshot-tls-verify.log | openssl x509 -outform DER | openssl dgst -sha256
+   ```
+
+   Check the verification log for success independently of the pipeline's last
+   exit status. Do not post full logs or certificate bodies. No CA/server change
+   is prescribed if the fingerprint differs or verification fails.
+5. After camera success, separately approve a lifecycle test: revoke through
+   Hub, observe at least two 15-second camera intervals with no new snapshot
+   commands/missing-binding stack traces, and confirm the old identity is denied.
+   Open SETUP explicitly, retain saved fields, issue a fresh owner code and pair.
+   Confirm automatic ACTIVE/MQTT READY and resumed real snapshots. Also verify
+   that a temporary network outage reconnects with the same identity and does
+   not automatically open Setup Mode. Execute disruptions one at a time with
+   the operator; do not use fabricated traffic or infer missing counters as zero.
+   Record the observation window. If command emission is not observable, mark
+   it NOT OBSERVED rather than asserting a zero count from missing logs.
+6. Only then resume the existing print/model and AMS plan. Those observations
+   remain NOT RUN until actually executed. Preserve all resources and restoration
+   obligations; cleanup is NOT STARTED.
+
+### Rollback and artifacts
+
+Restore only the previous Core application image and, after explicit approval,
+the reviewed `5aba847` firmware artifact/source with the same CA. Preserve the
+current paired identity and saved settings. Do not restore old revoked secrets,
+roll back authority/DB state, replace certificates or reset NVS.
+The pre-build binary was preserved locally as
+`stage9-restoration/pre-camera-tls-fix-secure-smoke-firmware.bin`, SHA-256
+`5b9c36167864237dd7c869901088d56380cf0161ec412004c569224a2c665cc9`.
+This is a build artifact, not a device flash dump, and remains ignored.
+No new Stage 9 infrastructure, deployment, hardware operation or cleanup was
+performed during this source increment. Existing proxy/key/data artifacts and
+the prior cleanup journal remain unchanged.

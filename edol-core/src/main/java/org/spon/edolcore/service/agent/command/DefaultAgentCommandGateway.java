@@ -44,7 +44,7 @@ public class DefaultAgentCommandGateway implements AgentCommandGateway {
     @Override
     public void uploadSnapshot(UUID printerId) {
         if (!usesAgent(printerId)) return;
-        publisher.publish(printerId, AgentCommandPayloadFactory.UPLOAD_SNAPSHOT);
+        publisher.publishSnapshotIfAvailable(printerId, AgentCommandPayloadFactory.UPLOAD_SNAPSHOT);
     }
 
     private boolean usesAgent(UUID printerId) {
