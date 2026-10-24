@@ -2,6 +2,12 @@
 
 ## Current state: resume, do not bootstrap
 
+Latest source status: the final **Continuous MQTT, verified transfer completion
+and dashboard commands** section supersedes the historical MQTT-pause guidance.
+The operator's Core 185ed932 / Agent 8db73079 report confirms real Agent camera
+uploads/display with that workaround. The new continuous-MQTT source is local
+and has NOT been deployed, flashed or physically accepted.
+
 The October 24 operator report (backend `ecea9b0`, Agent `bf84769`)
 supersedes the historical checkpoints below. Verified physical results:
 Agent HTTPS enrollment and MQTT provisioning HTTP 200, Agent ACTIVE,
@@ -1127,3 +1133,250 @@ It is a local build artifact, not a device flash dump. After separate approval,
 rollback uses that artifact or `0252423` source and the same CA, preserving
 current identity/NVS. No backend runtime rollback is required by this patch;
 do not restore old revoked secrets or broker/DB state. Cleanup is NOT STARTED.
+
+## Continuous MQTT, verified transfer completion and dashboard commands
+
+This source increment supersedes the intentional MQTT-pause workaround above.
+Baseline: backend `ea576b3078d67c3d4227aabefa81d5a2b19214fe`, deployed Core
+`185ed932`, clean Agent worktree `8db73079a0315ce51727717ae420f3badde77e4f`.
+The Agent worktree was detached at that commit and was attached to its existing
+`stage9-agent-pairing` branch without resetting files or copying history.
+Backend remains on `EDOL-048`; unrelated `edol-hub/logs/` is excluded.
+
+### Evidence and root causes
+
+The operator's `8db73079` report confirms two uploaded JPEGs, 84,760 and 85,186
+bytes, further HTTP 200 responses and a real Hub camera image. NTP, CA and exact
+IPv4 SAN, DIRECT/AGENT printing telemetry, and DIRECT Unicode model metadata
+work. These are historical hardware results with the MQTT-pause workaround,
+not acceptance of the current source. Reconnects of 1487–2320 ms were introduced
+by firmware. Both logical printer IDs remain independent; layer display is
+unchanged. No new deployment/device observation occurred in this increment.
+
+Source investigation found:
+
+- Agent commands executed synchronous upload services directly in the EDOL
+  PubSubClient callback. Keeping a socket open would still starve both MQTT
+  loops, and recursive loop() calls would reuse callback buffers unsafely.
+- The audited WiFiClientSecure.available() returns a negative TLS error/close
+  result and stops the client; read(buffer,n) returns -1 when available <= 0.
+  The old `while (data_.available())` treated a negative result as true and
+  could report DATA_READ after the declared payload. Core had already received
+  Content-Length bytes and emitted MODEL AVAILABLE before FTP completion.
+  Hardware's exact terminal TLS error remains unmeasured; the new regression
+  reproduces this source path, not the historical physical read itself.
+- Both dashboard pages issued command POSTs without CSRF. The detail page
+  ignored HTTP status entirely. Secure Hub rejects these requests before the
+  controller, explaining the common DIRECT/AGENT symptom and absent command
+  logs. No live browser POST was replayed. This is source/MockMvc evidence;
+  actual operator-browser network capture remains a physical retest item.
+  The existing RestTemplate already has CoreTenantPropagationInterceptor;
+  changing to RestClient is unnecessary. Hub validates printer ownership and
+  uses its service token/server-established tenant; Core requires
+  core.command.execute and printer ownership before selecting transport.
+
+### Memory budget and design comparison
+
+The exact Arduino-ESP32 2.0.17 / espressif32 6.13.0 ESP32 SDK configuration has
+CONFIG_MBEDTLS_SSL_MAX_CONTENT_LEN=16384 and no enabled dynamic TLS buffers.
+WiFiClientSecure exposes no supported runtime TLS buffer-resizing API.
+PubSubClient.setBufferSize changes MQTT packet storage, not TLS records.
+The pinned vendor verifier remains `2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9`.
+
+| Source-backed component | Snapshot | Model |
+| --- | ---: | ---: |
+| Maximum TLS session overlap (including two MQTT) | 4 | 5 |
+| TLS record **content** floor, two 16 KiB directions/session | 131,072 B | 163,840 B |
+| Secure MQTT packet buffers (two 8192 B allocations) | 16,384 B | 16,384 B |
+| New worker stack, ESP-IDF bytes; local stream buffers live inside it | 12,288 B | 12,288 B |
+| Sum of these floors, excluding everything below | 159,744 B | 192,512 B |
+
+These are allocation lower bounds, **not total heap usage or capacity proof**.
+Record overhead, TLS contexts, parsed chains, ECDH/signature temporaries, TCP,
+Wi-Fi, other tasks and ArduinoJson/String allocations are additional. The
+request handoff has a 256-byte active name and one 256-byte pending model;
+the event queue has three slots, each limited to 2048 serialized bytes plus
+String overhead. No whole model/JPEG buffer is allocated. The prior successful
+upload reported free_heap=132920 / largest_block=77812 before HTTPS while
+printer MQTT was paused. It cannot establish current continuous-MQTT margin.
+Its largest block was also smaller than either successful full JPEG.
+
+| Approach | Assessment against this SDK/workload |
+| --- | --- |
+| Remove disconnect and keep synchronous transfers | Reject: MQTT loop starvation and callback reentrancy remain |
+| Recursively service MQTT from transfer callbacks | Reject: PubSubClient and callback buffer reuse are unsafe |
+| Resize TLS buffers/session reuse | No supported wrapper resizing/resumption contract; MQTT packet resize is unrelated. Requires a separate exact-SDK change and negative TLS controls |
+| Whole-image/model RAM staging | Needs additional large storage while MQTT survives; observed largest block is below one JPEG. Segmented staging also consumes handshake headroom |
+| Flash/filesystem staging | Could reduce TLS overlap, but changes storage/lifetime/wear contracts; no existing filesystem is silently formatted, repartitioned or adopted |
+| Core reads the remote printer directly | Does not cover private remote LANs; an outbound Agent is still required |
+| One low-priority bulk task, EDOL-first TLS and bounded streaming | Selected: preserves sole ownership of both MQTT clients, services telemetry/commands during blocking bulk handshakes, reduces EDOL verifier pressure, and rejects resource failures |
+
+HTTPS is prepared with both MQTT sessions established, before camera/FTPS TLS
+exists. The prepared connection is reused only while still connected; there
+is no HTTPS reconnect under LAN pressure. FTPS control/data or camera close
+before HTTP finalization. This reduces EDOL verification overlap from four TLS
+sessions to three, but maximum streaming overlap remains four/five. No claim
+is made that model streaming or two snapshots fit the actual device.
+
+Admission uses the actual SDK IN/OUT record-buffer lengths (including record
+overhead), both free heap and the largest contiguous block. It is a necessary
+record floor, deliberately not an invented signature peak threshold. Sequential
+EDOL setup addresses its transient verifier peak; every later allocation or
+handshake failure still rejects the transfer and cleans up bulk clients.
+Calibrated peak headroom requires operator measurements. If continuous MQTT
+plus four/five sessions exceeds hardware capacity, clean transfer rejection is
+the supported limit; do not restore the pause or weaken EDOL TLS. A different
+outbound Agent hardware/storage design needs a separate review.
+
+### Scheduling, transfer outcome and commands
+
+One worker at idle priority owns all camera/FTPS/HTTP access. The normal
+Arduino loop owns both PubSubClients, command forwarding, heartbeat and event
+publication. A callback copies a validated filename (maximum 255 bytes, no
+control characters) into a bounded mailbox and returns. One active operation
+and at most one pending, coalesced model are allowed. Snapshots never queue;
+models outrank them. Completion starts a 15-second cooldown, with no automatic
+worker retry. Worker creation starts only after both MQTT clients connect and
+retries allocation at most every 30 seconds. Model events retain disconnected
+outcomes, retry publish at most three times one second apart and expire after
+60 seconds. No new bulk operation starts before that bounded handoff drains;
+expiry explicitly logs missing delivery confirmation. The main loop also drains
+and collects completion after Wi-Fi loss, avoiding a stuck operation/setup gate.
+This remains bounded best-effort MQTT delivery, not a durable transfer receipt.
+The lab console reports request
+QUEUED/REJECTED separately from bulk completion and blocks SETUP/TLS/TIME while
+bulk work is active. Home uses the same scheduling without secure enrollment
+or EDOL trust requirements; DIRECT backend behavior is retained.
+
+FTPS requires a strictly parsed SIZE (1 byte to 32 MiB), RETR 125/150, exactly
+SIZE bytes and final 226. Negative available/read before SIZE, truncated or
+excess data, missing/wrong completion, write failures and timeouts fail.
+After the authenticated payload count, a negative data EOF does not trigger
+another payload read; final control-channel completion is still mandatory.
+A one-byte output tail prevents HTTP from reaching Content-Length before FTP
+completion. Only then is the tail committed and HTTP status checked. Thus a
+post-payload FTP failure cannot race Core's complete-body acceptance. Each
+started firmware attempt emits one terminal event. An HTTP acknowledgement
+lost after sending the tail is inherently uncertain, reported as
+HTTP_UPLOAD_FAILED_OR_UNCONFIRMED; this protocol has no new transfer receipt ID.
+Core metadata success/stop prevents late failures from reactivating retries.
+Duplicate failure scheduling shares one pending timer; four retries exhaust
+acquisition. A generation guard prevents an old timer clearing new work.
+
+Camera payloads are bounded to 256 KiB and 30 seconds; FTPS data to 120 seconds
+and 32 MiB; LAN/EDOL TLS handshakes and idle I/O to ten seconds. Command/topic,
+identity/credential/NVS formats, descriptor sentinel and strict EDOL trust,
+time, signature and exact IP SAN checks are preserved. Printer-LAN trust
+limitations remain acknowledged and separate.
+
+The dashboard command helper supplies server-rendered CSRF, bounds pending
+commands per printer and request wait to ten seconds, rejects login redirects,
+and shows safe rejection/unknown-outcome feedback. It never automatically
+replays a command. HTTP success says accepted and waits for telemetry. Proxy
+logs contain printer ID, allowlisted command and numeric status, not tokens or
+bodies; upstream rejection bodies are not exposed. Both real Core gateways are
+covered offline; the secure Agent route must resolve a usable persisted
+binding for the trusted current tenant, never a payload tenant/printer claim.
+
+Hub processingFailures remains a separate unresolved historical observation.
+New diagnostics record validated event/printer UUID, allowlisted type and
+exception class, without message/SQL/body or stack dumps. Envelope and receipt
+isolation are unchanged. The counter cannot be closed from Core parsing PASS.
+
+### Source verification and limitations
+
+See Agent docs/verification.md for native commands. Targeted checks use offline
+stubs/MockMvc; no live MQTT, printer commands, serial, Docker, deployment,
+bootstrap, migrations, certificate/authority changes or data cleanup occurred.
+Final counts and local reviewed commits are recorded below after verification.
+
+### Minimal next physical acceptance — NOT EXECUTED
+
+1. Separately approve backend deployment and Agent flash of the reviewed local
+   revisions. Core/Hub source both changed; do not blindly apply the earlier
+   firmware-only instruction. Preserve the existing run, all data/volumes,
+   realm, authorities, CA/private keys and restoration artifacts. No migration
+   or bootstrap is needed. Confirm the actual Agent USB port; COM9 is historical.
+2. Preserve/hash the accepted local build artifact before any future build/flash
+   workflow. Use the same public CA and retain all identity/NVS/settings; no
+   erase, reset or re-pair. Current implementation work performed builds only.
+3. With separate operator approval, two sequential snapshots: wait for each
+   bulk completion **and 15-second cooldown**. Require both MQTT connections
+   and ongoing telemetry/keepalive throughout, verified TLS, HTTP 200 and real
+   Hub image refresh. Record stage/free heap/largest block at each handshake.
+   Request QUEUED, capture alone or an open socket without telemetry is not PASS.
+4. Unicode model: record SIZE, transferred byte count, final FTP code 226,
+   matching HTTP Content-Length/200 and exactly one consistent terminal outcome
+   with metadata. Verify no queued retry survives success. A lost HTTP response
+   remains uncertain; do not call it a definitive remote failure or replay blindly.
+5. Exercise an independently approved insufficient-memory/defer case without
+   disconnecting MQTT or weakening TLS. If either workload cannot fit, stop and
+   record the hardware limit. Do not substitute the pause workaround.
+6. Separately approve controlled dashboard Pause then inverse Resume, DIRECT
+   and AGENT independently, with operator observing the print and agreeing to
+   restoration. Check browser POST/CSRF/status, bounded Hub log and telemetry.
+   No such command has been sent by the implementation agent.
+7. Keep revoke/re-pair and AMS as separately approved later gates. AMS hardware
+   acceptance: NOT RUN. Cleanup: NOT STARTED.
+
+### Rollback boundary
+
+No deployment/flash occurred, so no runtime rollback was executed. Future
+rollback requires separate approval: backend to the pre-increment baseline
+(deployed Core 185ed932), Agent to 8db73079 using the unchanged CA and current
+NVS. That Agent rollback restores the known telemetry pause and therefore does
+not satisfy the continuous-MQTT requirement. Restore no revoked credential or
+old broker/database state; preserve all prior restoration obligations/artifacts.
+No push or publication from the secret-bearing original Agent repository.
+
+### Final targeted verification record
+
+| Check | Actual final result |
+| --- | --- |
+| Selected Core tests | 18 PASS, zero failures/errors/skips |
+| Selected Hub tests | 20 PASS, zero failures/errors/skips |
+| Browser command helper Node tests | 5 PASS, zero failures/skips |
+| Native executable configurations | 12 distinct assertion-PASS configurations, including Home/secure production bulk task and both MQTT wrappers |
+| Windows transfer_mailbox runner | Assertion PASS, followed by WinError 32/5 temp cleanup; runner exit is not clean PASS |
+| Exact vendor TLS controls | 16 PASS; allocation-fault regression and three rejection/recovery cycles PASS |
+| Final Home firmware build | SUCCESS, 14.578 s, static RAM 14.7%, flash 73.9% |
+| Final secure firmware build | SUCCESS, 15.744 s, static RAM 15.1%, flash 78.3% |
+| Final secure_smoke firmware build | SUCCESS, 15.637 s, static RAM 15.2%, flash 78.7% |
+| Both Git diffs | Whitespace check PASS |
+| New hardware / commands / deployment | NOT RUN |
+
+Actual backend and browser commands, from the backend root:
+
+```powershell
+mvn -B -pl edol-core,edol-hub -am -Dtest=DashboardCommandRoutingTest,AgentPrinterCommandAuthorityTest,MetadataAcquisitionRetryTest,PrinterCommandControllerTest,CorePrinterHttpAuthorizationTest,AgentSnapshotRoutingTest,CorePrinterProxyControllerTest,SecureHubWebSecurityTest,SecureMqttEventListenerTest,CoreRestClientInjectionContextTest -Dsurefire.failIfNoSpecifiedTests=false test
+node --test edol-hub/src/test/js/printer-commands.test.mjs
+```
+
+Counts come from the selected final Surefire XML files. No PostgreSQL,
+Testcontainers or complete reactor verification was selected, so zero skips
+applies only to this bounded suite. Native commands/configurations are in Agent
+docs/verification.md. The 37,722-byte Unicode regression uses synthetic bytes
+through real FtpsClient and DeferredTailStream, not the operator's model file.
+It requires 226 and checks 426 never releases the final HTTP byte.
+
+Read-only Sonar analyzed all 14 modified supported Java/HTML/JS/Python files.
+New actionable findings (Python duplicate literal and feedback element
+semantics) were fixed and reanalyzed. JS/helper tests and Python have no
+remaining findings; the printers list has none. The Java snippet analyzer
+reports S1598 for all nine packages because its file path is empty, despite
+matching real package directories. S1075 on the existing /api/printers/ protocol
+path is a false positive: the host is configurable, but this API path is the
+contract. No suppression was added. Full dashboard detail analysis still
+reports 18 pre-existing findings in unchanged sections: CDN integrity,
+accessibility, commented code and formatting advice, including three invalid
+top-level-await suggestions for a classic script. These are recorded separately
+in Project TODO; the full file is not claimed Sonar-clean. No unrelated
+CDN/style refactor was mixed into this command fix. C++ is unsupported by this
+MCP analyzer; its build/native evidence is reported separately.
+
+Initial host fixture compile/link errors, a Mockito wildcard compilation issue
+and a MockMvc invocation-count expectation were corrected before these final
+results. Local cache/compiler permissions and Windows cleanup artifacts were
+kept separate from source assertions. All local commits are created by the
+commit-agent after this source review; their SHA values are in the final
+implementation handoff. There is no push or runtime acceptance claim.

@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
+    <script src="/js/printer-commands.js" defer></script>
     <title>Printers • Edol Hub</title>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.7.0/dist/css/tabler.min.css" rel="stylesheet"
           integrity="sha384-/ZecLhD4wkLsbjdJWUEWeSZJJSEQ3XCPdtLmmm6SW128l+eSNplV12po3tSK7pdy" crossorigin="anonymous">
@@ -44,6 +47,7 @@
     </style>
 </head>
 <body class="layout-fluid">
+<output id="printer-command-feedback" class="alert alert-info" aria-live="polite" hidden></output>
 <div class="page">
     <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark">
         <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
@@ -279,15 +283,7 @@
     }
 
     async function sendCommand(printerId, command) {
-        try {
-            const response = await fetch(`/api/printers/${printerId}/commands/${command}`, {method: 'POST'});
-            if (!response.ok) alert(`Unable to ${command} printer.`);
-        } catch (error) {
-            console.warn(`Failed to ${command} printer`, error);
-            alert(`Unable to ${command} printer.`);
-        } finally {
-            refreshOverview();
-        }
+        await sendPrinterCommand(printerId, command);
     }
 
     async function stopPrinter(printerId) {

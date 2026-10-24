@@ -64,13 +64,27 @@ public class SecureMqttEventListener {
             process(envelope);
         } catch (IllegalArgumentException exception) {
             ingress.processingFailed();
-            log.warn("Rejected Core MQTT processing: consumer=hub, counters={}", ingress.snapshot());
+            logProcessingFailure(envelope, exception);
         } catch (Exception exception) {
             ingress.processingFailed();
-            log.warn("Failed Core MQTT processing: consumer=hub, counters={}", ingress.snapshot());
+            logProcessingFailure(envelope, exception);
             throw new IllegalStateException("Could not process Core MQTT integration event", exception);
         }
         acknowledge(message);
+    }
+
+    private void logProcessingFailure(CoreMqttEventEnvelope envelope, Exception exception) {
+        // Class names and validated identifiers only; exception messages may contain SQL/data.
+        log.warn("Core MQTT processing failed: event={}, type={}, printer={}, category={}, counters={}",
+                envelope.eventId(), diagnosticEventType(envelope.eventType()), envelope.printerId(),
+                exception.getClass().getSimpleName(), ingress.snapshot());
+    }
+
+    private String diagnosticEventType(String type) {
+        return switch (type) {
+            case "print.started", "print.finished", "print.failed", "print.progress.changed", "print.metadata.loaded" -> type;
+            default -> "other";
+        };
     }
 
     private void process(CoreMqttEventEnvelope envelope) {

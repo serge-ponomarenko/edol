@@ -16,4 +16,6 @@ public class MetadataAcquisitionState {
 
     private int attempt;
 
+    private long generation;
+
 }

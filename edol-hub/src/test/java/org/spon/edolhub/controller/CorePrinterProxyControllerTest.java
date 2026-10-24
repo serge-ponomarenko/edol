@@ -103,4 +103,33 @@ class CorePrinterProxyControllerTest {
                 String.class
         );
     }
+    @Test
+    void preservesCoreCommandRejectionWithoutReturningItsBody() {
+        when(restTemplate.exchange(
+                "http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/pause",
+                HttpMethod.POST, null, String.class))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden", null,
+                        "private upstream detail".getBytes(java.nio.charset.StandardCharsets.UTF_8), null));
+        var response = controller.command(PRINTER_ID, "pause", null);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).isEqualTo("Core rejected printer command");
+    }
+
+    @Test
+    void reportsUnknownCommandOutcomeForTransportFailure() {
+        when(restTemplate.exchange(
+                "http://edolcore:8080/api/printers/" + PRINTER_ID + "/commands/resume",
+                HttpMethod.POST, null, String.class))
+                .thenThrow(new org.springframework.web.client.ResourceAccessException("synthetic timeout"));
+        assertThat(controller.command(PRINTER_ID, "resume", null).getStatusCode().value()).isEqualTo(504);
+    }
+
+    @Test
+    void foreignPrinterCannotReachCoreCommandTransport() {
+        when(printerAccessService.getPrinter(PRINTER_ID)).thenThrow(new IllegalArgumentException("Unavailable"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.command(PRINTER_ID, "pause", null))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+    }
+
 }

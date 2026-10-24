@@ -48,15 +48,37 @@ without restarting Core. MQTT disconnect/authentication failure is not an
 authenticated revocation notification to firmware; re-enrollment currently uses
 the existing operator-opened setup portal.
 
-In secure firmware, synchronous camera/model transfers temporarily close the
-printer-side MQTT TLS session to reserve heap for bulk TLS and signature
-verification. The EDOL MQTT client/authority remains intact. Bulk clients are
-closed before restoring the printer MQTT connection on success or failure;
-failed restoration uses the existing main-loop reconnect policy. This creates
-a telemetry interruption during transfers, not a new persistent setup state.
-Home retains its existing transfer scheduling and MQTT behavior. All firmware
-TLS clients preserve an invalid descriptor after SDK cleanup; EDOL verification
-continues to require its CA and exact peer identity.
+Firmware gives both MQTT clients to the main loop and camera/FTPS/HTTP clients
+to one low-priority bulk task. MQTT callbacks copy bounded transfer requests;
+they never perform bulk I/O or recursively service MQTT. There is one active
+operation, at most one coalesced pending model, no snapshot queue and a
+15-second cooldown after completion. Model requests outrank snapshots. Worker
+model events cross a bounded single-producer/single-consumer queue; only the
+main loop publishes them. Disconnected events remain queued, with at most three
+publish attempts one second apart and a 60-second expiry. New bulk operations
+wait for that queue to drain; completed state is also collected after Wi-Fi
+loss. Home uses the same ownership/scheduling boundary.
+Secure bulk operations verify EDOL HTTPS before opening printer bulk TLS,
+reuse that prepared connection, and never intentionally disconnect printer or
+EDOL MQTT. Record-buffer admission is only a necessary memory floor; failed
+handshakes/transient allocations reject the transfer without weakening trust.
+No filesystem, partition, NVS or credential migration is introduced. All TLS
+clients preserve the invalid socket descriptor after SDK cleanup.
+
+Agent model transfer requires a validated positive FTPS SIZE, exactly that many
+bytes, a RETR preliminary reply and final 226. A one-byte HTTP tail is withheld
+until FTP completion, preventing premature Core acceptance. LAN sockets close
+before HTTP finalization. Only the expected HTTP response completes the Agent
+operation; a lost acknowledgement remains uncertain. Core metadata acquisition
+coalesces duplicate failures into one pending retry and stops after four retries;
+metadata success/stop cancels pending work. Per-printer state and trusted tenant
+execution are retained, including independent DIRECT/AGENT logical printers.
+
+Dashboard command POSTs carry the server-rendered CSRF token and report HTTP
+rejection or uncertain network outcomes. The Hub proxy retains its authenticated
+RestTemplate interceptor and printer ownership check; Core selects DIRECT Bambu
+or the persisted, usable Agent MQTT authority. HTTP acceptance is distinct from
+observing a printer state change in subsequent telemetry.
 
 Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. In `secure-multi-tenant` mode, Hub is an OIDC BFF: a validated OIDC identity discovers active memberships before a request establishes the fail-closed `TenantContext`. The historical default-tenant request bridge is removed. Stage 5 establishes authenticated Hub-to-Core tenant propagation. The `stage5-smoke` profile deliberately keeps Core printer runtime, Hub MQTT, catalog, recovery, AMS, and Notify disabled; later MQTT and consumer stages must not infer a tenant. AMS retains only its separately trusted three-route internal compatibility ingress. Home uses its independent installation-owned tenant scope. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 

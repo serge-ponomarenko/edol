@@ -1,6 +1,7 @@
 package org.spon.edolhub.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.spon.edolhub.service.PrinterAccessService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
@@ -13,11 +14,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/printers/{printerId}")
 @RequiredArgsConstructor
@@ -52,12 +55,24 @@ public class CorePrinterProxyController {
             return ResponseEntity.badRequest().body("Unsupported printer command");
         }
 
-        return restTemplate.exchange(
-                edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/commands/" + command,
-                HttpMethod.POST,
-                body == null ? null : new org.springframework.http.HttpEntity<>(body),
-                String.class
-        );
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    edolCoreUrl + CORE_PRINTERS_API_PATH + printerId + "/commands/" + command,
+                    HttpMethod.POST,
+                    body == null ? null : new org.springframework.http.HttpEntity<>(body),
+                    String.class
+            );
+            log.info("Printer command response: printer={}, command={}, status={}",
+                    printerId, command, response.getStatusCode().value());
+            return response;
+        } catch (RestClientResponseException exception) {
+            log.warn("Printer command rejected: printer={}, command={}, status={}",
+                    printerId, command, exception.getStatusCode().value());
+            return ResponseEntity.status(exception.getStatusCode()).body("Core rejected printer command");
+        } catch (ResourceAccessException exception) {
+            log.warn("Printer command outcome unknown: printer={}, command={}", printerId, command);
+            return ResponseEntity.status(504).body("Core command outcome is unknown");
+        }
     }
 
     @GetMapping("/media/model/{image}")

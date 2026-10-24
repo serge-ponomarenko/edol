@@ -2,6 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
+    <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
+    <script src="/js/printer-commands.js" defer></script>
 
     <title>Dashboard • Edol Hub</title>
 
@@ -85,6 +88,7 @@
 </head>
 
 <body class="layout-fluid">
+<output id="printer-command-feedback" class="alert alert-info" aria-live="polite" hidden></output>
 
 <div class="page">
 
@@ -1074,26 +1078,17 @@
     refreshMaintenanceAlerts();
 
     async function pausePrint() {
-        await fetch(`/api/printers/${printerId}/commands/pause`, {
-            method: "POST"
-        });
+        await sendPrinterCommand(printerId, 'pause');
     }
 
     async function resumePrint() {
-        await fetch(`/api/printers/${printerId}/commands/resume`, {
-            method: "POST"
-        });
+        await sendPrinterCommand(printerId, 'resume');
     }
 
     async function stopPrint() {
-        await fetch(`/api/printers/${printerId}/commands/stop`, {
-            method: "POST"
-        });
-        const modal =
-            bootstrap.Modal.getInstance(
-                document.getElementById("stopPrintModal")
-            );
-        modal.hide();
+        if (await sendPrinterCommand(printerId, 'stop')) {
+            bootstrap.Modal.getInstance(document.getElementById('stopPrintModal')).hide();
+        }
     }
 
     async function setPrintSpeed(level) {
@@ -1105,20 +1100,7 @@
         updatePrintSpeedSelect();
 
         try {
-            const response = await fetch(
-                `/api/printers/${printerId}/commands/print-speed`,
-                {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({level})
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error("Unable to change print speed");
-            }
-        } catch (error) {
-            console.error(error);
+            await sendPrinterCommand(printerId, 'print-speed', {level});
         } finally {
             isPrintSpeedCommandPending = false;
             updatePrintSpeedSelect();

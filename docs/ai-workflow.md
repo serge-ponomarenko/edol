@@ -46,6 +46,27 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
+- Stage 9 continuous-MQTT source retest: operator evidence at Core `185ed932` /
+  Agent `8db73079` confirms two JPEG uploads/display, but the intentional MQTT
+  pause is superseded by the new worker implementation. Measure free heap,
+  largest block, transient handshake peaks and uninterrupted MQTT under the
+  reviewed source. Follow the final continuous-MQTT section of the hardware
+  remediation runbook; preserve all identities/data/authorities/CA and obtain
+  separate deployment, port-identification, flash and command-test approvals.
+  Actual new-source snapshots, Unicode model and DIRECT/AGENT Pause/Resume,
+  revoke/re-pair and AMS hardware acceptance remain NOT RUN. If four/five TLS
+  sessions do not fit, retain MQTT and reject transfers; a PSRAM-capable outbound
+  Agent or explicitly reviewed staging/SDK change is a separate decision.
+- Investigate the existing Hub `processingFailures=1` with the new event ID,
+  allowlisted event type, printer ID and exception-class diagnostics. Do not
+  infer its cause from Core metadata success or Agent DATA_READ. Preserve
+  envelope validation, receipt/tenant isolation and independent logical jobs.
+- Separate dashboard legacy hardening: existing full-file Sonar warnings cover
+  CDN integrity, accessibility and formatting in unchanged sections. Review
+  those together; do not mix a dependency/style rollout into command routing.
+  The snippet analyzer's empty-path Java package warning and top-level-await
+  advice for classic browser scripts are analysis artifacts, not code fixes.
+
 - Stage 9 hardware preparation failed on Hub navigation, service audiences and
   disabled Notify startup after the earlier source gate. Continue via
   `docs/deployment/stage9-hardware-remediation.md` and `tools/stage9/resume.py`,

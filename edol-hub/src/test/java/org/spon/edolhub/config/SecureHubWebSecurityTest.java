@@ -59,8 +59,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @WebMvcTest(
-        controllers = TenantSelectionController.class,
-        properties = "edol.deployment.mode=secure-multi-tenant",
+        controllers = {TenantSelectionController.class, org.spon.edolhub.controller.CorePrinterProxyController.class},
+        properties = {"edol.deployment.mode=secure-multi-tenant", "edol-core.url=http://synthetic.invalid"},
         excludeAutoConfiguration = OAuth2ClientAutoConfiguration.class
 )
 @Import({
@@ -83,6 +83,9 @@ class SecureHubWebSecurityTest {
 
     @Autowired
     private SecurityFilterChain secureSecurityFilterChain;
+
+    @MockitoBean
+    private org.springframework.web.client.RestTemplate restTemplate;
 
     @MockitoBean
     private TenantMembershipService membershipService;
@@ -194,6 +197,33 @@ class SecureHubWebSecurityTest {
         );
 
         org.assertj.core.api.Assertions.assertThat(session.getId()).isNotEqualTo(originalId);
+    }
+
+    @Test
+    void dashboardCommandRequiresCsrfBeforeAnyCoreCall() throws Exception {
+        UUID printer = UUID.randomUUID();
+        mockMvc.perform(post("/api/printers/" + printer + "/commands/pause")
+                        .session(authenticatedSession()))
+                .andExpect(status().isForbidden());
+        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    void dashboardCommandWithCsrfUsesThePrinterScopedCoreRoute() throws Exception {
+        UUID printer = UUID.randomUUID();
+        UUID tenant = UUID.randomUUID();
+        MockHttpSession session = authenticatedSession();
+        session.setAttribute(HubSessionAttributes.ACTIVE_TENANT_ID, tenant);
+        when(membershipService.hasActiveMembership(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(tenant)))
+                .thenReturn(true);
+        when(restTemplate.exchange("http://synthetic.invalid/api/printers/" + printer + "/commands/pause",
+                org.springframework.http.HttpMethod.POST, null, String.class))
+                .thenReturn(org.springframework.http.ResponseEntity.ok("{}"));
+        mockMvc.perform(post("/api/printers/" + printer + "/commands/pause").with(csrf()).session(session))
+                .andExpect(status().isOk());
+        verify(printerAccessService, org.mockito.Mockito.times(2)).getPrinter(printer);
+        verify(restTemplate).exchange("http://synthetic.invalid/api/printers/" + printer + "/commands/pause",
+                org.springframework.http.HttpMethod.POST, null, String.class);
     }
 
     private MockHttpSession authenticatedSession() {
