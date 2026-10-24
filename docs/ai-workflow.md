@@ -73,6 +73,16 @@ must never be copied into the repository or a Codex configuration file.
   authenticated revocation confirmation protocol. MQTT disconnect, auth failure
   and generic HTTPS 401 must not erase credentials or open setup automatically.
   Preserve saved Wi-Fi/LAN/endpoints/NVS; current recovery uses explicit SETUP.
+  Retest at `0252423` still fails camera trust for the same leaf accepted by
+  the probe; Agent model data TLS now explicitly reports allocation failure.
+  The exact vendor verifier can mask signer-verification allocation errors as
+  leaf-only NOT_TRUSTED. Current firmware reserves heap by pausing printer MQTT
+  during secure transfers, then reconnects after bulk cleanup. Hardware proof
+  is pending; do not advance to revoke/re-pair until two real JPEG uploads and
+  a changing dashboard image pass. DIRECT Core metadata now has operator PASS.
+  Hub processingFailures=1 after metadata is separate unresolved evidence:
+  obtain a safe exception category before claiming complete Hub metadata PASS;
+  do not infer a tenant/security failure from the aggregate counter alone.
 
 - Stage 9.3b source now implements the approved single-Mosquitto MQTT path;
   see `docs/deployment/stage9-agent-mqtt-contract.md`. Earlier MQTT-disabled

@@ -48,6 +48,16 @@ without restarting Core. MQTT disconnect/authentication failure is not an
 authenticated revocation notification to firmware; re-enrollment currently uses
 the existing operator-opened setup portal.
 
+In secure firmware, synchronous camera/model transfers temporarily close the
+printer-side MQTT TLS session to reserve heap for bulk TLS and signature
+verification. The EDOL MQTT client/authority remains intact. Bulk clients are
+closed before restoring the printer MQTT connection on success or failure;
+failed restoration uses the existing main-loop reconnect policy. This creates
+a telemetry interruption during transfers, not a new persistent setup state.
+Home retains its existing transfer scheduling and MQTT behavior. All firmware
+TLS clients preserve an invalid descriptor after SDK cleanup; EDOL verification
+continues to require its CA and exact peer identity.
+
 Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. In `secure-multi-tenant` mode, Hub is an OIDC BFF: a validated OIDC identity discovers active memberships before a request establishes the fail-closed `TenantContext`. The historical default-tenant request bridge is removed. Stage 5 establishes authenticated Hub-to-Core tenant propagation. The `stage5-smoke` profile deliberately keeps Core printer runtime, Hub MQTT, catalog, recovery, AMS, and Notify disabled; later MQTT and consumer stages must not infer a tenant. AMS retains only its separately trusted three-route internal compatibility ingress. Home uses its independent installation-owned tenant scope. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
 
 ## Accepted Multi-Tenant Direction

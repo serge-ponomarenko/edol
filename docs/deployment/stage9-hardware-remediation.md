@@ -18,6 +18,14 @@ Agent camera display is therefore **BLOCKED**, not PASS. New full print lifecycl
 model transfers and AMS hardware acceptance are **NOT RUN**. The final
 camera/revoke section records this increment; its source has **not been deployed
 or flashed**. Earlier sections are historical evidence.
+
+The subsequent retest at Core `185ed932` / Agent `0252423` confirms the same
+HTTPS leaf validates in an explicit TLS probe but fails camera upload with
+leaf-only NOT_TRUSTED. Camera capture passes, upload/display remain blocked.
+New print evidence also confirms Printing cards and DIRECT Core model/metadata
+success, but Agent FTPS data TLS fails allocation (`-32512`), followed by an
+aborted HTTP body. See the final **TLS memory-pressure follow-up** section.
+The current source change has not been flashed or deployed.
 Do not repeat bootstrap, enrollment, identity preparation or historical checks.
 Earlier deployment/flash instructions are historical, not instructions to repeat.
 
@@ -983,3 +991,139 @@ This is a build artifact, not a device flash dump, and remains ignored.
 No new Stage 9 infrastructure, deployment, hardware operation or cleanup was
 performed during this source increment. Existing proxy/key/data artifacts and
 the prior cleanup journal remain unchanged.
+
+## TLS memory-pressure follow-up — retest at Core 185ed932 / Agent 0252423
+
+### New physical evidence
+
+| Observation | Result and boundary |
+| --- | --- |
+| Explicit Agent TLS probe against Core HTTPS leaf `e8a4bcbf5943fd7270fcce1d193dac15429556b2bd6d78fe36e0503909ee92e8` | Verified; depths 1 and 0, flags zero |
+| Two real camera captures, 91,637 / 92,040 bytes | Capture PASS; HTTPS upload FAIL twice with the identical leaf, depth 0 only and NOT_TRUSTED 0x8 |
+| Same existing CA, ready NTP, preserved identity after flash | Operator confirmed; neither CA replacement nor re-pair is needed to investigate |
+| DIRECT Core model `Куб.gcode.3mf` | curl exit 0, metadata extracted and parsed successfully; Core acquisition stopped normally |
+| Agent model | `DOWNLOAD_FAILED:DATA_CONNECT`; ESP32 reports -32512, SSL memory allocation failed at FTPS data TLS setup |
+| Core model HTTP 500 / ClientAbortException | Follows the Agent's aborted stream; it is not evidence of an HTTPS authentication/CA failure |
+| Printer overview | Both cards show Printing, progress area and DIRECT preview; Hub jobs also receive later progress events |
+| Hub metadata event | processingFailures rose to 1 after DIRECT metadata. Envelope rejection stayed zero. The exception category is absent; complete Hub metadata persistence is not PASS |
+| Full STARTED → RUNNING → FINISHED, camera display, Agent model success, revoke/re-pair and AMS | Pending; no full lifecycle or final acceptance claimed |
+
+The early boot leaf fingerprint cannot be attributed solely from the old
+pathless certificate log: broker TLS on 18884 and Core HTTPS on 18443 are
+different endpoints. It is not used to explain this failure. The later probe
+successfully verifies exactly the same Core leaf rejected during upload.
+New lab connection diagnostics include host/port before certificate output.
+
+### Root mechanism and falsifiable evidence
+
+Production `AgentService.uploadSnapshot` opened camera TLS before HTTPS while
+both Bambu and EDOL MQTT TLS were live. The probe had no camera TLS session.
+Model transfer opened FTPS control and HTTPS before opening FTPS data, reaching
+five TLS sessions; the latter failed with an explicit allocation error.
+JPEG data is streamed in 1 KiB chunks; the reported 90 KiB frame size does not
+mean a 90 KiB JPEG buffer was allocated by AgentService.
+
+In the pinned Espressif mbedTLS 2.28.7 source:
+
+1. `library/x509_crt.c::x509_crt_check_signature` calls the public-key verifier.
+2. `x509_crt_find_parent_in` sets `signature_is_good = ret == 0`; for a trusted
+   root candidate, **any** failed check (including allocation failure) skips it.
+3. With no suitable parent, `x509_crt_verify_chain` adds NOT_TRUSTED and ends the
+   chain at the leaf. The callback therefore sees depth 0 / 0x8, rather than a
+   separate allocator error or depth-1 CA callback.
+
+The exact-vendor regression loads the same valid leaf and correct CA before
+injecting one allocation failure during verification. `fault_at=1` reproduces
+the observed leaf-only NOT_TRUSTED; releasing the restriction restores depths
+1/0 with zero flags. Three rejection/recovery cycles pass. This explains why a
+sound trust anchor and identical server certificate can produce these different
+outcomes under pressure. No verifier code/flag is patched to accept the failure.
+
+Memory pressure is supported by the production TLS overlap, the explicit FTPS
+allocation error and real-verifier reproduction. The exact allocation on the
+physical camera attempt was not traced; this source evidence does not itself
+establish a successful hardware fix. If the new sequence still fails with
+adequate memory, retain that counterevidence and investigate it rather than
+declaring the CA bad or bypassing NOT_TRUSTED.
+
+### Minimal patch and compatibility
+
+* Secure AgentService operations now temporarily disconnect **printer MQTT
+  only** before opening bulk connections. The EDOL MQTT client is not
+  intentionally disconnected and its authority/credentials remain unchanged.
+* On every success/failure exit, HTTPS and camera/FTPS sockets are closed before
+  printer MQTT reconnect. An unsuccessful reconnect is left to the existing
+  main-loop retry. An already-offline printer MQTT link is not force-connected
+  by the transfer. Home does not perform this pause.
+* This reduces active TLS sessions by one during transfers and creates a
+  printer-telemetry interruption. The existing synchronous-loop/EDOL keepalive
+  limitation remains; no durable command or zero-telemetry-gap guarantee is added.
+* The descriptor-sentinel wrapper now also covers camera, FTPS and printer MQTT;
+  it fixes the remaining LAN `setSocketOption`/descriptor-0 path. FTPS timeouts
+  now use 10 seconds rather than 10000 seconds. Existing LAN certificate policy
+  is unchanged and remains separate from strict EDOL HTTPS/MQTT verification.
+* Lab-only free-heap/largest-block and endpoint diagnostics accompany the
+  existing numeric certificate flags/depth and public leaf fingerprint. They
+  contain no credential, code, body, certificate dump or private key.
+
+CA installation, exact IPv4 SAN checks, trust/signature/time checks, routes,
+topics, payloads, NVS and credential formats are unchanged. No backend runtime
+source, broker, database, proxy, certificate or realm change is required.
+
+### Source verification
+
+| Check | Actual result |
+| --- | --- |
+| Exact vendor mbedTLS controls | 16 PASS, plus allocation-fault reproduction and three rejection/recovery cycles PASS |
+| Native executable configurations | 13 distinct PASS, including separate Home/secure production AgentService orchestration tests |
+| Full native runner exit | Windows temp-directory cleanup error after twelve executables; FTPS passed separately. Do not label the runner exit PASS |
+| CA-hook Python tests | 3 PASS |
+| Home, secure, secure_smoke ESP32 builds | Three SUCCESS, same public CA; source/build checks only |
+| Sonar | Modified Python runner analyzed without findings; C++/CMake unsupported by the available analyzer |
+| Backend runtime tests | Not repeated: this increment changes backend documentation only |
+| New physical upload, model/reconnect/revoke outcomes | NOT RUN |
+
+Reproduction commands and fault-injection boundaries are in Agent
+`docs/verification.md`. The fault allocator is desktop-test-only and does not
+change the firmware allocator or the pinned SDK. Vendor source hashes remain
+checked. Both repositories pass `git diff --check`.
+
+### Next operator session — firmware only, approval before flash
+
+1. Keep Core `185ed932` running. Do **not** rebuild/redeploy Hub/Core or other
+   services for this increment; backend changes are documentation only.
+2. After explicit flash approval, confirm the actual Agent USB port (COM9 was
+   last observed), preserve/hash the existing binary and build the reviewed
+   `lolin_d32_secure_smoke` revision with the unchanged Stage 9 public CA via
+   `EDOL_AGENT_ROOT_CA_FILE`. Upload firmware only; retain paired identity,
+   Wi-Fi, printer LAN settings and Core/MQTT endpoints. No erase/reset/re-pair.
+3. Run one explicit `TLS` probe. Then run **exactly two `SNAPSHOT` commands
+   sequentially**, waiting for each operation to finish. Require verified TLS,
+   HTTP 200 and a genuinely updating Agent camera image in Hub. Observe printer
+   telemetry reconnecting after transfer cleanup; a JPEG capture or TLS probe
+   alone is not snapshot upload/display PASS.
+4. If NOT_TRUSTED or allocation failure persists, stop. Retain only stage,
+   host/port, flags/depth, peer leaf SHA-256 and numeric heap/largest-block
+   observations. Do not rotate CA/credentials or repeat bootstrap. No additional
+   revoke/re-pair test while camera remains blocked.
+5. After camera success, separately approve the existing revoke → explicit
+   SETUP → fresh pairing → ACTIVE/MQTT READY → resumed-camera regression.
+   Full printing, Agent Unicode model transfer and AMS follow as separately
+   observed steps. Keep independent jobs for the two logical printer IDs.
+
+The Hub processing failure remains a separate item requiring safe exception
+category evidence; the aggregate counter does not establish a tenant or
+metadata root cause. Do not mark it resolved from the Core's parsing success.
+
+### Rollback / cleanup journal extension
+
+No new Stage 9 resource, deployment, hardware or cleanup action occurred.
+Preserve all existing volumes, realm, authorities, certificates, proxy configs
+and restoration obligations. A new ignored pre-build artifact was saved:
+`stage9-restoration/pre-pressure-verification-secure-smoke-firmware.bin`,
+1,032,928 bytes, SHA-256
+`03f262360cebc75f657a15029d74a3ceda65f32accbdbe76812a727b788aa3fc`.
+It is a local build artifact, not a device flash dump. After separate approval,
+rollback uses that artifact or `0252423` source and the same CA, preserving
+current identity/NVS. No backend runtime rollback is required by this patch;
+do not restore old revoked secrets or broker/DB state. Cleanup is NOT STARTED.
