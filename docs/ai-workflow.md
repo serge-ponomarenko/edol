@@ -56,8 +56,11 @@ must never be copied into the repository or a Codex configuration file.
   The current operator checkpoint has DIRECT telemetry/live camera PASS and
   Agent enrollment blocked by TLS -9984. Source fixes now wrap asynchronous
   recovery and reconnect checks in the trusted runtime tenant executor. Lab-only
-  Agent TIME/TLS diagnostics are ready for an explicitly approved upload; obtain
-  actual clock/verifier evidence before changing endpoint certificates. Do not
+  Operator diagnostics now establish CN_MISMATCH-only for a correct IP SAN;
+  the audited Espressif mbedTLS 2.28.7 name matcher only handles DNS SANs.
+  A strict per-client IPv4 SAN callback is source-verified with real vendor
+  certificate tests; its new firmware still needs explicitly approved physical
+  acceptance. Existing CA/certificates and endpoints must stay unchanged. Do not
   bootstrap the run again, infer zero verifier flags from unavailable state,
   bypass TLS/RLS or reset existing identities to make acceptance pass.
 

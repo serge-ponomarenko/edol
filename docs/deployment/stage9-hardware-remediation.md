@@ -554,3 +554,92 @@ hardware result. The verification record in firmware docs includes the retained
 local build artifact and rollback-source limitations. Sonar checked the changed
 Python runner plus extracted portal HTML/JS, with no remaining findings; C++ is
 unsupported. No backend application code changed or Maven checks were repeated.
+
+## Confirmed TLS root cause and IPv4 SAN fix
+
+This checkpoint supersedes the earlier unknown-cause notes. The operator has
+now supplied NTP/CA confirmation and device verification flags **0x00000004
+(CN_MISMATCH), without time/trust flags**, for HTTPS 192.168.0.200:18443. The
+existing server certificate has matching IP Address SAN and passes OpenSSL IP
+verification. No server certificate or trust-anchor change is indicated.
+
+### Exact bundled implementation
+
+Local SDK metadata identifies Arduino-ESP32 2.0.17, PlatformIO Espressif32
+6.13.0, ESP-IDF v4.4.7 at `38eeba213a`. The IDF mbedTLS gitlink resolves to
+Espressif **2.28.7**, commit `2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9`.
+This is the vendor fork, not an assumed upstream release.
+
+In that exact [x509_crt.c](https://github.com/espressif/mbedtls/blob/2b8e772fc1cb0732cda3bae7d1e9d6f4cfaf63d9/library/x509_crt.c),
+`x509_get_subject_alt_name` retains raw SAN entries, but `x509_crt_check_san`
+only checks dNSName. `x509_crt_verify_name` does not fall back to CN when a SAN
+extension exists. Arduino's unchanged `mbedtls_ssl_set_hostname(IP-string)`
+therefore yields CN_MISMATCH despite an exact binary iPAddress SAN. The
+OpenSSL/ESP32 difference is explained by the different name matchers.
+
+### Minimal secure correction
+
+The EDOL secure transport subclass installs a **per-connection IPv4 identity
+callback** before Arduino TLS setup. It requires an exact binary four-byte
+iPAddress SAN on the leaf; it neither accepts CN-only certificates nor treats
+a textual DNS SAN/wildcard as an IP identity. Matching replaces only the leaf
+name decision; mismatching explicitly sets CN_MISMATCH. All other flags and
+non-leaf certificates remain untouched. DNS retains native verification.
+The expected hostname still reaches set_hostname and VERIFY_REQUIRED remains.
+
+The same client is used by Core HTTPS enrollment/uploads/provisioning, TLS
+diagnostics and EDOL MQTT. Each connection reinstalls its own callback; stop
+resets the previous TLS context, preventing reuse of another endpoint's IP.
+Home and the acknowledged local-printer LAN TLS limitation are unchanged.
+The secure platform is pinned at 6.13.0 and a version guard requires an explicit
+review before changing mbedTLS. No SDK files, backend routes, topics, NVS,
+CA/certificates, proxy, broker or other infrastructure configuration changed.
+
+### Source evidence and next operator action
+
+The exact vendor source was built locally with desktop crypto and disposable
+certificates unrelated to Stage 9. **16/16 cases PASS**:
+
+| Control | Result |
+| --- | --- |
+| Original verifier, matching IP SAN | Reproduces CN_MISMATCH |
+| Correct IP SAN with strict callback | Accepted, flags 0 |
+| Foreign IP / wrong SAN / CN-only / textual DNS IP / malformed IP SAN | Rejected, CN_MISMATCH |
+| Mixed SAN including correct IP | Accepted |
+| DNS matching / foreign hostname | Accepted / rejected by native verification |
+| Wrong CA / expired / future / damaged signature | Rejected; non-name flags preserved |
+| Callback before ssl_setup, hostname and VERIFY_REQUIRED | Preserved by real vendor TLS context setup |
+| Parser and non-leaf flag controls | Passed |
+
+The existing **10 native executable tests passed**, including per-client hook
+installation, independent IP contexts, DNS reuse and ambiguous numeric address
+rejection. Their runner still exits 1 for the documented Windows temp-directory
+cleanup error after tests pass. **3 CA-hook tests and all three ESP32 builds
+passed**. Secure ELF links the verifier and all connect overrides; Home ELF does
+not. Sonar checked both changed Python runners without findings; C++/CMake is
+unsupported. No backend Maven/history checks were repeated.
+
+Reproduction commands, pinned source hashes and fixtures are recorded in Agent
+`docs/verification.md` and `scripts/run_ip_san_tests.py`. These are maintainer
+checks, not another operator preparation checklist. Tests do not establish a
+physical ESP32 TLS handshake; **new firmware hardware acceptance remains NOT RUN**.
+
+After review and separate flash approval, use the existing secure_smoke build
+procedure with the **same CA and endpoints**. Confirm actual Agent USB port;
+last recorded COM9 is not permanent identification. There is no backend redeploy
+or certificate renewal prescribed by this fix. Open the existing setup form,
+retain saved fields, enter a fresh owner code and Save & Reboot once. Observe
+verified TLS, enrollment, MQTT READY and genuine telemetry. TIME/TLS remain
+optional diagnostics if another failure occurs; no unpaired setup pass is needed.
+Stop on a new nonzero verification flag; do not remove verification or replay
+uncertain one-time requests.
+
+No physical action or Stage 9 network access occurred in this increment. The
+pre-build local smoke artifact was preserved as
+`stage9-restoration/pre-ip-san-fix-7f00b48.bin`, SHA256
+`777de1ab437b59732bbb06f2e6349b83e6baf2808b046776c748362a90687e0a`.
+It is not a device dump. Rollback requires approved firmware upload from that
+reviewed artifact or previous source/CA; no reset, erase, DB/authority rollback
+or CA replacement. Earlier firmware retains the IP-SAN defect. Generated local
+test CA/keys stay ignored under .pio and are never device trust material.
+Existing cleanup/restoration obligations remain; cleanup is NOT STARTED.

@@ -267,6 +267,12 @@ Stage 9.3b.2 firmware source adds an explicit secure PlatformIO profile for
 one-time HTTPS pairing and credential-bound streamed uploads, with a public CA
 provided through a build-local header and a separate device identity namespace.
 The Home profile remains the default and retains legacy settings/contracts.
+Secure EDOL HTTPS/MQTT clients on the audited Arduino-ESP32 2.0.17 / mbedTLS
+2.28.7 SDK add strict IPv4 SAN verification through a per-session callback.
+Canonical IPv4 requires an exact binary iPAddress SAN; CN and textual DNS SAN
+cannot authorize an IP endpoint. DNS retains native matching, and all chain,
+signature, time and usage checks remain required. No server certificate or
+deployment change is required; physical acceptance remains a separate gate.
 The owner explicitly deferred setup AP hardening: its existing open Wi-Fi and
 local portal trust boundary remain. Secure setup now uses one Save & Reboot form
 with bounded progress/retry through Wi-Fi, NTP, verified TLS, enrollment and MQTT
