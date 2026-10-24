@@ -11,9 +11,11 @@ import jakarta.annotation.PostConstruct;
 import org.spon.edolams.service.AmsSpoolChangerService;
 import org.spon.edolams.service.AmsPrinterTenantResolver;
 import org.spon.edolams.service.AmsTenantContext;
+import org.spon.edolams.service.UnmappedAmsPrinterException;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.UUID;
 
@@ -41,6 +43,8 @@ public class MqttEventListener {
     @ServiceActivator(inputChannel = "mqttInputChannel")
     public void handle(Message<?> message) {
         boolean validatedEnvelope = false;
+        CoreMqttEventEnvelope validated = null;
+        String stage = "envelope";
         try {
             String payload = message.getPayload().toString();
 
@@ -54,7 +58,9 @@ public class MqttEventListener {
                 validateEnvelope(json, envelope);
                 ingress.validated(envelope.schemaVersion(), json.has(LEGACY_EVENT));
                 validatedEnvelope = true;
+                validated = envelope;
                 log.info("Core MQTT ingress validated: consumer=ams, counters={}", ingress.snapshot());
+                stage = "tenant_mapping";
                 tenantScope = tenantResolver.openForEnvelope(envelope.printerId(), envelope.tenantId());
                 event = envelope.eventType();
                 printerId = envelope.printerId();
@@ -66,6 +72,7 @@ public class MqttEventListener {
             }
 
             try {
+                stage = "handler";
                 if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
                     log.info("EdolCore MQTT EVENT: {}", event);
                 }
@@ -91,14 +98,38 @@ public class MqttEventListener {
             if (deploymentMode == DeploymentMode.SECURE_MULTI_TENANT) {
                 if (validatedEnvelope) {
                     ingress.processingFailed();
+                    logProcessingFailure(validated, stage, e);
                 } else {
                     ingress.rejectEnvelope();
+                    log.warn("Rejected Core MQTT envelope: consumer=ams, category={}, counters={}",
+                            e.getClass().getSimpleName(), ingress.snapshot());
                 }
-                log.warn("Rejected Core MQTT ingress: consumer=ams, counters={}", ingress.snapshot());
             } else {
                 log.error("Failed to process MQTT message", e);
             }
         }
+    }
+
+    private void logProcessingFailure(CoreMqttEventEnvelope envelope, String stage, Exception exception) {
+        String reason = exception instanceof UnmappedAmsPrinterException ? "unmapped_printer" : stage;
+        Throwable cause = exception;
+        for (int depth = 0; depth < 8 && cause.getCause() != null && cause.getCause() != cause; depth++) {
+            cause = cause.getCause();
+        }
+        Integer status = exception instanceof RestClientResponseException response
+                ? response.getStatusCode().value() : null;
+        // Validated UUIDs, allowlisted type and class names only; messages may contain secrets or SQL.
+        log.warn("Core MQTT processing failed: consumer=ams, event={}, type={}, tenant={}, printer={}, stage={}, reason={}, category={}, cause={}, http_status={}, counters={}",
+                envelope.eventId(), diagnosticEventType(envelope.eventType()), envelope.tenantId(), envelope.printerId(),
+                stage, reason, exception.getClass().getSimpleName(), cause.getClass().getSimpleName(), status,
+                ingress.snapshot());
+    }
+
+    private String diagnosticEventType(String type) {
+        return switch (type) {
+            case "ams.status.changed", "ams.slot.unloaded", "ams.slot.changed", "ams.slot.loaded" -> type;
+            default -> "other";
+        };
     }
 
     private void validateEnvelope(JsonNode json, CoreMqttEventEnvelope envelope) {

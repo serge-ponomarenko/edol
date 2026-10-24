@@ -46,6 +46,19 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
+- Resolve the Stage 9 AMS terminal enrollment failure using the production
+  diagnostics and image/CA audit documented in the final AMS section of
+  `docs/deployment/stage9-hardware-remediation.md`. Physical root cause, flashed
+  image identity, current NTP time, TLS flags/heap and server receipt remain
+  unconfirmed. Preserve the existing CA/NVS/settings; no insecure mode, proxy
+  change, automatic code replay, arbitrary credential deletion or bootstrap.
+- Identify AMS `processingFailures` using event/printer/tenant UUID, allowlisted
+  type, tenant-mapping/handler stage, exception/cause class and upstream status.
+  An unmapped printer or tenant mismatch fails after envelope validation and
+  must remain rejected. Do not auto-add mappings or weaken isolation; payload,
+  persistence and Hub upstream failures require actual categorized evidence.
+  This is independent of terminal HTTPS and the existing Hub processing failure.
+
 - Stage 9 continuous-MQTT source retest: operator evidence at Core `185ed932` /
   Agent `8db73079` confirms two JPEG uploads/display, but the intentional MQTT
   pause is superseded by the new worker implementation. Measure free heap,

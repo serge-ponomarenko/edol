@@ -1,5 +1,10 @@
 # Stage 9 Hardware Acceptance Remediation — 2026-10-24
 
+Latest AMS-only follow-up: see **AMS terminal HTTPS enrollment and independent
+MQTT processing diagnostics** at the end. It records source diagnostics and
+offline results; physical terminal enrollment remains FAIL. It does not reopen
+bootstrap, change the proxy or close Agent's separate remaining gates.
+
 ## Current state: resume, do not bootstrap
 
 Latest source status: the final **Continuous MQTT, verified transfer completion
@@ -1380,3 +1385,155 @@ results. Local cache/compiler permissions and Windows cleanup artifacts were
 kept separate from source assertions. All local commits are created by the
 commit-agent after this source review; their SHA values are in the final
 implementation handoff. There is no push or runtime acceptance claim.
+
+## AMS terminal HTTPS enrollment and independent MQTT processing diagnostics
+
+### Scope and source findings
+
+Baseline: backend source `d52fdd0` on `EDOL-048` (operator Core runtime
+`185ed932`); terminal `0749cec` on `main`, initially clean and ahead of origin
+by two commits. Unrelated `edol-hub/logs/` remains excluded. No bootstrap,
+server request, live log capture, broker/DB/realm/proxy change, deployment,
+serial access, flash, enrollment attempt, NVS reset or environment cleanup
+occurred. Existing CA retained. No architecture, schema or endpoint contract changed.
+
+Terminal diagnostics commit: `27790ac834635b9ef7aceb0d6059a98b0a12cab0`.
+Its [production HTTPS verification document](https://github.com/serge-ponomarenko/edol-ams-terminal/blob/27790ac834635b9ef7aceb0d6059a98b0a12cab0/docs/https-enrollment-diagnostics.md)
+contains exact source references, limitations, commands and image provenance.
+
+| Terminal source | Finding |
+| --- | --- |
+| `settings_screen.cpp:onEnrollClick`; `terminal_enrollment_service.cpp:9` | Applies visible host/port/HTTPS; queues one enrollment POST with the owner code, no auto retry. |
+| `terminal_api.cpp:22` | Constructs the explicitly selected scheme, host and port for `/api/terminal/v1/enroll`. |
+| `http_service.cpp:68` | Epoch > 2024-01-01 gate; otherwise NTP with a two-second wait. A plausible epoch does not establish current NTP synchronization. |
+| `http_service.cpp:158` | CA/time precheck, secure begin and POST; no plaintext fallback. Generic UI error previously hid all nonpositive results. |
+| `terminal_enrollment_service.cpp:41` | Only successful response plus credential persistence enables secure mode. Lost one-time reply can be uncertain. |
+| `ams_service.cpp:152` | Before enrollment, polling uses legacy HTTP independently of the enrollment HTTPS switch. Its recurring 400 is a separate request. |
+| `scripts/edol_terminal_ca.py`; `platformio.ini` | Correct variables are EDOL_AMS_ROOT_CA_FILE and EDOL_TERMINAL_SECURE_BUILD. Forced build-local header inclusion confirmed in an actual production compiler invocation. |
+
+Baseline local object/ELF/BIN contain the exact normalized header CA, not just
+PEM markers. Cached IDE metadata omitted the include and is not actual compiler
+evidence. This does not identify the image currently flashed on COM16.
+Normalized PEM SHA-256:
+`a83bd645d1319b7427c0af43585971c0bf1ee8437d70b4a3ec5e25d28d7e7b38`.
+OpenSSL parses/self-verifies this trust anchor, valid 2026-10-22 11:23:40Z through
+2026-11-21 11:23:40Z. This is not verification of the server leaf/chain or of
+the operator's intended original CA selection; compare with the existing run CA.
+
+The observer pins the already installed espressif32 6.13.0 / Arduino 2.0.17
+lifecycle. It records safe category, scheme/host/port, CA presence, actual
+epoch/clock gate, free/largest heap, HTTP result and SDK TLS error. It captures
+available certificate flags before Arduino's failed-connect cleanup without
+altering flags or adding a network probe. Unavailable is printed literally.
+An SDK upgrade requires re-auditing the observer. Wrong-variable builds now
+fail explicitly; CA-free builds overwrite stale generated CA content.
+
+`connect_start` precedes combined DNS/TCP/TLS, not a separately observed
+handshake boundary. `precheck_failed`, `begin_failed`, `http_response` and
+`transport_failed` distinguish observable stages. HTTP -1 alone is not a
+certificate diagnosis. No pairing codes, credentials, headers, bodies, whole
+URLs, query values or PEM are logged. Runtime build output gives environment,
+normalized public CA hash and application-descriptor ELF identity; the offline
+auditor checks CA in object/ELF/BIN and matching ELF identity inside BIN.
+
+Agent's memory-pressure NOT_TRUSTED and IPv4 SAN lessons remain hypotheses,
+not terminal causes. The terminal has different UI allocations and one
+synchronous TLS request at a time. Flashed identity, current NTP time,
+actual TLS flags/heap, server chain/identity and receipt of the physical POST
+remain unknown. No physical flags are inferred from the generic screen error.
+
+### Independent AMS MQTT investigation
+
+`edol-ams/.../event/MqttEventListener.java:63` resolves tenant **after** counting
+validated envelopes and **before** switching event types, including types with
+no AMS handler. `AmsPrinterTenantResolver.java:64` rejects unknown printers and
+tenant mismatches. Both increment processingFailures, not rejectedEnvelope.
+Two logical printers observing one P1S do not share a logical ID or gain an
+implicit mapping. This reproduces a source path yielding the reported counter
+pattern, not a proven classification of the historical physical failures.
+
+For mapped `ams.slot.loaded`, `MqttEventListener.java:143` reads slot and
+`AmsSpoolChangerService.java:35` checks RAM staging/expiry, then calls Hub if
+a staged spool exists. This handler does not directly write AMS JPA. A missing
+slot, upstream HTTP/Hub persistence or other handler failure is a separate
+candidate; the old counter-only log cannot distinguish them.
+
+New logs distinguish envelope rejection, tenant mapping and handler failure,
+with validated event/tenant/printer UUID, allowlisted type, unmapped-printer
+reason, exception/cause class and available upstream HTTP status. No exception
+message, SQL, body or stack dump. Tests reproduce foreign/unknown rejection,
+handler/persistence categories, malformed slot and upstream 403 redaction;
+tenant scope closes after handler failure. No mapping, tenant isolation or
+handler acceptance policy is weakened. Actual failed event types/mappings and
+categories require later runtime diagnostics; no AMS deployment was performed.
+Hub processingFailures remains separate and unresolved.
+
+### Final verification and artifacts
+
+| Source-only check | Final result |
+| --- | --- |
+| Actual production HttpService native controls, CA present / absent | Both PASS |
+| Actual CA hook and image audit Python tests | 6 PASS |
+| AMS targeted Maven | 23 PASS, zero failures/errors/skips |
+| Secure normal esp32dev with retained CA | SUCCESS; RAM 112,812 / 327,680 B, flash 1,237,545 / 1,310,720 B |
+| Forced-header compiler invocation / final image audit | Confirmed / all checks PASS |
+| Sonar supported modified Java/Python files | Seven analyzed; no actionable findings |
+| Both repositories git diff --check | PASS |
+| Physical enrollment, authenticated state, live MQTT processing | NOT RUN |
+
+Successful backend command:
+
+```powershell
+mvn -B -pl edol-ams -am '-Dtest=MqttEventListenerTest,AmsPrinterTenantResolverTest,TerminalAuthenticationServiceTest,TerminalPairingManagementServiceTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+```
+
+Fresh XML: listener 8, tenant resolver 3, authentication 3, pairing management 9.
+Initial stale/inaccessible generated artifacts required a scoped elevated clean
+build; the final tests passed after the last test addition. No stale XML counted.
+Full reactor and Docker/migration tests were not run for diagnostic-only changes.
+An initial verbose PlatformIO build failed SCons 4.11.1 command printing
+(`_Null + str`) after successful compilation/linking; ordinary nonverbose build
+succeeded, including after final source changes. No toolchain patch was needed.
+Synthetic flags and static RAM sizes are not physical TLS or capacity evidence.
+
+Final local BIN SHA-256:
+`95f5f097e4748aa66c0481cb2f3693736b7cfa41f78889d9ac7240321480f073`.
+ELF SHA-256 (compare with runtime AMS build output):
+`42489fd12cd71f4c72f664c5e9442e880b58c958cc0df3dbfd9972eab35d0a4e`.
+Baseline BIN was preserved in ignored terminal
+`.pio/pre-enrollment-diagnostics/firmware.bin`, SHA-256
+`780ec5ee5a17545fccbdba5e1280c65a78423a16b39635edd6c20248183b51d1`.
+That is a local build artifact, not a flash dump. The extracted existing public
+CA is retained locally there; no PEM or binary was committed.
+
+Sonar's two Java S1598 empty-snippet-path reports are MCP artifacts: actual
+package/file paths match. No suppressions. C++ is unsupported by this MCP;
+native tests and actual ESP32 compilation cover it without claiming C++ Sonar.
+
+### Minimal next operator procedure — NOT EXECUTED
+
+Use the linked terminal document's exact commands. First inspect the previous
+pairing/identity outcome in Hub read-only. Build normal esp32dev with
+EDOL_TERMINAL_SECURE_BUILD=1 and **EDOL_AMS_ROOT_CA_FILE** pointing to the same
+existing Stage 9 public CA; run the offline image audit. After separate operator
+flash authorization confirm COM16, upload without erase/uploadfs/sec06, then
+compare runtime environment/CA/ELF identity with the audit. Preserve NVS/settings.
+Resolve the uncertain prior outcome before obtaining one fresh code and
+pressing ENROLL once. Never replay the old code or delete an ACTIVE identity
+just to retry.
+
+Record only safe enrollment HTTP/TLS/flags, epoch, heap and timestamp. Correlate
+privately with the existing proxy/AMS logs, reporting exact enrollment POST
+receipt/status within a known logging window. Do not repeat malformed Debian
+400 probes or change the working proxy. Require enrollment HTTP 200, local
+credential persistence, intended Hub terminal ACTIVE and subsequent authenticated
+HTTPS state HTTP 200/real state. Stop after failure or uncertain response for
+owner status inspection; no automatic replay or credential reset.
+
+Operator checkpoint remains: Agent camera PASS with MQTT pause; continuous MQTT
+NOT SATISFIED; DIRECT model PASS; Agent DATA_READ unresolved; observed RUNNING
+telemetry PASS; terminal Wi-Fi and proxy PASS; terminal enrollment FAIL;
+AMS processing FAIL observed; Hub processing separately unresolved;
+terminal authenticated operations NOT RUN; cleanup NOT STARTED.
+New AMS diagnostics require a separately authorized deployment to gather live
+evidence; no deployment is part of this source handoff.

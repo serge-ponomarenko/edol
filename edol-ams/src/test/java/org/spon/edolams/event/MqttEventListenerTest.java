@@ -3,6 +3,10 @@ package org.spon.edolams.event;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.web.client.RestClientResponseException;
 import org.spon.edol.deployment.DeploymentMode;
 import org.spon.edol.mqtt.CoreMqttIngressObservation;
 import org.spon.edolams.config.AmsPrinterTenantProperties;
@@ -18,11 +22,13 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+@ExtendWith(OutputCaptureExtension.class)
 class MqttEventListenerTest {
 
     private final UUID tenantId = UUID.randomUUID();
@@ -86,6 +92,64 @@ class MqttEventListenerTest {
         verify(changer).setAmsSpoolIntoSlot(printerId, 2);
         assertThat(observation(listener).snapshot().validatedV2()).isZero();
         assertThat(observation(listener).snapshot().rejectedEnvelope()).isZero();
+    }
+
+    @Test
+    void reportsMappingFailuresSeparatelyWithoutWeakeningIsolation(CapturedOutput output) {
+        var listener = secureListener();
+        listener.handle(new GenericMessage<>(envelope(3, UUID.randomUUID()).toString()));
+        listener.handle(new GenericMessage<>(envelope(3, tenantId)
+                .put("printerId", UUID.randomUUID().toString()).toString()));
+
+        assertThat(output.getOut()).contains("stage=tenant_mapping", "reason=unmapped_printer",
+                "category=IllegalArgumentException", "category=UnmappedAmsPrinterException", "type=ams.slot.loaded");
+        verifyNoInteractions(changer);
+        assertThat(observation(listener).snapshot().rejectedEnvelope()).isZero();
+        assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(2);
+        assertThatThrownBy(tenants::currentTenantId).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void reportsHandlerAndPersistenceCategoryWithoutExceptionMessagesOrPayload(CapturedOutput output) {
+        var listener = secureListener();
+        doThrow(new IllegalStateException("secret-outer", new IllegalArgumentException("secret-sql")))
+                .when(changer).setAmsSpoolIntoSlot(printerId, 2);
+        var json = envelope(3, tenantId);
+        json.withObject("payload").put("secret", "secret-body");
+        listener.handle(new GenericMessage<>(json.toString()));
+
+        assertThat(output.getOut()).contains("stage=handler", "category=IllegalStateException",
+                "cause=IllegalArgumentException", "printer=" + printerId, "tenant=" + tenantId)
+                .doesNotContain("secret-outer", "secret-sql", "secret-body");
+        assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(1);
+        assertThatThrownBy(tenants::currentTenantId).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void reportsMissingSlotAsHandlerFailureAndDoesNotMutateSpools(CapturedOutput output) {
+        var listener = secureListener();
+        var json = envelope(3, tenantId);
+        json.withObject("payload").remove("slot");
+        listener.handle(new GenericMessage<>(json.toString()));
+
+        assertThat(output.getOut()).contains("stage=handler", "category=NullPointerException");
+        verifyNoInteractions(changer);
+        assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(1);
+        assertThatThrownBy(tenants::currentTenantId).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void reportsUpstreamStatusWithoutItsBody(CapturedOutput output) {
+        var listener = secureListener();
+        doThrow(new RestClientResponseException("secret-message", 403, "Forbidden", null,
+                "secret-upstream-body".getBytes(java.nio.charset.StandardCharsets.UTF_8), null))
+                .when(changer).setAmsSpoolIntoSlot(printerId, 2);
+        listener.handle(new GenericMessage<>(envelope(3, tenantId).toString()));
+
+        assertThat(output.getOut()).contains("stage=handler", "http_status=403")
+                .doesNotContain("secret-message", "secret-upstream-body");
+        assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(1);
+        assertThatThrownBy(tenants::currentTenantId).isInstanceOf(IllegalStateException.class);
     }
 
     private MqttEventListener secureListener() {
