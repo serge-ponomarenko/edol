@@ -7,7 +7,7 @@ import org.spon.edolcore.event.model.ModelAvailableEvent;
 import org.spon.edolcore.exception.ModelNotLoadedException;
 import org.spon.edolcore.exception.ModelTransferException;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
-import org.spon.edolcore.persistence.printer.PrinterConnectionConfigurationRepository;
+import org.spon.edolcore.service.printer.management.PrinterManagementService;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.printer.ftps.CurlFtpsClient;
 import org.spon.edolcore.service.printer.ftps.FtpsConnection;
@@ -24,7 +24,7 @@ import java.util.UUID;
 public class DirectModelTransferProvider implements ModelTransferProvider {
 
     private final PrinterStateService printerStateService;
-    private final PrinterConnectionConfigurationRepository configurationRepository;
+    private final PrinterManagementService printerManagementService;
     private final CurlFtpsClient curlFtpsClient;
     private final ApplicationEventPublisher applicationEventPublisher;
 
@@ -40,18 +40,10 @@ public class DirectModelTransferProvider implements ModelTransferProvider {
         Path localFile = MODELS_DIR.resolve(printerId.toString()).resolve(fileName);
 
         try {
+            PrinterConnectionConfiguration configuration = printerManagementService.getConnection(printerId);
             Files.createDirectories(MODELS_DIR.resolve(printerId.toString()));
 
             Files.deleteIfExists(localFile);
-
-            PrinterConnectionConfiguration configuration =
-                    configurationRepository
-                            .findByPrinterId(printerId)
-                            .orElseThrow(() ->
-                                    new IllegalStateException(
-                                            "Printer configuration not found: " + printerId
-                                    )
-                            );
 
             FtpsConnection ftpsConnection = new FtpsConnection(
                     configuration.getFtpHost(),

@@ -192,6 +192,7 @@ public class PrinterStateService {
             return;
 
         String newState = print.get(FIELD_GCODE_STATE).asText();
+        getState(printerId).setPrinting(isAnyOf(newState, STATE_PREPARE, STATE_RUNNING, STATE_PAUSE));
 
         if (newState.equals(lastState(printerId)))
             return;

@@ -75,4 +75,29 @@ class AgentManagementControllerTest {
         controller.revoke(printer, new ExtendedModelMap(), new MockHttpServletResponse());
         verify(agents).revoke(printer);
     }
+
+    @Test
+    void statusPollingIsReadOnlyOwnerScopedNoStoreAndContainsNoPairingCode() {
+        when(agents.status(printer)).thenReturn(new CoreAgentManagementClient.Status(UUID.randomUUID(), "ACTIVE",
+                Instant.now(), null, Instant.now(), "READY"));
+        var response = new MockHttpServletResponse();
+        var status = controller.status(printer, response);
+        assertThat(status.getBody().state()).isEqualTo("ACTIVE");
+        assertThat(status.getBody().mqttState()).isEqualTo("READY");
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        verify(agents, never()).pair(any(), anyBoolean());
+        when(printers.getPrinter(printer)).thenThrow(new IllegalArgumentException("Foreign printer"));
+        assertThatThrownBy(() -> controller.status(printer, new MockHttpServletResponse()))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(agents, times(1)).status(printer);
+    }
+
+    @Test
+    void statusFailureIsSafeAndDoesNotIssueANewCode() {
+        when(agents.status(printer)).thenThrow(new org.springframework.web.client.ResourceAccessException("Synthetic"));
+        var result = controller.status(printer, new MockHttpServletResponse());
+        assertThat(result.getStatusCode().value()).isEqualTo(502);
+        assertThat(result.getBody().state()).isEqualTo("UNAVAILABLE");
+        verify(agents, never()).pair(any(), anyBoolean());
+    }
 }

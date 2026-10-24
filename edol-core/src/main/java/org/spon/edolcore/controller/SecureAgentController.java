@@ -73,7 +73,14 @@ public class SecureAgentController {
     @PostMapping(value = "/upload", consumes = "application/octet-stream")
     public ResponseEntity<Void> upload(@AuthenticationPrincipal AgentPairingService.Identity identity,
                                       @RequestParam String fileName, InputStream body) throws IOException {
-        var model = files.store(identity.printerId(), fileName, body);
+        ModelFileStorage.StoredModel model;
+        try {
+            model = files.store(identity.printerId(), fileName, body);
+        } catch (IOException exception) {
+            log.warn("Secure agent model stream/storage failed: agentId={}, printerId={}, failureType={}",
+                    identity.agentId(), identity.printerId(), exception.getClass().getSimpleName());
+            throw exception;
+        }
         events.publishEvent(new ModelAvailableEvent(identity.printerId(), model.path()));
         log.info("Secure agent model accepted: agentId={}, printerId={}, bytes={}",
                 identity.agentId(), identity.printerId(), model.bytes());
@@ -93,7 +100,7 @@ public class SecureAgentController {
     @ExceptionHandler({ResponseStatusException.class, IOException.class})
     ResponseEntity<Void> rejected(Exception exception) {
         int status = exception instanceof ResponseStatusException rejection ? rejection.getStatusCode().value() : 500;
-        log.warn("Secure agent request rejected: status={}", status);
+        log.warn("Secure agent request rejected: status={}, failureType={}", status, exception.getClass().getSimpleName());
         return ResponseEntity.status(status).build();
     }
 

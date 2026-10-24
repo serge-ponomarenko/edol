@@ -9,5 +9,6 @@ public interface AgentCommandGateway {
     void enableSnapshotScheduler(UUID printerId);
 
     void disableSnapshotScheduler(UUID printerId);
+    void uploadSnapshot(UUID printerId);
 
 }

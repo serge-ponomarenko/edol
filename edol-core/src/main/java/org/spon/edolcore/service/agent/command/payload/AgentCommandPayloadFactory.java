@@ -2,6 +2,8 @@ package org.spon.edolcore.service.agent.command.payload;
 
 public final class AgentCommandPayloadFactory {
 
+    public static final String UPLOAD_SNAPSHOT = "{\"command\":\"UPLOAD_SNAPSHOT\"}";
+
     private static final String UPLOAD_MODEL_PAYLOAD = """
             {
                 "command": "UPLOAD_MODEL",
@@ -37,4 +39,5 @@ public final class AgentCommandPayloadFactory {
     public static String disableSnapshotScheduler() {
         return DISABLE_SNAPSHOT_SCHEDULER_PAYLOAD;
     }
+
 }

@@ -13,12 +13,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
+import java.time.Instant;
 
 @Controller
 @RequestMapping("/printers/{printerId}/agent")
@@ -84,6 +87,21 @@ public class AgentManagementController {
         populateStatus(printerId, model, response);
         return PAGE;
     }
+
+    @GetMapping("/status")
+    @ResponseBody
+    public ResponseEntity<StatusView> status(@PathVariable UUID printerId, HttpServletResponse response) {
+        authorize(printerId, new org.springframework.ui.ExtendedModelMap(), response);
+        try {
+            var status = agents.status(printerId);
+            return ResponseEntity.ok(status == null ? new StatusView("NOT_PAIRED", null, null)
+                    : new StatusView(status.state(), status.mqttState(), status.expiresAt()));
+        } catch (RestClientException exception) {
+            return ResponseEntity.status(502).body(new StatusView("UNAVAILABLE", null, null));
+        }
+    }
+
+    public record StatusView(String state, String mqttState, Instant expiresAt) { }
 
     private void populateStatus(UUID printerId, Model model, HttpServletResponse response) {
         try {

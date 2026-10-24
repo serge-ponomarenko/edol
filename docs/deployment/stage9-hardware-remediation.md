@@ -1,19 +1,21 @@
-# Stage 9 Hardware Acceptance Remediation — 2026-10-23
+# Stage 9 Hardware Acceptance Remediation — 2026-10-24
 
 ## Current state: resume, do not bootstrap
 
-The latest operator report supersedes the original checkpoint below. Backend
-`1444970` was deployed, service audiences corrected and the existing HTTPS proxy
-reloaded. DIRECT telemetry and live camera updates are **physical PASS**. Agent
-`65b1fd9` was flashed on COM9, booted into setup and displayed the intended
-endpoints. Enrollment was attempted and **failed TLS verification (-9984)**;
-Agent MQTT/telemetry/uploads and AMS hardware acceptance remain **NOT RUN**.
+The October 24 operator report (backend `ecea9b0`, Agent `bf84769`)
+supersedes the historical checkpoints below. Verified physical results:
+Agent HTTPS enrollment and MQTT provisioning HTTP 200, Agent ACTIVE,
+DIRECT and AGENT real telemetry and independent Hub print jobs, DIRECT live
+camera. The IPv4 SAN TLS correction is physically verified; **TLS -9984 is no
+longer the blocker**. Both logical printers intentionally observe one P1S.
 
-The current source increment fixes two DIRECT background tenant boundaries and
-adds Agent clock/TLS diagnostics. It has **not been deployed or flashed**.
-The next operator procedure and rollback are in the final section. Do not repeat
-bootstrap, identity preparation or historical checks. Earlier deployment/flash
-instructions below are historical, not instructions to repeat now.
+Current blockers are model acquisition, metadata retries, Agent camera,
+overview printing/progress and DIRECT snapshot command routing. The current
+source remediation has **not been deployed or flashed**. See the final
+October 24 section for A–G causes, verification and the next operator procedure.
+The complete print lifecycle and AMS hardware acceptance remain **NOT RUN**.
+Do not repeat bootstrap, enrollment, identity preparation or historical checks.
+Earlier deployment/flash instructions are historical, not instructions to repeat.
 
 The existing Debian run is `/home/serge/edol-stage9-hardware`, Compose project
 `edol-stage9-hardware`, base `compose.backend.yaml`. Preserve its database,
@@ -643,3 +645,155 @@ reviewed artifact or previous source/CA; no reset, erase, DB/authority rollback
 or CA replacement. Earlier firmware retains the IP-SAN defect. Generated local
 test CA/keys stay ignored under .pio and are never device trust material.
 Existing cleanup/restoration obligations remain; cleanup is NOT STARTED.
+
+## October 24 — printing, model transfers and Agent camera (A–G)
+
+### Source diagnosis and changes
+
+| Finding | Root cause and implemented boundary | Physical retest |
+| --- | --- | --- |
+| A: Ready during RUNNING, no progress | `PrinterStateService.updateGcodeState` did not set `printing`; only `MetadataParsedEventListener` set it after metadata success. The existing overview API/template uses that bit and already polls every five seconds. Derive it from PREPARE/RUNNING/PAUSE, clear on other reported states, preserve on telemetry deltas. Late metadata cannot resurrect a finished print. No DTO or overview production template change. | Pending |
+| B: DIRECT configuration missing | `DirectModelTransferProvider.requestModel` used a repository query without the transaction that installs the RLS tenant setting. Use `PrinterManagementService.getConnection`; directory preparation and FTPS run after the short configuration transaction. Foreign/missing tenant remains denied. | Pending |
+| C: Agent DOWNLOAD_FAILED | Physical logs do not identify the FTPS substage. Confirmed source defects: PASV parser required `227 (` rather than accepting normal human-readable prefixes, reply reader did not handle multiline replies, and download could discard bytes buffered at EOF. Correct those paths, bound reply/idle waits, classify failures without logging raw replies. **The precise physical cause is still unproven.** | Blocked pending approved firmware retest |
+| D: retries lose tenant | `MetadataAcquisitionService` scheduled a plain callback. Every acquisition attempt now executes through `CoreRuntimeTenantExecutor` using the trusted printer binding; it never derives a tenant from model/MQTT payloads or supplies a global fallback. | Pending |
+| E: DIRECT requires Agent binding at finish | `DefaultAgentCommandGateway.disableSnapshotScheduler` published unconditionally. Snapshot controls now check persisted connection mode; DIRECT produces no Agent command. AGENT missing/revoked authority still fails closed. | Pending |
+| F: Agent camera unavailable | `AgentCameraProvider.supports` returned false; the separate firmware snapshot scheduler was enabled only after successful metadata parsing. Core's existing 15-second camera background loop now requests the existing `UPLOAD_SNAPSHOT` command. Firmware uploads asynchronously through credential-bound HTTPS into `CameraSnapshotStore`. A pending request returns no bytes and cannot replace a cached frame. Metadata parsing no longer enables a second periodic scheduler. | Pending; no image success claimed |
+| G: enrollment status stale | The pairing page rendered server status only once. Add owner/printer-authorized GET `/printers/{printerId}/agent/status`, no-store, returning only state/MQTT state/expiry. Poll every five seconds while visible, add Refresh status and safe retry feedback, clear displayed code on ACTIVE/revocation/expiry. Polling never issues a code or rotates authority. | Pending |
+
+Agent FTPS diagnostics use `DOWNLOAD_FAILED:<stage>` in the existing reason
+field, plus numeric `ftp_code`, `transferred` and `expected` in local logs.
+Stages include PASV_REPLY, PASV_PARSE, DATA_CONNECT, RETR_REPLY, DATA_READ,
+DATA_TIMEOUT, HTTP_STREAM_WRITE and COMPLETION_REPLY. No raw FTP replies,
+request/response bodies, codes or credentials are logged. The correlated Core
+500 may follow an incomplete upload; the report does not establish that it was
+the original download failure. `SecureAgentController` now records status and
+exception class (and issued IDs for storage I/O errors) without bodies/secrets.
+
+PASV human-readable prefixes are not fixed protocol text; see
+[RFC 1123 section 4.1.2.6](https://www.rfc-editor.org/rfc/rfc1123#section-4.1.2.6).
+Unicode model basenames such as `Куб.gcode.3mf` remain supported. Routes,
+MQTT topics, payload fields, CA checks and NVS keys are unchanged. The existing
+local-printer LAN certificate-verification limitation is unchanged and separate
+from verified EDOL TLS. This increment adds no schema/configuration migration.
+
+### Automated evidence
+
+| Check | Actual result |
+| --- | --- |
+| Selected Core/Hub regression tests: LivePrintingStateTest, MetadataRetryTenantTest, AgentSnapshotRoutingTest, DirectModelTransferProviderTest, AgentManagementControllerTest, AgentManagementPageTest, PrinterOverviewServiceTest, CameraControllerTest | 20 PASS, 0 failures/errors/skips |
+| DirectRuntimePersistenceTest with isolated PostgreSQL 17/Testcontainers, Flyway 11, runtime role without RLS bypass | 4 PASS, 0 failures/errors/skips; includes real transaction scope for DIRECT model configuration, missing/foreign tenant rejection and no network I/O inside transaction |
+| SecureAgentHttpTest | 3 PASS, 0 failures/errors/skips |
+| Node overview rendering and Agent status polling tests | 7 PASS |
+| Firmware native executables | 11 distinct PASS; FTPS production source tested separately. Full runner stops after ten passing executables on Windows WinError 32 temporary-directory cleanup; runner exit is not a clean PASS |
+| Python CA-hook tests | 3 PASS |
+| ESP32 Home / secure / secure_smoke builds | All three SUCCESS with the existing public CA for secure builds |
+| Physical model transfers, new Agent camera path, corrected overview and finish lifecycle | NOT RUN for this increment |
+
+Final distinct Java total is **27**, not the sum including repeated checks.
+After Sonar corrections, AgentSnapshotRoutingTest (3),
+AgentManagementPageTest (2) and the seven Node cases passed again. The extracted
+Python source/include selection and standalone FTPS test also passed again.
+Read-only Sonar covered all changed supported sources: 16 Java, one HTML,
+two JavaScript and one Python file. Actionable findings were corrected. Only
+the known pathless Java S1598 snippet artifact remains (real package paths
+match); nothing was suppressed. The available analyzer does not support C++.
+Both repositories passed `git diff --check`.
+
+Maintainer reproduction (no device required):
+
+```powershell
+mvn -B -pl edol-core,edol-hub -am '-Dtest=LivePrintingStateTest,MetadataRetryTenantTest,AgentSnapshotRoutingTest,DirectModelTransferProviderTest,AgentManagementControllerTest,AgentManagementPageTest,PrinterOverviewServiceTest,CameraControllerTest' -Dsurefire.failIfNoSpecifiedTests=false clean test
+# DirectRuntimePersistenceTest requires the isolated remote-Docker verification skill.
+mvn -B -pl edol-core -am -Dtest=DirectRuntimePersistenceTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -pl edol-core -am -Dtest=SecureAgentHttpTest -Dsurefire.failIfNoSpecifiedTests=false test
+node --test tools/stage9/test_printer_overview.cjs tools/stage9/test_agent_status.cjs
+```
+
+### Minimal operator resumption — separate approval required
+
+1. Preserve current image references and rollback artifacts. After explicit
+   deployment approval, update the existing backend checkout and build only
+   Core and Hub using the existing packaging procedure. Tag the actual built
+   images with a new unique tag before changing the candidate override; do not
+   assume Maven creates that tag. Deploy only those two services using existing
+   `compose.backend.yaml` and `remediation/compose.resume.yaml`, with
+   `--no-deps --pull never`. Do not run prepare, identity, bootstrap or migrations,
+   recreate infrastructure, reload the proxy or change authorities/certificates.
+2. Open the existing AGENT printer's Agent page. Refresh status must show ACTIVE
+   and the MQTT state, and keep updating. **Do not re-pair an already working
+   Agent.** Keep its existing identity, portal settings, CA and endpoints.
+3. Check Agent camera after one background interval plus upload time. Verify a
+   genuinely changing image with the operator. If unavailable, record only safe
+   command/upload status and numeric errors. A command sent or an HTTP endpoint
+   response alone does not establish a live camera PASS.
+4. For the FTPS changes, request separate firmware upload approval and confirm
+   the actual Agent USB port (COM9 is historical). Build `lolin_d32_secure_smoke`
+   with the same public CA via `EDOL_AGENT_ROOT_CA_FILE`, preserve/hash the
+   current build artifact if present, and upload firmware only. No erase-flash,
+   filesystem upload, NVS reset, new code, CA or credential rotation.
+5. Observe one operator-approved real print through both existing logical
+   printers. Check Printing/progress on both cards, metadata/preview/filament for
+   the Unicode model, and STARTED → RUNNING → FINISHED with independent sessions
+   and jobs. DIRECT finish must produce no Agent-binding error. Force no extra
+   print commands from the test agent. Allow an ordinary failed acquisition to
+   retry and confirm no missing tenant context. If Agent transfer still fails,
+   collect the new stage, FTP numeric code, byte counts and HTTPS status; stop
+   there rather than changing credentials/TLS or repeating bootstrap.
+6. Only after these read-only observations pass, resume the existing separately
+   approved recovery/revoke/replace and AMS terminal hardware plan. AMS hardware
+   is NOT RUN. Device restoration and cleanup remain separate approved actions.
+
+No full historical reactor/security audits are needed for this retest. Known
+enrollment/TLS and telemetry PASS remain accepted; source tests do not convert
+pending hardware cases into PASS. No deployment or hardware action occurred
+during this remediation.
+
+After separate deployment approval and updating the existing clean backend
+checkout to the reviewed revision, the two-service command sequence is:
+
+```sh
+cd /home/serge/edol-stage9-hardware/backend
+(
+  set -eu
+  stage9_tag="stage9-print-$(git rev-parse --short HEAD)"
+  stage9_override="../remediation/compose.$stage9_tag.yaml"
+  test ! -e "$stage9_override"
+  for stage9_app in core hub; do
+    if docker image inspect "edol-stage9-$stage9_app:before-$stage9_tag" >/dev/null 2>&1; then
+      echo 'Rollback tag exists; stop and review the previous attempt' >&2
+      exit 1
+    fi
+    stage9_container=$(docker compose -p edol-stage9-hardware -f ../compose.backend.yaml -f ../remediation/compose.resume.yaml ps -q "edol$stage9_app")
+    test -n "$stage9_container"
+    stage9_image=$(docker inspect --format '{{.Image}}' "$stage9_container")
+    docker image tag "$stage9_image" "edol-stage9-$stage9_app:before-$stage9_tag"
+    docker build --pull=false -f "docker/edol-$stage9_app.Dockerfile" -t "edol-stage9-$stage9_app:$stage9_tag" .
+  done
+  set -C
+  printf 'services:\n  edolcore:\n    image: edol-stage9-core:%s\n  edolhub:\n    image: edol-stage9-hub:%s\n' "$stage9_tag" "$stage9_tag" > "$stage9_override"
+  docker compose -p edol-stage9-hardware -f ../compose.backend.yaml -f ../remediation/compose.resume.yaml -f "$stage9_override" config --quiet
+  docker compose -p edol-stage9-hardware -f ../compose.backend.yaml -f ../remediation/compose.resume.yaml -f "$stage9_override" up -d --no-deps --pull never edolcore edolhub
+)
+```
+
+Record the override path and both rollback tags. Stop on any error; do not
+overwrite an existing override or rollback tag. These commands are instructions
+only and were **not executed** against the Stage 9 environment.
+
+### Rollback and cleanup journal
+
+Rollback only changed Core/Hub application images to the recorded prior image
+references using the existing Compose files and `--no-deps --pull never`.
+If firmware was explicitly updated, restore the reviewed previous artifact or
+`bf84769` source with the same public CA, after separate operator approval.
+Do not restore a database snapshot, revoke/reissue credentials, reset NVS or
+roll back broker state. Existing identities and telemetry data must survive.
+
+Preserve the existing HTTPS proxy `edol-stage9-agent-https`, both proxy config
+copies, `remediation/agent-https.resume.conf`, CA/server keys and certificates,
+the realm/authorities/volumes, and all `stage9-restoration` artifacts. No new
+Stage 9 infrastructure resource was created. A secure_smoke build artifact did
+not exist immediately before this increment's builds; no pre-build binary
+backup is claimed. Existing restoration files remain ignored and untouched.
+Isolated Testcontainers verification completed and its tunnel closed; it is not
+part of the live Stage 9 run. Cleanup is **NOT STARTED**.

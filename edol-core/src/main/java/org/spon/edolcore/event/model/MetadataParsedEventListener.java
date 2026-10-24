@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.service.mqtt.CoreIntegrationEventPublisher;
 import org.spon.edolcore.service.PrinterStateService;
-import org.spon.edolcore.service.agent.command.AgentCommandGateway;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +16,6 @@ public class MetadataParsedEventListener {
 
     private final PrinterStateService printerStateService;
     private final CoreIntegrationEventPublisher mqttMessagePublisher;
-    private final AgentCommandGateway agentCommandGateway;
 
     @EventListener
     public void handle(MetadataParsedEvent event) {
@@ -25,9 +23,7 @@ public class MetadataParsedEventListener {
 
         PrinterState state = printerStateService.getState(printerId);
 
-        state.setPrinting(true);
-
-        agentCommandGateway.enableSnapshotScheduler(printerId);
+        // Live printing state and camera acquisition do not depend on optional model metadata.
 
         mqttMessagePublisher.publish(
                 "edolcore/print/metadata",

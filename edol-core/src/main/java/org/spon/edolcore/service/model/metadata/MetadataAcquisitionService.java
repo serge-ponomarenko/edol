@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolcore.service.LogContextFactory;
 import org.spon.edolcore.service.PrinterStateService;
+import org.spon.edolcore.service.printer.runtime.CoreRuntimeTenantExecutor;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,7 @@ public class MetadataAcquisitionService {
             new ConcurrentHashMap<>();
     private final LogContextFactory logContextFactory;
     private final PrinterStateService printerStateService;
+    private final CoreRuntimeTenantExecutor runtimeTenantExecutor;
 
 
     public void start(UUID printerId) {
@@ -82,6 +84,10 @@ public class MetadataAcquisitionService {
     }
 
     private void attemptAcquisition(UUID printerId) {
+        runtimeTenantExecutor.execute(printerId, () -> attemptInTenant(printerId));
+    }
+
+    private void attemptInTenant(UUID printerId) {
         MetadataAcquisitionState state = state(printerId);
 
         synchronized (state) {

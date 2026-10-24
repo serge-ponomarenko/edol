@@ -123,6 +123,33 @@ class DirectRuntimePersistenceTest {
         assertThatThrownBy(() -> camera.capture(PRINTER)).isInstanceOf(MissingCoreTenantContextException.class);
     }
 
+    @Test
+    void modelTransferReadsTenantConfigurationInItsOwnTransactionBeforeSyntheticFtps() throws Exception {
+        var states = mock(org.spon.edolcore.service.PrinterStateService.class);
+        var state = new org.spon.edol.model.PrinterState();
+        state.setCurrentFile("Куб.gcode.3mf");
+        when(states.getState(PRINTER)).thenReturn(state);
+        var ftp = mock(org.spon.edolcore.service.printer.ftps.CurlFtpsClient.class);
+        var events = mock(org.springframework.context.ApplicationEventPublisher.class);
+        var transfer = new org.spon.edolcore.service.model.transfer.DirectModelTransferProvider(states,
+                context.getBean(org.spon.edolcore.service.printer.management.PrinterManagementService.class), ftp, events);
+        doAnswer(call -> {
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return null;
+        }).when(ftp).download(any(), anyString(), anyString());
+        try (var files = mockStatic(java.nio.file.Files.class); var ignored = context.getBean(CoreTenantContext.class).open(TENANT_A)) {
+            transfer.requestModel(PRINTER);
+            verify(ftp).download(any(), anyString(), anyString());
+        }
+        reset(ftp, events);
+        try (var ignored = context.getBean(CoreTenantContext.class).open(TENANT_B)) {
+            assertThatThrownBy(() -> transfer.requestModel(PRINTER))
+                    .hasRootCauseInstanceOf(org.spon.edolcore.service.printer.management.exception.PrinterNotFoundException.class);
+        }
+        assertThatThrownBy(() -> transfer.requestModel(PRINTER)).hasRootCauseInstanceOf(MissingCoreTenantContextException.class);
+        verifyNoInteractions(ftp, events);
+    }
+
     @Configuration(proxyBeanMethods = false)
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackageClasses = PrinterRepository.class, bootstrapMode = BootstrapMode.LAZY)

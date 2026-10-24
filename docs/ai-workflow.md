@@ -53,14 +53,15 @@ must never be copied into the repository or a Codex configuration file.
   bootstrap should reuse these exact contracts, but must not recreate this
   operator's realm, DB, authorities or certificates. No redeploy/hardware
     operation or cleanup is implicit in source regression checks.
-  The current operator checkpoint has DIRECT telemetry/live camera PASS and
-  Agent enrollment blocked by TLS -9984. Source fixes now wrap asynchronous
-  recovery and reconnect checks in the trusted runtime tenant executor. Lab-only
-  Operator diagnostics now establish CN_MISMATCH-only for a correct IP SAN;
-  the audited Espressif mbedTLS 2.28.7 name matcher only handles DNS SANs.
-  A strict per-client IPv4 SAN callback is source-verified with real vendor
-  certificate tests; its new firmware still needs explicitly approved physical
-  acceptance. Existing CA/certificates and endpoints must stay unchanged. Do not
+  The October 24 operator checkpoint confirms Agent enrollment/provisioning,
+  IPv4 SAN TLS, DIRECT/AGENT telemetry and DIRECT live camera physical PASS.
+  Current source fixes cover metadata retry tenant scope, DIRECT model RLS
+  lookup, transport-specific snapshot commands, telemetry-derived printing,
+  asynchronous Agent camera and pairing status polling. Agent DOWNLOAD_FAILED
+  has no proven physical substage yet; bounded FTPS diagnostics and protocol
+  corrections need an approved firmware retest. The complete print lifecycle,
+  Agent model/camera acceptance and AMS hardware remain open. Existing
+  CA/certificates and endpoints must stay unchanged. Do not
   bootstrap the run again, infer zero verifier flags from unavailable state,
   bypass TLS/RLS or reset existing identities to make acceptance pass.
 

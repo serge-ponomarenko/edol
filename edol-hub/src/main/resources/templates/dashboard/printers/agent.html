@@ -12,12 +12,15 @@
     <h1>Printer agent</h1>
     <p>Connect an agent in your printer's local network. It connects to EDOL automatically.</p>
     <p>Pairing requires an enabled AGENT printer. Configure and save this on the printer edit page first. Disabling a paired printer revokes its Agent access.</p>
-    <p>Status: <strong th:text="${agentStatusUnavailable == true ? 'Unavailable' : (agentStatus == null ? 'Not paired' : agentStatus.state)}"></strong></p>
+    <p>Status: <strong id="agent-status" th:text="${agentStatusUnavailable == true ? 'Unavailable' : (agentStatus == null ? 'Not paired' : agentStatus.state)}"></strong></p>
+    <p><output id="agent-status-message" aria-live="polite"></output></p>
+    <button id="refresh-agent-status" type="button" class="btn btn-outline-primary mb-3"
+            th:attr="data-status-url=@{/printers/{id}/agent/status(id=${agentPrinterId})}">Refresh status</button>
     <p class="alert alert-warning" th:if="${agentStatus != null and agentStatus.mqttState == 'REVOKE_PENDING'}">
         Access is revoked in Core. MQTT disconnection is pending while the broker is unavailable.
     </p>
     <p class="alert alert-danger" th:if="${agentError}" th:text="${agentError}"></p>
-    <section class="alert alert-primary" th:if="${agentPairing}">
+    <section id="agent-pairing-code" class="alert alert-primary" th:if="${agentPairing}">
         <h2>Enter this code in the agent setup</h2>
         <p class="display-6 font-monospace" th:text="${agentPairing.pairingCode}"></p>
         <p>Shown once. Valid until <time th:text="${agentPairing.expiresAt}"></time>. Do not share it.</p>
@@ -34,5 +37,46 @@
     </form>
     <a th:href="@{/printers/{id}/edit(id=${agentPrinterId})}">Back to printer</a>
 </main>
+<script>
+    const refreshButton = document.getElementById('refresh-agent-status');
+    const statusText = document.getElementById('agent-status');
+    const statusMessage = document.getElementById('agent-status-message');
+    let statusPending = false;
+
+    function applyAgentStatus(status) {
+        statusText.textContent = status.state;
+        statusMessage.textContent = status.state === 'ACTIVE'
+            ? `Agent enrolled successfully. MQTT: ${status.mqttState || 'not provisioned'}.`
+            : `Agent status: ${status.state}.`;
+        const pairing = document.getElementById('agent-pairing-code');
+        if (pairing && (status.state === 'ACTIVE' || status.state === 'REVOKED'
+                || (status.expiresAt && Date.parse(status.expiresAt) <= Date.now()))) {
+            pairing.replaceChildren();
+            pairing.hidden = true;
+        }
+    }
+
+    async function refreshAgentStatus() {
+        if (statusPending) return;
+        statusPending = true;
+        refreshButton.disabled = true;
+        try {
+            const response = await fetch(refreshButton.dataset.statusUrl, {cache: 'no-store', headers: {'Accept': 'application/json'}});
+            if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+                throw new Error('Status unavailable');
+            }
+            applyAgentStatus(await response.json());
+        } catch {
+            statusMessage.textContent = 'Unable to refresh Agent status. Check your login or connection and use Refresh status.';
+        } finally {
+            statusPending = false;
+            refreshButton.disabled = false;
+        }
+    }
+
+    refreshButton.addEventListener('click', refreshAgentStatus);
+    setInterval(() => { if (!document.hidden) refreshAgentStatus(); }, 5000);
+    setTimeout(refreshAgentStatus, 0);
+</script>
 </body>
 </html>
