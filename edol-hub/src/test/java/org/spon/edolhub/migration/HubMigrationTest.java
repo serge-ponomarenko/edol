@@ -29,6 +29,8 @@ import org.spon.edolhub.repository.MaintenanceDefinitionRepository;
 import org.spon.edolhub.repository.MaintenanceExecutionRepository;
 import org.spon.edolhub.repository.PrinterRepository;
 import org.spon.edolhub.repository.PrinterStatsRepository;
+import org.spon.edolhub.repository.PrintJobRepository;
+import org.spon.edolhub.repository.PrintAllocationPreviewRepository;
 import org.spon.edolhub.repository.TenantMembershipRepository;
 import org.spon.edolhub.repository.TenantRepository;
 import org.spon.edolhub.repository.UserRepository;
@@ -39,6 +41,15 @@ import org.spon.edolhub.service.MissingTenantContextException;
 import org.spon.edolhub.service.PrinterAccessService;
 import org.spon.edolhub.service.PrinterStatsService;
 import org.spon.edolhub.service.TenantContext;
+import org.spon.edolhub.service.CoreMqttEventReceiptService;
+import org.spon.edolhub.service.PrintJobService;
+import org.spon.edolhub.service.PrintRuntimeStateService;
+import org.spon.edolhub.service.JobSpoolUsageService;
+import org.spon.edolhub.service.TenantAwareTransactionalExecutor;
+import org.spon.edolhub.service.spool.*;
+import org.spon.edol.model.PrinterState;
+import org.spon.edol.mqtt.CoreMqttEventEnvelope;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -65,6 +76,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.io.TempDir;
 
 @Testcontainers(disabledWithoutDocker = true)
@@ -87,6 +99,115 @@ class HubMigrationTest {
                 POSTGRES.getPassword()
         );
         flyway(null).clean();
+    }
+
+    @Test
+    void metadataRollbackDiscardsRuntimeJobAlongWithReceiptAndNewJob() {
+        JdbcClient admin = JdbcClient.create(dataSource);
+        admin.sql("""
+                DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hub_runtime') THEN
+                        CREATE ROLE hub_runtime LOGIN PASSWORD 'test-runtime-password'
+                            NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+                    END IF;
+                END $$
+                """).update();
+        flyway(null).migrate();
+        UUID tenantId = UUID.randomUUID();
+        UUID printerId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        admin.sql("insert into hub.tenants (id, name) values (:id, 'Test')")
+                .param("id", tenantId).update();
+        insertProjection(admin, printerId, tenantId);
+        DataSource runtimeDataSource = new DriverManagerDataSource(POSTGRES.getJdbcUrl(),
+                "hub_runtime", "test-runtime-password");
+        JdbcClient jdbc = JdbcClient.create(runtimeDataSource);
+        TenantContext tenantContext = new TenantContext();
+        PrintRuntimeStateService runtimeState = new PrintRuntimeStateService();
+        PrinterState state = new PrinterState();
+        state.setSessionId("recovery-session");
+
+        try (EntityManagerFactory emf = entityManagerFactory(runtimeDataSource, tenantContext);
+             TenantContext.TenantScope ignored = tenantContext.open(tenantId)) {
+            TransactionTemplate transaction = new TransactionTemplate(
+                    new TenantAwareJpaTransactionManager(emf, runtimeDataSource, tenantContext));
+            CoreMqttEventEnvelope event = new CoreMqttEventEnvelope(2, eventId, "print.metadata.loaded",
+                    tenantId, printerId, "2026-10-27T12:00:00Z", Map.of());
+
+            assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+                JpaRepositoryFactory factory = repositoryFactory(emf);
+                PrinterRepository printers = factory.getRepository(PrinterRepository.class);
+                PrintJobRepository jobs = factory.getRepository(PrintJobRepository.class);
+                PrintAllocationPreviewRepository previews = factory.getRepository(PrintAllocationPreviewRepository.class);
+                PrintAllocationSnapshotService snapshots = mock(PrintAllocationSnapshotService.class);
+                doThrow(new IllegalArgumentException("synthetic allocation failure"))
+                        .when(snapshots).createSnapshot(any(), same(state));
+                PrintJobService service = new PrintJobService(mock(RestTemplate.class), jobs,
+                        mock(PrinterStatsService.class), mock(JobSpoolUsageService.class), runtimeState,
+                        snapshots, mock(PrintAllocationFinalizeService.class), mock(PrintAllocationPreviewService.class),
+                        mock(SpoolAllocationService.class), previews, printers,
+                        mock(AllocationPreviewRuntimeCacheService.class), mock(AllocationPreviewRuntimeSyncService.class),
+                        mock(TenantAwareTransactionalExecutor.class));
+                CoreMqttEventReceiptService receipts = new CoreMqttEventReceiptService(jdbc, printers);
+                receipts.process(event, () -> {
+                    service.start(printerId, state);
+                    jobs.flush();
+                    service.metadataLoaded(printerId, state);
+                });
+            })).isInstanceOf(IllegalArgumentException.class);
+
+            assertThat(runtimeState.getCurrentJob(printerId)).isNull();
+            assertThat(runtimeState.isAllocationPreviewReady(printerId)).isFalse();
+            Integer receiptCount = transaction.execute(status -> jdbc.sql(
+                    "select count(*) from hub.core_mqtt_event_receipts where event_id = :id")
+                    .param("id", eventId).query(Integer.class).single());
+            Integer jobCount = transaction.execute(status -> jdbc.sql(
+                    "select count(*) from hub.print_jobs where printer_id = :id")
+                    .param("id", printerId).query(Integer.class).single());
+            assertThat(receiptCount).isZero();
+            assertThat(jobCount).isZero();
+
+            transaction.executeWithoutResult(status -> {
+                JpaRepositoryFactory factory = repositoryFactory(emf);
+                PrintJobRepository jobs = factory.getRepository(PrintJobRepository.class);
+                PrinterRepository printers = factory.getRepository(PrinterRepository.class);
+                PrintJobService service = metadataTestService(factory, jobs, printers, runtimeState,
+                        mock(PrintAllocationSnapshotService.class), mock(AllocationPreviewRuntimeSyncService.class));
+                service.start(printerId, state);
+                jobs.flush();
+                service.metadataLoaded(printerId, state);
+                assertThat(runtimeState.isAllocationPreviewReady(printerId)).isTrue();
+            });
+            assertThat(runtimeState.getCurrentJob(printerId)).isNotNull();
+            assertThat(runtimeState.isAllocationPreviewReady(printerId)).isTrue();
+            var committedJob = runtimeState.getCurrentJob(printerId);
+            runtimeState.setAllocationPreviewReady(printerId, false);
+
+            assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+                JpaRepositoryFactory factory = repositoryFactory(emf);
+                PrintJobRepository jobs = factory.getRepository(PrintJobRepository.class);
+                PrinterRepository printers = factory.getRepository(PrinterRepository.class);
+                AllocationPreviewRuntimeSyncService sync = mock(AllocationPreviewRuntimeSyncService.class);
+                doThrow(new IllegalStateException("synthetic refresh failure")).when(sync).refresh(any());
+                PrintJobService service = metadataTestService(factory, jobs, printers, runtimeState,
+                        mock(PrintAllocationSnapshotService.class), sync);
+                service.start(printerId, state);
+                service.metadataLoaded(printerId, state);
+            })).isInstanceOf(IllegalStateException.class);
+            assertThat(runtimeState.getCurrentJob(printerId)).isSameAs(committedJob);
+            assertThat(runtimeState.isAllocationPreviewReady(printerId)).isFalse();
+        }
+    }
+
+    private PrintJobService metadataTestService(JpaRepositoryFactory factory, PrintJobRepository jobs,
+            PrinterRepository printers, PrintRuntimeStateService runtimeState,
+            PrintAllocationSnapshotService snapshots, AllocationPreviewRuntimeSyncService sync) {
+        return new PrintJobService(mock(RestTemplate.class), jobs,
+                mock(PrinterStatsService.class), mock(JobSpoolUsageService.class), runtimeState,
+                snapshots, mock(PrintAllocationFinalizeService.class), mock(PrintAllocationPreviewService.class),
+                mock(SpoolAllocationService.class), factory.getRepository(PrintAllocationPreviewRepository.class),
+                printers, mock(AllocationPreviewRuntimeCacheService.class), sync,
+                mock(TenantAwareTransactionalExecutor.class));
     }
 
     @Test

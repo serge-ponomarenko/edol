@@ -81,7 +81,24 @@ must never be copied into the repository or a Codex configuration file.
   `5513f575-2a14-4254-8ca4-309cdc5a5c1a` was `print.metadata.loaded` for the
   Agent printer and failed with `IllegalArgumentException` during recovery.
   Earlier two categories are not established. The waiting filament display
-  may be related but is not proven. Preserve tenant isolation and receipt logic.
+  may be related but is not proven. Source and offline tests identify two
+  distinct `IllegalArgumentException` candidates: an unknown or foreign Hub
+  printer at the receipt boundary, and missing tenant material identification
+  during allocation snapshot creation. The listener also counts and
+  acknowledges an allocation `IllegalArgumentException` after recovery start.
+  These controls do not establish which path occurred on the device. Design
+  safe stage-specific diagnostics before a separately authorized runtime
+  investigation; preserve tenant isolation, receipt transactions and ACK rules.
+  An isolated PostgreSQL/JPA test reproduced a stale in-memory current job after
+  receipt and new-job rollback. Hub now stages current-job, allocation-ready and
+  allocation-preview updates until transaction commit; targeted tests cover
+  rollback, success, an existing job and failure after readiness is set. These
+  source and disposable tests do not identify the physical failure; obtain
+  categorized runtime evidence only within separately authorized deployment.
+  Separately investigate mutable `PrintJob` references already published in
+  runtime state: finish, cancel and progress can modify the referenced object
+  before commit, so staging map updates alone does not isolate those mutations
+  from rollback or concurrent readers. Preserve per-printer and tenant scope.
 - Investigate Notify startup exit code 1 independently; do not attribute it to
   the historical Telegram startup issue without redacted runtime evidence.
 - Separate dashboard legacy hardening: existing full-file Sonar warnings cover

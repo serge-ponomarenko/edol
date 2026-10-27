@@ -89,6 +89,39 @@ class SecureMqttEventListenerTest {
         assertThat(observation(listener).snapshot().rejectedEnvelope()).isZero();
     }
 
+    @Test
+    void metadataAllocationIllegalArgumentIsCountedAndAcknowledgedAfterRecoveryStart() throws Exception {
+        PrinterService printers = mock(PrinterService.class);
+        PrintJobService jobs = mock(PrintJobService.class);
+        TenantContext tenants = mock(TenantContext.class);
+        TenantContext.TenantScope scope = mock(TenantContext.TenantScope.class);
+        CoreMqttEventReceiptService receipts = mock(CoreMqttEventReceiptService.class);
+        UUID tenantId = UUID.randomUUID();
+        UUID printerId = UUID.randomUUID();
+        PrinterState state = new PrinterState();
+        when(tenants.open(tenantId)).thenReturn(scope);
+        when(printers.getState(printerId)).thenReturn(state);
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(1)).run();
+            return true;
+        }).when(receipts).process(any(CoreMqttEventEnvelope.class), any(Runnable.class));
+        doThrow(new IllegalArgumentException("allocation category"))
+                .when(jobs).metadataLoaded(printerId, state);
+        var listener = listener(printers, jobs, tenants, receipts);
+        var acknowledgment = mock(SimpleAcknowledgment.class);
+
+        listener.handle(MessageBuilder.withPayload(envelope(tenantId, printerId, "print.metadata.loaded"))
+                .setHeader(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK, acknowledgment).build());
+
+        var order = org.mockito.Mockito.inOrder(jobs);
+        order.verify(jobs).start(printerId, state);
+        order.verify(jobs).metadataLoaded(printerId, state);
+        verify(scope).close();
+        verify(acknowledgment).acknowledge();
+        assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(1);
+        assertThat(observation(listener).snapshot().rejectedEnvelope()).isZero();
+    }
+
     private CoreMqttIngressObservation observation(SecureMqttEventListener listener) {
         return (CoreMqttIngressObservation) ReflectionTestUtils.getField(listener, "ingress");
     }

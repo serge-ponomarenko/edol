@@ -166,7 +166,10 @@ event type, tenant and printer IDs, RFC 3339 timestamp, and nested payload,
 while the legacy `event` and top-level fields remain in that same message. Core
 derives the tenant only from persisted printer ownership. Secure Hub MQTT
 ingress is disabled by default and uses tenant/printer validation plus a
-tenant-RLS receipt ledger before it mutates its projection. The
+tenant-RLS receipt ledger before it mutates its projection. Hub publishes
+printer-scoped current-job, allocation-ready and allocation-preview cache
+updates after transaction commit; the processing transaction can read its own
+pending values, while rollback discards those updates. The
 `stage6-smoke` profiles and `docker/compose.stage6-smoke.yaml` provide a
 local-loopback, disposable ACL harness only: generic agent MQTT and printer
 runtime remain disabled, while the dedicated Core publisher and Hub subscriber
