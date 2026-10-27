@@ -59,21 +59,31 @@ must never be copied into the repository or a Codex configuration file.
   persistence and Hub upstream failures require actual categorized evidence.
   This is independent of terminal HTTPS and the existing Hub processing failure.
 
-- Stage 9 continuous-MQTT source retest: operator evidence at Core `185ed932` /
-  Agent `8db73079` confirms two JPEG uploads/display, but the intentional MQTT
-  pause is superseded by the new worker implementation. Measure free heap,
-  largest block, transient handshake peaks and uninterrupted MQTT under the
-  reviewed source. Follow the final continuous-MQTT section of the hardware
-  remediation runbook; preserve all identities/data/authorities/CA and obtain
-  separate deployment, port-identification, flash and command-test approvals.
-  Actual new-source snapshots, Unicode model and DIRECT/AGENT Pause/Resume,
-  revoke/re-pair and AMS hardware acceptance remain NOT RUN. If four/five TLS
-  sessions do not fit, retain MQTT and reject transfers; a PSRAM-capable outbound
-  Agent or explicitly reviewed staging/SDK change is a separate decision.
-- Investigate the existing Hub `processingFailures=1` with the new event ID,
-  allowlisted event type, printer ID and exception-class diagnostics. Do not
-  infer its cause from Core metadata success or Agent DATA_READ. Preserve
-  envelope validation, receipt/tenant isolation and independent logical jobs.
+- Stage 9 Agent dynamic-TLS retest: operator evidence on 2026-10-27 confirms
+  repeated HTTPS snapshot uploads and one 37,672-byte Unicode model transfer,
+  including FTP 226 and HTTP 200, using Agent `f558127` and a custom SDK. One
+  camera handshake returned `-28928`; determine its cause and test recovery
+  before claiming stable acceptance. The normal PlatformIO SDK does not enable
+  this optimization. Preserve MQTT, certificate validation, identities, NVS,
+  CA, volumes and restoration files. Measure transient memory and MQTT servicing;
+  test larger models and negative TLS controls only with separate hardware
+  approval. DIRECT/AGENT Pause/Resume, revoke/re-pair and AMS acceptance remain
+  open. See the final dynamic-TLS section of the hardware remediation runbook.
+- The main local Agent repository now has an explicit isolated dynamic-TLS smoke
+  build using the retained hardware-tested SDK archive. Its archive hash, DIO
+  settings, CA hash, linker flags and used ELF wrappers are checked; the stock
+  environments remain separate. Rebuilding that SDK from source with fully
+  pinned dependencies remains open. Do not commit SDK archives, certificates,
+  credentials or firmware binaries. A normal PlatformIO upload does not use
+  the experimental SDK, and any flash requires separate approval. The observed
+  `-28928` handshake failure remains an independent stability gate.
+- Investigate Hub `processingFailures=3`: event
+  `5513f575-2a14-4254-8ca4-309cdc5a5c1a` was `print.metadata.loaded` for the
+  Agent printer and failed with `IllegalArgumentException` during recovery.
+  Earlier two categories are not established. The waiting filament display
+  may be related but is not proven. Preserve tenant isolation and receipt logic.
+- Investigate Notify startup exit code 1 independently; do not attribute it to
+  the historical Telegram startup issue without redacted runtime evidence.
 - Separate dashboard legacy hardening: existing full-file Sonar warnings cover
   CDN integrity, accessibility and formatting in unchanged sections. Review
   those together; do not mix a dependency/style rollout into command routing.

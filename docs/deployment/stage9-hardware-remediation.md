@@ -1,5 +1,10 @@
 # Stage 9 Hardware Acceptance Remediation — 2026-10-24
 
+Latest operator checkpoint: see **Dynamic TLS buffer hardware retest —
+2026-10-27** at the end. Agent snapshots and one Unicode model transfer passed
+with a custom SDK; one camera TLS error and Hub/AMS/Notify gates remain open.
+The earlier Agent checkpoints below are historical, not the current outcome.
+
 Latest AMS-only follow-up: see **AMS terminal HTTPS enrollment and independent
 MQTT processing diagnostics** at the end. It records source diagnostics and
 offline results; physical terminal enrollment remains FAIL. It does not reopen
@@ -1537,3 +1542,71 @@ AMS processing FAIL observed; Hub processing separately unresolved;
 terminal authenticated operations NOT RUN; cleanup NOT STARTED.
 New AMS diagnostics require a separately authorized deployment to gather live
 evidence; no deployment is part of this source handoff.
+
+## Dynamic TLS buffer hardware retest — 2026-10-27
+
+This operator checkpoint supersedes earlier Agent-only hardware results. It does
+not establish AMS terminal acceptance. Backend Core/Hub were deployed at
+`d52fdd0e7ca7b2a7858580665b3b19c33a721916`; AMS diagnostics at backend
+`16656bd9cfe5df653fc3a274a51c7aedd3151592` have not been physically retested.
+Agent source was `f5581272313db8248687f26c296dca5e9a28465f`, built with an
+isolated custom ESP-IDF 4.4.7 / Arduino-ESP32 2.0.17 SDK. Its mbedTLS dynamic
+TX/RX buffers were enabled, DTLS and variable buffers disabled, and input and
+output content limits remained 16,384 bytes. The generated PlatformIO link
+configuration contained all nine Espressif dynamic-buffer wrappers; the final
+ELF contained the relevant setup, read, write, free and handshake wrappers.
+The stock PlatformIO package does not provide this configuration. This is a
+custom SDK experiment, not a normal build or an SDK upgrade.
+
+The custom SDK archive SHA-256 was
+`0128f8b5c65d07d2c6ff95fc926ee1b9d439959ca1522a75eabb141d3e79a594`;
+the flashed smoke BIN SHA-256 was
+`57bf36447f193e711262a7f5196fb0b9f2d55486340404441b71d78d15fc99c3`.
+The existing public CA fingerprint matched the prior smoke CA. COM9 app0 was
+backed up before flashing; the partition table matched and NVS was not erased.
+The backup and SDK are private local artifacts, not committed source or proof
+that the build is reproducible from the repository alone.
+
+| Check | Operator evidence | Status |
+| --- | --- | --- |
+| EDOL HTTPS | Multiple observed handshakes, certificate depths 1 and 0 flags zero | PASS for observed handshakes; negative controls NOT RUN |
+| Agent camera | Repeated JPEG captures and HTTPS 200; image displayed | PASS for observed attempts, with a separate handshake failure below |
+| Agent Unicode model | `Куб.gcode.3mf`: 37,672 bytes, FTP 226, exact byte count, HTTP 200 and completion event | PASS for this model and run |
+| Telemetry | DIRECT and AGENT independently reported print progress; screenshot showed both | OBSERVED; continuous service of both Agent MQTT clients is not instrumented |
+| Resource use | Before HTTPS approximately 193 KB free / 110,580 B largest; after HTTPS approximately 189 KB free | Observed stage snapshots, not handshake minima or leak proof |
+| Camera error | One `-28928` / `MBEDTLS_ERR_SSL_BAD_INPUT_DATA` from dynamic RX `mbedtls_ssl_fetch_input`; later camera attempts succeeded | FAIL once; cause and reproducibility UNKNOWN |
+| Hub ingress | `processingFailures` 2 to 3 on event `5513f575-2a14-4254-8ca4-309cdc5a5c1a`, `print.metadata.loaded`, Agent printer, `IllegalArgumentException` | FAIL; exact cause and impact UNKNOWN |
+| Print recovery | Configuration update followed by recovery `RECOVERED` with the existing session | OBSERVED; do not attribute it to bulk transfer or MQTT failure |
+| AMS terminal / 16656bd | No diagnostic deployment or hardware retest in this checkpoint | NOT RUN |
+
+The original 403 snapshot responses occurred before the temporary proxy trust
+override. Core was published on a LAN address; a test-only Core override used
+Tomcat native forwarding and trusted the then-current proxy IP `10.253.90.7`.
+A direct HTTP request with a spoofed `X-Forwarded-Proto` returned 403; the Agent
+subsequently received HTTP 200 through the proxy. This fixed the observed test
+path, but the address is dynamically allocated and must not be treated as a
+durable trust boundary. Do not restart/recreate the proxy or allocate its address
+to another container while this override remains active. Revert the temporary
+override after authorized test completion; design durable proxy isolation and
+header sanitization separately for dev/prod. Do not expose credentials in logs.
+
+Read-only source analysis narrows, but does not prove, the `-28928` cause. The
+ESP-IDF 4.4.7 dynamic RX wrapper assigns a stack buffer to `ssl->in_hdr` before
+calling `mbedtls_ssl_fetch_input`. The audited mbedTLS implementation returns
+`MBEDTLS_ERR_SSL_BAD_INPUT_DATA` when both receive callbacks are absent or its
+input-length check fails; that check subtracts `ssl->in_buf` from `ssl->in_hdr`.
+Those pointers may refer to different allocations in this wrapper. The device
+log does not say which branch fired or capture the pointer/state values. Treat
+the pointer relationship as a source-level hypothesis requiring a controlled
+reproduction and vendor-version audit, not as an established device root cause
+or justification to bypass TLS validation.
+
+Next: reproduce or classify the one dynamic-buffer handshake failure; capture
+per-stage peak/minimum heap and largest block plus both MQTT connection/loop
+observations; investigate the categorized Hub event and earlier two failures;
+inspect Notify exit 1 independently. For AMS, deploy 16656bd and the terminal
+diagnostics only after separate approval, then follow the preceding AMS procedure
+without NVS reset, code replay, authority edits or automatic pairing. Preserve
+all databases, identity, CA, proxy and restoration artifacts. Complete larger
+model, repeat/recovery, negative TLS, command and hardware acceptance only under
+their own approved scope.
