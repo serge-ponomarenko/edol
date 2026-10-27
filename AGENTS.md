@@ -3,6 +3,7 @@
 ## Communication
 
 - Reply to users in Ukrainian. Write code, documentation, and code comments in English.
+- When the conversation context appears close to its limit and the user requests work that clearly requires a long execution, suggest moving to a new chat before starting if doing so would be beneficial.
 
 ## Source of Truth
 
