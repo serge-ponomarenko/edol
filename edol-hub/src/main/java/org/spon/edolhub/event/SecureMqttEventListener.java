@@ -52,7 +52,7 @@ public class SecureMqttEventListener {
             envelope = objectMapper.treeToValue(json, CoreMqttEventEnvelope.class);
             validateEnvelope(json, envelope);
             ingress.validated(envelope.schemaVersion(), json.has(LEGACY_EVENT));
-            log.info("Core MQTT ingress validated: consumer=hub, counters={}", ingress.snapshot());
+            log.debug("Core MQTT ingress validated: consumer=hub, counters={}", ingress.snapshot());
         } catch (JsonProcessingException | IllegalArgumentException | DateTimeException exception) {
             ingress.rejectEnvelope();
             log.warn("Rejected Core MQTT envelope: consumer=hub, counters={}", ingress.snapshot());

@@ -59,7 +59,7 @@ public class MqttEventListener {
                 ingress.validated(envelope.schemaVersion(), json.has(LEGACY_EVENT));
                 validatedEnvelope = true;
                 validated = envelope;
-                log.info("Core MQTT ingress validated: consumer=ams, counters={}", ingress.snapshot());
+                log.debug("Core MQTT ingress validated: consumer=ams, counters={}", ingress.snapshot());
                 stage = "tenant_mapping";
                 tenantScope = tenantResolver.openForEnvelope(envelope.printerId(), envelope.tenantId());
                 event = envelope.eventType();

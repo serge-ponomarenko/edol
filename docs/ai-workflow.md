@@ -46,12 +46,15 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
-- Resolve the Stage 9 AMS terminal enrollment failure using the production
-  diagnostics and image/CA audit documented in the final AMS section of
-  `docs/deployment/stage9-hardware-remediation.md`. Physical root cause, flashed
-  image identity, current NTP time, TLS flags/heap and server receipt remain
-  unconfirmed. Preserve the existing CA/NVS/settings; no insecure mode, proxy
-  change, automatic code replay, arbitrary credential deletion or bootstrap.
+- Complete Stage 9 AMS terminal acceptance using the final AMS section of
+  `docs/deployment/stage9-hardware-remediation.md`. An IPv4 SAN verification
+  mismatch was reproduced and corrected; COM16 reported the audited firmware
+  identity, enrollment HTTP 200 and subsequent verified HTTPS state HTTP 200.
+  Hub shows ACTIVE/CONSUMED and the operator's terminal displays AMS slots and
+  sensor data. Physical negative controls and broader terminal lifecycle remain
+  separate. Preserve existing
+  CA/NVS/settings; no insecure mode, proxy change, code replay, arbitrary
+  credential deletion or bootstrap.
 - Identify AMS `processingFailures` using event/printer/tenant UUID, allowlisted
   type, tenant-mapping/handler stage, exception/cause class and upstream status.
   An unmapped printer or tenant mismatch fails after envelope validation and
@@ -99,8 +102,29 @@ must never be copied into the repository or a Codex configuration file.
   runtime state: finish, cancel and progress can modify the referenced object
   before commit, so staging map updates alone does not isolate those mutations
   from rollback or concurrent readers. Preserve per-printer and tenant scope.
+- Investigate automatic tenant catalog creation for model metadata. In the
+  2026-10-27 Hub `484b442` print, DIRECT and AGENT metadata events both failed
+  with `IllegalArgumentException`; both dashboards stayed pending and final
+  allocation reported no preview. The operator reports an empty catalog. Source
+  and offline tests show that an unknown material type fails before vendor and
+  filament creation; the physical exception branch is not yet confirmed. Assess
+  tenant-scoped bootstrap of basic materials such as PLA, PETG and ABS, and
+  whether other materials should be added automatically or with user approval;
+  do not select a policy before review. Preserve existing matching semantics,
+  avoid inventing spool inventory and never share tenant catalog data.
+  Distinguish missing metadata from an unknown catalog entry and handle duplicate
+  creation safely. Existing failed events are acknowledged; do not replay or
+  alter historical jobs automatically.
 - Investigate Notify startup exit code 1 independently; do not attribute it to
   the historical Telegram startup issue without redacted runtime evidence.
+  The operator plans a later end-to-end test with a real, dedicated test
+  Telegram bot. Do not expose bot credentials or send messages without the
+  separately authorized test scope.
+- Clear stale current-print dashboard artifacts after a print finishes: the
+  model image and name, current job and completed progress can remain visible
+  while the printer is Ready. Determine the appropriate lifecycle and display
+  behavior for DIRECT and AGENT separately; preserve print history, stored
+  records and media, tenant isolation and recovery of an actually active print.
 - Separate dashboard legacy hardening: existing full-file Sonar warnings cover
   CDN integrity, accessibility and formatting in unchanged sections. Review
   those together; do not mix a dependency/style rollout into command routing.

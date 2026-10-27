@@ -1610,3 +1610,43 @@ without NVS reset, code replay, authority edits or automatic pairing. Preserve
 all databases, identity, CA, proxy and restoration artifacts. Complete larger
 model, repeat/recovery, negative TLS, command and hardware acceptance only under
 their own approved scope.
+
+## AMS terminal diagnostic flash — 2026-10-27
+
+The operator authorized flashing and testing COM16 without creating firmware
+backups. Terminal source `27790ac834635b9ef7aceb0d6059a98b0a12cab0` was clean.
+The retained terminal CA matched the existing Stage 9 public CA. The first
+local image audit detected a stale generated header; a secure `esp32dev` rebuild
+restored consistency and the header/object/ELF/BIN audit passed. BIN SHA-256:
+`95f5f097e4748aa66c0481cb2f3693736b7cfa41f78889d9ac7240321480f073`.
+
+PlatformIO upload on COM16 succeeded with verified writes and without full erase
+or a new backup. Its written ranges covered bootloader, partition table,
+boot-app data and application; NVS was outside those ranges. After one reset,
+the running image reported the expected `esp32dev` environment, normalized CA
+hash and ELF identity matching the audit. This confirms image identity, not
+enrollment or authenticated state.
+
+The observed pre-enrollment `state` requests used legacy HTTP toward the HTTPS
+port and received 400. These are not enrollment attempts and do not diagnose
+HTTPS. The existing Hub pairing outcome must be checked before using a fresh
+code; do not replay an old code or erase identity. AMS backend diagnostic
+deployment, actual enrollment and authenticated state are not established by
+this flash. Keep the existing proxy, CA, NVS and settings.
+
+Subsequently, the operator attempted HTTPS enrollment. Device diagnostics
+reported `http_result=-1`, `tls_error=-9984` and `verify_flags=0x00000004`
+(name mismatch), with a configured CA and plausible clock. The existing proxy
+certificate has the matching IPv4 SAN. The pinned Espressif mbedTLS verifier's
+IP SAN behavior was previously reproduced in the Agent vendor tests; no CA or
+server certificate was changed. A terminal IPv4 SAN callback now requires the
+exact binary leaf SAN while preserving other verification flags and native DNS
+verification. Offline exact-vendor controls passed 16 cases and host HTTP tests
+passed with and without CA. The secure build and image audit passed; the operator
+authorized reflashing COM16 without backup, and the runtime ELF identity matched
+the audit. A subsequent fresh enrollment returned HTTP 200 over verified HTTPS
+with TLS error 0 and flags 0. Subsequent HTTPS state requests also returned 200
+with verified connections and flags 0. The operator's Hub screenshot confirms
+ACTIVE/CONSUMED and last connection; the terminal displays four AMS slots and
+sensor data. These results do not establish the AMS MQTT diagnostic deployment,
+physical negative TLS controls, slot write/recovery or full hardware acceptance.
