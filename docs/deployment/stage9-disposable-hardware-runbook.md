@@ -1,6 +1,18 @@
 # Stage 9 Combined Disposable Hardware Runbook
 
-## Gate and scope
+## Current checkpoint - 2026-11-11
+
+The original October preparation notes below are historical. Use the
+[November handoff](stage9-resume-handoff-2026-11-11.md),
+[full-cycle record](stage9-full-cycle-2026-11-08.md) and
+[final AMS/NFC evidence](stage9-ams-mapping-alignment-2026-11-08.md) for current
+outcomes. The NFC functional topic is closed by the operator; do not rerun it.
+Combined Stage 9 security/lifecycle acceptance is incomplete. Notify is next.
+
+Use the main Agent and terminal repositories for new local work; preserve old
+worktrees and artifacts. Never publish the main Agent repository's old history.
+
+## Historical gate and scope
 
 **Resume after the 2026-10-23 failed preparation:** follow
 [hardware remediation and short resume procedure](stage9-hardware-remediation.md)
@@ -124,8 +136,9 @@ source build or parsed YAML does not establish runtime readiness.
 
 ## FLASH-A — Agent, then real telemetry
 
-Use the existing `.worktrees/edol-agent-stage9` worktree, never the original
-secret-bearing repository or published main. Preserve the approved ordinary
+The original October run used the Agent worktree. For current local work use
+the main Agent repository, preserving its private history and local configuration;
+do not connect/push it to the sanitized publication repository. Preserve the approved ordinary
 restoration image/settings first. Build `lolin_d32_secure_smoke` with
 `EDOL_AGENT_ROOT_CA_FILE` pointing to the run's public CA file. Scope environment
 changes to the build and restore their previous values afterwards. Record image
@@ -262,24 +275,28 @@ database/auth state and redacted evidence until cleanup is separately approved;
 this runbook does not authorize deletion. Never tear down the shared working
 broker, accepted services or their data.
 
-## Results worksheet
+## Results worksheet - reconciled 2026-11-11
 
-| Case | Required evidence | Status |
+Historical outcomes remain in their dated evidence records. This table reflects
+only what those records and the operator establish; partial rows stay partial.
+
+| Case | Current evidence | Status |
 | --- | --- | --- |
-| PREP | Isolated resources, resolved config, TLS, RLS, scopes and restoration plan | NOT RUN |
-| FLASH-A | Operator report 2026-10-23: COM9, secure_smoke `97e64b1`, firmware SHA256 `0C339ABD39073FBE6F25F893B58AE11D0868AE37601D593E64485D47770E4238`, setup boot successful | PASS (operator report) |
-| AGENT-STATE | Real printer telemetry routed to the bound tenant/printer | NOT RUN |
-| AGENT-UPLOAD | MQTT snapshot trigger, real camera and HTTPS/model upload | NOT RUN |
-| FLASH-T | Confirmed terminal port, operational secure esp32dev image/hash | NOT RUN |
-| AMS-READ | Terminal enrollment and real printer/slot state without simulator | NOT RUN |
-| AMS-NFC | Blank test tag and owned/unknown spool lookup boundaries | NOT RUN |
-| AMS-WRITE | One approved tray metadata change observed on the real printer | NOT RUN |
-| AMS-INVERSE | Full original metadata restored and independently observed | NOT RUN |
-| RECOVERY | Reconnect/restarts and both service/Agent paths recover | NOT RUN |
-| TLS | Actual negative controls and trusted recovery; Stage 8 evidence identified | NOT RUN |
-| AGENT-LIFECYCLE | Active-session revoke, denied old identity, replace recovery | NOT RUN |
-| TERMINAL-LIFECYCLE | Disposable binding revoke/re-pair and real state recovery | NOT RUN |
-| RESTORE | Both devices, original identities/settings and printer restored | NOT RUN |
+| PREP | Retained baseline restored November 8/11; recheck after downtime | Historical bounded PASS |
+| FLASH-A | Audited main Agent image and subsequent functional sessions recorded in full-cycle evidence | Operator PASS |
+| AGENT-STATE | DIRECT and AGENT telemetry and both print finishes | Functional PASS; continuous dual-MQTT servicing unproven |
+| AGENT-UPLOAD | Camera captures, HTTPS success, exact model bytes and FTP 226 | Functional PASS; transient-memory/negative-security gates open |
+| FLASH-T | Operator uploaded pinned NFC-feedback candidate without erasure/re-enrollment | Operator PASS |
+| AMS-READ | Existing ACTIVE/CONSUMED binding and real slots/sensors | Functional PASS |
+| AMS-NFC | Operator accepted exercised read/write/erase, owned lookup, feedback, repeat and different tags | Functional topic CLOSED; formal security negatives not implied |
+| AMS-WRITE | Owned spool metadata assigned to EXT and observed in EDOL/slicer | Operator functional PASS, DIRECT binding |
+| AMS-INVERSE | Operator reported previous EXT state restored | Operator restoration; independent exact-field verification absent |
+| RECOVERY | Retained service restart and existing terminal binding recovered | Partial; broader perturbations unexecuted |
+| TLS | Earlier Stage 8 SEC06 plus trusted current requests | Partial; combined physical negatives unexecuted |
+| AGENT-LIFECYCLE | Earlier re-pair evidence retained | Active-session final scope incomplete |
+| TERMINAL-LIFECYCLE | Existing binding retained through firmware updates | Full revoke/re-pair scope unexecuted |
+| RESTORE | Existing artifacts preserved; EXT restored by operator | Full formal restoration gate incomplete |
+| NOTIFY | Dedicated test bot available; exit 1 cause unclassified | Next bounded scope, real delivery NOT RUN |
 
 Record timestamp, observation window, redacted evidence and operator decision
 per case. Mark PASS only on actual observations; distinguish FAIL, BLOCKED,

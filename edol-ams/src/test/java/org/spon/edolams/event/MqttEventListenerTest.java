@@ -15,9 +15,12 @@ import org.spon.edolams.service.AmsSpoolChangerService;
 import org.spon.edolams.service.AmsTenantContext;
 import org.springframework.messaging.support.GenericMessage;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,6 +30,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.http.HttpMethod.POST;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withNoContent;
 
 @ExtendWith(OutputCaptureExtension.class)
 class MqttEventListenerTest {
@@ -81,6 +88,49 @@ class MqttEventListenerTest {
         verifyNoInteractions(changer);
         assertThatThrownBy(tenants::currentTenantId).isInstanceOf(IllegalStateException.class);
         assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(2);
+    }
+
+    @Test
+    void mappedMirrorCannotConsumeAnotherPrinterStagingAndMappingFailuresRemainRejected() {
+        UUID agentPrinter = UUID.randomUUID();
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://hub.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        AmsSpoolChangerService realChanger = new AmsSpoolChangerService(builder.build());
+        var resolver = new AmsPrinterTenantResolver(DeploymentMode.SECURE_MULTI_TENANT,
+                new AmsPrinterTenantProperties(List.of(
+                        new AmsPrinterTenantProperties.PrinterTenant(printerId, tenantId),
+                        new AmsPrinterTenantProperties.PrinterTenant(agentPrinter, tenantId))),
+                tenants);
+        ReflectionTestUtils.invokeMethod(resolver, "validateMappings");
+        var listener = new MqttEventListener(realChanger, DeploymentMode.SECURE_MULTI_TENANT, resolver);
+        AtomicInteger writes = new AtomicInteger();
+        server.expect(requestTo("https://hub.test/s/" + printerId + "/41/2"))
+                .andExpect(method(POST))
+                .andExpect(request -> {
+                    assertThat(tenants.currentTenantId()).isEqualTo(tenantId);
+                    writes.incrementAndGet();
+                })
+                .andRespond(withNoContent());
+        realChanger.setSpoolScannedState(printerId, 41L);
+
+        listener.handle(new GenericMessage<>(envelope(3, tenantId)
+                .put("printerId", agentPrinter.toString()).toString()));
+        assertThat(writes.get()).isZero();
+        assertThat(observation(listener).snapshot().processingFailures()).isZero();
+
+        listener.handle(new GenericMessage<>(envelope(3, UUID.randomUUID()).toString()));
+        listener.handle(new GenericMessage<>(envelope(3, tenantId)
+                .put("printerId", UUID.randomUUID().toString()).toString()));
+        assertThat(writes.get()).isZero();
+        assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(2);
+
+        listener.handle(new GenericMessage<>(envelope(3, tenantId).toString()));
+        assertThat(writes.get()).isEqualTo(1);
+        listener.handle(new GenericMessage<>(envelope(3, tenantId).toString()));
+        assertThat(writes.get()).isEqualTo(1);
+        assertThat(observation(listener).snapshot().processingFailures()).isEqualTo(2);
+        assertThatThrownBy(tenants::currentTenantId).isInstanceOf(IllegalStateException.class);
+        server.verify();
     }
 
     @Test

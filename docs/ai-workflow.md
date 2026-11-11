@@ -46,6 +46,58 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
+- Improve spool-status discoverability in Hub and the AMS terminal. On
+  2026-11-11 the operator created spools but saw every populated tray as `NEW`;
+  changing the matching spools from SEALED to ACTIVE made them appear. Explain
+  on spool creation/edit that AMS automatic identification requires an ACTIVE
+  spool with the matching printer profile and color in the current tenant.
+  Replace or clarify `NEW` so users can distinguish an unidentified inventory
+  spool from a physically empty tray or a newly purchased spool. Provide a
+  clear, deliberate activation action and explain its inventory consequences.
+  Preserve SEALED as a valid stock state, tenant isolation and existing matching
+  semantics; do not auto-activate stock, silently choose among duplicate matches,
+  or send printer metadata commands as part of this UX improvement.
+
+- **NFC functional topic CLOSED - 2026-11-11 operator acceptance.** The
+  uploaded terminal fixes preserve enrollment, reject ID-zero/empty/204 staging,
+  avoid HTTP 204 body waits, keep HTTP/TLS off the UI loop and show immediate
+  lookup feedback while coalescing in-flight same-tag repeats. Final verification
+  passed 50 staging scenarios plus HTTP worker/TLS fixtures and ESP32 image audit.
+  The operator confirmed read/write/erase, owned-spool EXT metadata observed in
+  EDOL and slicer with previous state restored, immediate feedback, repeated
+  presentations and a different tag working. Do not reopen or run more NFC
+  acceptance now; address a new reproducible regression if one appears.
+  Evidence: docs/deployment/stage9-ams-mapping-alignment-2026-11-08.md.
+  Formal cross-tenant/physical TLS negatives, exact-field independent restoration,
+  full lifecycle and long idle/transient heap observations are not promoted to
+  PASS by this functional closure; retain them in the final Stage 9 security gate.
+
+- The final NFC capture includes one state transport timeout (-11), followed by
+  recovery and successful finds. Cause is unclassified. Record it for recurrence;
+  do not launch another terminal investigation without a new reproducible issue.
+
+- **Next active scope: Notify.** Inspect current retained-container status and
+  redacted startup evidence before diagnosing historical exit 1. The operator
+  has a dedicated test Telegram bot and is willing to run a test print. Establish
+  the exact test chat/recipient and allowed message types/count before delivery;
+  obtain credentials locally without printing or committing them. Diagnose/start
+  only the scoped disposable Notify service after inspecting its actual image,
+  labels, mounts and network. Preserve service identities, tenant rejection,
+  subscriptions and existing infrastructure. No generic Compose up, authority
+  broadening, production recipient, credential rotation or printer command is
+  implicit. Use the 2026-11-11 handoff for the next chat.
+
+- Reconcile secure Hub metadata when it joins an already running print after
+  Core parsed the model. The 2026-11-08 recovery logs show one successful parse
+  before Hub startup and a waiting DIRECT allocation display, while a later
+  Agent parse created a preview. Secure progress handling restores jobs but
+  does not build a missing metadata preview; Home-only recovery does not cover
+  this case. Reproduce offline and design idempotent reconciliation from trusted
+  Core state for the same tenant/printer/session, preserving terminal-job and
+  rollback boundaries. Do not replay acknowledged events, force a model download,
+  alter live jobs, or deploy during the active print. See
+  `docs/deployment/stage9-baseline-recovery-2026-11-08.md` for evidence and limits.
+
 - Complete Stage 9 AMS terminal acceptance using the final AMS section of
   `docs/deployment/stage9-hardware-remediation.md`. An IPv4 SAN verification
   mismatch was reproduced and corrected; COM16 reported the audited firmware
@@ -60,7 +112,10 @@ must never be copied into the repository or a Codex configuration file.
   An unmapped printer or tenant mismatch fails after envelope validation and
   must remain rejected. Do not auto-add mappings or weaken isolation; payload,
   persistence and Hub upstream failures require actual categorized evidence.
-  This is independent of terminal HTTPS and the existing Hub processing failure.
+  The 2026-10-27 long print produced ten `unmapped_printer` failures for the
+  DIRECT logical printer; assess intended AMS ownership and duplicated events
+  before changing mappings. This does not classify earlier failures and is
+  independent of terminal HTTPS and the existing Hub processing failure.
 
 - Stage 9 Agent dynamic-TLS retest: operator evidence on 2026-10-27 confirms
   repeated HTTPS snapshot uploads and one 37,672-byte Unicode model transfer,
@@ -131,7 +186,9 @@ must never be copied into the repository or a Codex configuration file.
   The snippet analyzer's empty-path Java package warning and top-level-await
   advice for classic browser scripts are analysis artifacts, not code fixes.
 
-- Stage 9 hardware preparation failed on Hub navigation, service audiences and
+- **Historical October remediation chronology, superseded by the November
+  evidence and current checkpoint above; do not replay its deployment steps.**
+  Stage 9 hardware preparation failed on Hub navigation, service audiences and
   disabled Notify startup after the earlier source gate. Continue via
   `docs/deployment/stage9-hardware-remediation.md` and `tools/stage9/resume.py`,
   preserving the existing run and checkpoints. A future fresh-environment
@@ -173,8 +230,8 @@ must never be copied into the repository or a Codex configuration file.
   see `docs/deployment/stage9-agent-mqtt-contract.md`. Earlier MQTT-disabled
   notes below describe the HTTPS foundation. The operator-requested combined
   Agent/AMS real-printer session is prepared in
-  `docs/deployment/stage9-disposable-hardware-runbook.md`; physical observations
-  remain NOT RUN. Keep that session, working dev/prod migrations, live broker cutover and operator-led
+  `docs/deployment/stage9-disposable-hardware-runbook.md`; dated functional observations are recorded in the 2026-11-11 handoff;
+  combined security/lifecycle acceptance remains incomplete. Keep that session, working dev/prod migrations, live broker cutover and operator-led
   credential rotation separate from source/disposable acceptance. No legacy
   compatibility removal is justified by synthetic traffic.
 
@@ -224,7 +281,7 @@ must never be copied into the repository or a Codex configuration file.
   normal secure re-pair/recovery UX, live credential rotation, working broker
   cutover and dev/prod migrations remain separate gates. Keep feature flags off
   in working installations. Preserve Home/NVS and the existing open setup AP.
-  Firmware work belongs in `.worktrees/edol-agent-stage9` on
+  Historical firmware work used `.worktrees/edol-agent-stage9` on
   `stage9-agent-pairing`, not the sanitized publication checkout's `main`.
   The original EDOL-AGENT checkout retains secret-bearing ancestors and must
   never be a publication/push source. Confirm the actual Agent USB port; do not

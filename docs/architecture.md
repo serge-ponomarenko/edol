@@ -244,6 +244,21 @@ uses a build-local header to preserve PEM newlines on Windows; see the
 [Stage 8 acceptance record](deployment/stage8-terminal-acceptance-record.md).
 Home compatibility and production rollout remain separate gates.
 
+The terminal firmware HTTP service dispatches its two request slots to one
+FreeRTOS worker. DNS, clock readiness and HTTP/TLS transport run there; the
+Arduino main loop retains touch, LVGL, NFC, settings/enrollment persistence and
+application of completed responses. Atomic request states publish ownership
+and completion; an active slot cannot be cleared or reused. The worker performs
+one transport operation at a time without automatic POST retries. TLS validation
+and explicit transport selection remain unchanged. A new NFC lookup clears the
+previous local staging immediately, preventing assignment while lookup is pending.
+The main screen renders a pending lookup before a spool becomes assignable and
+readies its existing LVGL timer on staging-version changes. Repeated scans of
+the same ID during its lookup are coalesced; a different pending ID is retained
+for a subsequent lookup. This does not cache or bypass server ownership checks.
+These source responsibilities do not establish physical responsiveness or heap
+acceptance for an uploaded image.
+
 Stage 9.1 adds a secure-mode HTTP ownership interceptor for mapped
 `/api/printers/**` handlers with a `printerId` path variable. It resolves the
 persisted printer under the current tenant before runtime, camera, media, or

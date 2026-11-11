@@ -1,5 +1,25 @@
 # Stage 9 Hardware Acceptance Remediation — 2026-10-24
 
+## Current checkpoint - 2026-11-11
+
+The NFC functional topic is CLOSED at the operator's request. Terminal lookup,
+write/erase, immediate pending feedback, same-tag repeats and a different tag
+are operator-accepted; existing enrollment/NVS were preserved. See
+[final AMS/terminal evidence](stage9-ams-mapping-alignment-2026-11-08.md) and
+[the next-chat handoff](stage9-resume-handoff-2026-11-11.md). Do not repeat NFC
+tests unless a new reproducible issue appears.
+
+Agent camera/model/full-print functional results are recorded in the
+[November 8 full-cycle evidence](stage9-full-cycle-2026-11-08.md). The old terminal
+FAIL/NOT RUN and MQTT-pause checkpoints below are history, not current blockers
+or instructions. Continuous dual-MQTT/transient-memory proof, physical negative
+controls, lifecycle and final-lockdown requirements remain separate open gates.
+Next work is a bounded Notify diagnosis and dedicated test-bot print scenario.
+No production rollout, compatibility removal or new bootstrap is authorized.
+
+## Historical October checkpoints
+
+
 Latest operator checkpoint: see **Dynamic TLS buffer hardware retest —
 2026-10-27** at the end. Agent snapshots and one Unicode model transfer passed
 with a custom SDK; one camera TLS error and Hub/AMS/Notify gates remain open.
@@ -10,7 +30,7 @@ MQTT processing diagnostics** at the end. It records source diagnostics and
 offline results; physical terminal enrollment remains FAIL. It does not reopen
 bootstrap, change the proxy or close Agent's separate remaining gates.
 
-## Current state: resume, do not bootstrap
+## Historical resume state: do not replay bootstrap
 
 Latest source status: the final **Continuous MQTT, verified transfer completion
 and dashboard commands** section supersedes the historical MQTT-pause guidance.
@@ -1650,3 +1670,50 @@ with verified connections and flags 0. The operator's Hub screenshot confirms
 ACTIVE/CONSUMED and last connection; the terminal displays four AMS slots and
 sensor data. These results do not establish the AMS MQTT diagnostic deployment,
 physical negative TLS controls, slot write/recovery or full hardware acceptance.
+
+## AMS diagnostic backend deployment — 2026-10-27
+
+The operator authorized updating only AMS in the existing test environment.
+Backend checkout `72a050b366e6e5fa1c225a8b7730aa455c621302` was verified and
+only the tracked source archive was supplied to the AMS image build. The new
+`edol-stage9-ams:72a050b` image was deployed with `--no-deps`; the prior AMS
+image is retained as `edol-stage9-ams:before-72a050b` and the override is
+`remediation/compose.ams-72a050b.yaml`. Hub, Core and the existing HTTPS proxy
+retained their prior image identities. AMS startup succeeded and the terminal
+subsequently received HTTPS state HTTP 200 with TLS error 0 and flags 0.
+
+The bounded post-start log inspection did not find categorized AMS processing
+warnings. This is not a zero-failure or MQTT acceptance result: activity and
+event coverage during the observation window were not established. Capture
+safe stage/reason/exception identifiers when new real events occur; do not infer
+the cause of the historical counter or change tenant mappings automatically.
+
+## Long print with AMS diagnostics — 2026-10-27
+
+Operator-supplied Core, Hub, AMS and Agent logs cover a physical print from
+approximately 18:08:56Z to 18:49:44Z. Terminal serial logs were not saved.
+Core and Hub recorded separate DIRECT and AGENT sessions and both FINISH events.
+Hub created allocation previews for both jobs; insufficient spool allocation
+left them unresolved and finalization was skipped. During the print the same
+Hub observation counter remained at processingFailures=2 and rejectedEnvelope=0
+while validatedV2 rose from 105 to 310; those two failures predate this window.
+
+Agent logged 106 camera captures with HTTP 200 and one successful 610,729-byte
+model transfer with exact size, FTP 226 and HTTP 200. One earlier FTPS control
+connection failed with -80 (MBEDTLS_ERR_NET_CONN_RESET), followed by a successful
+model retry. The logs do not establish why the connection reset. DIRECT model
+acquisition also had an initial curl exit 35 before successful retry. Neither
+failure proves that TLS verification should be weakened. The earlier -28928
+dynamic RX error was not observed in these supplied logs; its cause remains open.
+Stage heap samples are not transient handshake minima or proof of no leak, and
+these logs do not prove uninterrupted servicing of both Agent MQTT clients.
+
+AMS diagnostics reported ten processing failures for the DIRECT logical printer,
+all `tenant_mapping` / `unmapped_printer` after envelope validation; the latest
+failure snapshot had rejectedEnvelope=0. These categorize this window, not the
+old counter-only failures. The same run logged two AMS slot changes, but the
+INFO messages do not contain printer IDs. A mapping for DIRECT must not be
+created automatically: decide whether it is an authorized AMS-managed logical
+printer and assess duplication with the separate AGENT path first. No terminal
+serial evidence, physical TLS-negative controls or full Stage 9 acceptance is
+implied by this print.
