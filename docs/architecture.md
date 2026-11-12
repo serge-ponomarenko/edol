@@ -258,7 +258,24 @@ Secure polling is EDOL-owned: it uses Telebof request/formatting objects without
 Bot requests are serialized per context because Telebof has a mutable request
 builder. Exceptions are sanitized and Telebof URL/response logging is disabled.
 Historical commands are discarded on activation/replacement; activation sends
-no startup/test message. Notification cadence/topics and Core printer command
+no startup/test message. Status notifications read the existing rendered JPEG from
+Core's `/api/printers/{id}/camera/status-image/content` endpoint using the same
+Notify service token and trusted tenant header as state reads. Core retains its
+`core.media.read` and printer ownership boundary. A dedicated client preserves
+those interceptors, disables redirects and bounds connect/read time to 3/5
+seconds. Only HTTP 200 JPEG responses with valid start/end markers up to 8 MiB
+are accepted. Empty, rejected, malformed, oversized or unavailable snapshots
+fall back to the already authorized text status, without caching another
+tenant's image or reading a Core-local filesystem path.
+Notify stages accepted bytes in an owner-only Java temporary file for Telebof's
+synchronous photo upload and removes it in `finally`; local preparation failure
+also falls back to text. Telegram transport failures remain visible rather than
+being silently retried as potentially duplicate messages. The binary endpoint
+reuses the existing status-image renderer and metadata prerequisites without
+changing the overlay. It returns 204 when no readable image is available, with
+Cache-Control: no-store. It does not substitute a raw camera snapshot. No Core
+volume, new authority or fresh printer capture command is introduced.
+Notification cadence/topics and Core printer command
 contracts are unchanged. There is no durable Telegram retry/outbox. Chat members
 can use the existing commands, so choosing a group chat grants that operational
 access. Source checks do not establish real Telegram delivery or the remaining

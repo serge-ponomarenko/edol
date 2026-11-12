@@ -14,7 +14,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -78,20 +80,42 @@ public class TelegramMessageController {
         );
         keyboard.addKeyboard(new InlineKeyboardButton("🖨 Printers", "printers"));
 
-        Path latestStatusImagePath = printerService.getLatestStatusImagePath(printerId);
+        byte[] snapshot = printerService.getStatusImage(printerId);
         String caption = formatter.buildStatusMessage(state, printer.name());
-        if (latestStatusImagePath != null) {
-            context.sendPhoto(chatId, latestStatusImagePath.toFile())
-                    .caption(caption)
-                    .parseMode(ParseMode.HTML)
-                    .replyMarkup(keyboard)
-                    .exec();
+        if (snapshot != null && sendSnapshot(context, chatId, snapshot, caption, keyboard)) {
             return;
         }
         context.sendMessage(chatId, caption)
                 .parseMode(ParseMode.HTML)
                 .replyMarkup(keyboard)
                 .exec();
+    }
+
+    private boolean sendSnapshot(BotContext context, long chatId, byte[] snapshot, String caption,
+                                 InlineKeyboardMarkup keyboard) {
+        Path temporary;
+        try {
+            temporary = Files.createTempFile("edol-notify-snapshot-", ".jpg");
+        } catch (IOException exception) {
+            return false;
+        }
+        try {
+            Files.write(temporary, snapshot);
+            context.sendPhoto(chatId, temporary.toFile())
+                    .caption(caption)
+                    .parseMode(ParseMode.HTML)
+                    .replyMarkup(keyboard)
+                    .exec();
+            return true;
+        } catch (IOException exception) {
+            return false;
+        } finally {
+            try {
+                Files.deleteIfExists(temporary);
+            } catch (IOException exception) {
+                log.warn("Unable to remove temporary Telegram snapshot");
+            }
+        }
     }
 
     public void sendStatusPrinterSelection(BotContext context, long chatId) {

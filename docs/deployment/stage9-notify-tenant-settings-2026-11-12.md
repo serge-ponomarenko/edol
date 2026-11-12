@@ -1,5 +1,15 @@
 # Stage 9 Notify tenant settings - 2026-11-12
 
+## Subsequent runtime outcome
+
+The source-only preparation below is historical. Hub V10, the retained
+encryption key and narrow Notify scope/audience were subsequently provisioned
+by the operator. Functional Notify testing was accepted on November 12,
+including Status photos with the original overlay. See the
+[current handoff](stage9-resume-handoff-2026-11-12.md) and
+[rollout evidence](stage9-hub-notify-rollout-869df1e-plan.md). Source/disposable
+checks and functional delivery do not close Stage 9 security/lifecycle gates.
+
 ## Scope and authorization
 
 The operator chose tenant-owned Telegram configuration, managed by an active

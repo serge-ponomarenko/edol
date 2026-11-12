@@ -1,6 +1,7 @@
 package org.spon.edolnotify.telegram;
 
 import io.github.natanimn.telebof.BotContext;
+import io.github.natanimn.telebof.requests.send.SendPhoto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -17,18 +18,66 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.UUID;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramMessageControllerTest {
+
+    @Test
+    void sendsTextWhenSnapshotIsUnavailable() {
+        BotContext context = mock(BotContext.class, RETURNS_DEEP_STUBS);
+        PrinterState current = state(PRINTING_PRINTER_ID, true, true);
+        when(printerService.getState(PRINTING_PRINTER_ID)).thenReturn(current);
+        when(printerService.getPrinters()).thenReturn(List.of(printer(PRINTING_PRINTER_ID, "Printer A", true)));
+        when(formatter.buildStatusMessage(current, "Printer A")).thenReturn("Printer status");
+        TelegramMessageController controller = new TelegramMessageController(
+                formatter, printerService, telegramBotService, mock(NotifyRecipientResolver.class));
+
+        controller.sendStatusMessage(context, 101L, PRINTING_PRINTER_ID);
+
+        verify(context).sendMessage(101L, "Printer status");
+        verify(context, never()).sendPhoto(eq(101L), any(File.class));
+    }
+
+    @Test
+    void sendsDownloadedSnapshotAndRemovesTemporaryFile() {
+        BotContext context = mock(BotContext.class, RETURNS_DEEP_STUBS);
+        PrinterState current = state(PRINTING_PRINTER_ID, true, true);
+        byte[] image = {(byte) 0xff, (byte) 0xd8, 1, 2, (byte) 0xff, (byte) 0xd9};
+        AtomicReference<File> temporary = new AtomicReference<>();
+        SendPhoto photoRequest = mock(SendPhoto.class, RETURNS_DEEP_STUBS);
+        doAnswer(invocation -> {
+            File file = invocation.getArgument(1);
+            temporary.set(file);
+            assertThat(Files.readAllBytes(file.toPath())).containsExactly(image);
+            return photoRequest;
+        }).when(context).sendPhoto(eq(101L), any(File.class));
+        when(printerService.getState(PRINTING_PRINTER_ID)).thenReturn(current);
+        when(printerService.getPrinters()).thenReturn(List.of(printer(PRINTING_PRINTER_ID, "Printer A", true)));
+        when(printerService.getStatusImage(PRINTING_PRINTER_ID)).thenReturn(image);
+        when(formatter.buildStatusMessage(current, "Printer A")).thenReturn("Printer status");
+        TelegramMessageController controller = new TelegramMessageController(
+                formatter, printerService, telegramBotService, mock(NotifyRecipientResolver.class));
+
+        controller.sendStatusMessage(context, 101L, PRINTING_PRINTER_ID);
+
+        verify(context).sendPhoto(101L, temporary.get());
+        assertThat(temporary.get()).doesNotExist();
+        verify(context, never()).sendMessage(eq(101L), anyString());
+    }
 
     private static final UUID PRINTING_PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101");
     private static final UUID READY_PRINTER_ID = UUID.fromString("00000000-0000-0000-0000-000000000102");

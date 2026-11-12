@@ -46,6 +46,59 @@ must never be copied into the repository or a Codex configuration file.
 
 ## Project TODO
 
+- **Notify functional topic CLOSED - 2026-11-12 operator acceptance.** Tenant
+  OWNER settings, polling, event delivery, Status photos and the previous overlay
+  were exercised with the dedicated test bot. The operator accepted the test
+  after STATUS_OVERLAY_HTTP_UPDATED and confirmed overlay photos during a print
+  for both logical printers. The fresh Notify window has no WARN/ERROR or
+  exceptions and processingFailures=0. Preserve tenant ownership, core.media.read,
+  bounded HTTP media, temporary-file cleanup, text fallback and the existing
+  visual appearance. This does not establish every notification type, future
+  print completion, security/lifecycle acceptance or durable retry guarantees.
+  See deployment/stage9-resume-handoff-2026-11-12.md. Do not reopen broad functional
+  testing without a concrete remaining audit gate or new reproducible defect.
+
+- Investigate Core transport failures observed after the overlay rollout on
+  2026-11-12: two camera SSLHandshakeException errors at 12:44:44/12:45:29 UTC,
+  one FTPS_CONNECT_FAILED model-transfer error at 12:44:56 and metadata retry
+  warnings. Later metadata success markers appeared at 12:45:38/12:46:02 and a
+  transfer success marker at 12:46:02. The cause remains unclassified; these
+  are separate from clean Notify processing and the earlier powered-off-printer
+  log-noise report. Correlate recurrence and transport state before changing
+  retries, logging or TLS. Preserve certificate validation, identities and CA;
+  do not weaken TLS or restart/command the printer merely to reproduce them.
+
+- Investigate duplicate-looking Notify status messages from the 2026-11-12
+  operator-started cube print. The screenshots show Preparing/Printing updates
+  for both DIRECT and AGENT plus additional per-printer updates after filament
+  metadata arrives. Trace event types and per-printer/session cadence before
+  deciding which updates to coalesce. Preserve independent DIRECT/AGENT IDs,
+  tenant routing, useful metadata/availability changes and failure visibility;
+  do not globally suppress messages or infer MQTT duplicates from screenshots
+  alone. The operator explicitly deferred this UX/cadence work.
+
+- Reduce expected connection-error log noise when a DIRECT printer is powered
+  off. During the operator's 2026-11-12 power-cycle observation, Core logged
+  repeated `NoRouteToHostException` (13 occurrences in the inspected bounded
+  tail) and `ConnectException` through `CameraBackgroundService` and
+  `BambuMqttConnection`. Reproduce later and distinguish expected unavailable
+  transport retries from unexpected failures; retain useful transition/retry
+  summaries and actionable recovery diagnostics instead of repeated full stack
+  traces. Preserve reconnect behavior, MQTT service, TLS validation and actual
+  fault visibility. This is separate from the Agent OFFLINE observation and
+  current Notify delivery diagnosis; no retry/lifecycle change was made now.
+
+- Reproduce and investigate the operator's 2026-11-12 observation that an
+  Agent-associated printer does not transition to OFFLINE after the physical
+  printer is powered off. Clarify whether the stale indicator is the Agent's
+  own connectivity or its printer's availability: an Agent can remain connected
+  to EDOL while its printer is unavailable. Correlate Bambu MQTT disconnect/stale
+  telemetry, Agent report/event publication, Core availability and Hub display
+  for the same logical printer. This is an operator report, not a confirmed
+  root cause. Preserve DIRECT/AGENT identities, continuous EDOL MQTT, CA/NVS
+  and current configuration; do not power-cycle, flash or change lifecycle
+  semantics as part of the current Notify diagnosis.
+
 - Improve spool-status discoverability in Hub and the AMS terminal. On
   2026-11-11 the operator created spools but saw every populated tray as `NEW`;
   changing the matching spools from SEALED to ACTIVE made them appear. Explain
@@ -76,7 +129,16 @@ must never be copied into the repository or a Codex configuration file.
   recovery and successful finds. Cause is unclassified. Record it for recurrence;
   do not launch another terminal investigation without a new reproducible issue.
 
-- **Next active scope: Notify.** Inspect current retained-container status and
+- **Next active scope: Stage 9 readiness audit.** Use the
+  [November 12 handoff](deployment/stage9-resume-handoff-2026-11-12.md) and compare
+  source/disposable evidence, retained runtime and physical observations against
+  the combined security/lifecycle gates. Produce a readiness matrix with evidence,
+  gaps, risk and the smallest next action. Audit read-only first; do not rerun
+  accepted NFC/Notify scenarios, bootstrap, deploy, flash, rotate credentials or
+  run printer-control tests implicitly. Keep UX backlog separate from required
+  security/lifecycle blockers.
+
+- **Historical Notify preparation, superseded by the accepted test above.** Inspect current retained-container status and
   redacted startup evidence before diagnosing historical exit 1. The operator
   has a dedicated test Telegram bot and is willing to run a test print. Establish
   the exact test chat/recipient and allowed message types/count before delivery;

@@ -1,5 +1,9 @@
 # Stage 9 handoff - 2026-11-11: NFC closed, Notify next
 
+This handoff is historical. Continue from the
+[November 12 Notify closure and readiness-audit handoff](stage9-resume-handoff-2026-11-12.md).
+NFC remains closed; Notify functional testing has since been accepted.
+
 ## Current outcome
 
 The operator accepted the exercised NFC functional scenarios and explicitly

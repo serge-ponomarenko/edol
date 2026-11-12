@@ -76,7 +76,7 @@ class CorePrinterHttpAuthorizationTest {
         PrinterManagementService management = context.getBean(PrinterManagementService.class);
         when(management.getPrinter(PRINTER_B)).thenReturn(printer(PRINTER_B, TENANT_B));
         String prefix = "/api/printers/" + PRINTER_B;
-        for (String route : List.of("/state", "/camera/snapshot", "/camera/status-image",
+        for (String route : List.of("/state", "/camera/snapshot", "/camera/status-image", "/camera/status-image/content",
                 "/media/model/plate", "/media/model/top", "/connection")) {
             mvc.perform(authenticated(get(prefix + route))).andExpect(status().isNotFound());
         }

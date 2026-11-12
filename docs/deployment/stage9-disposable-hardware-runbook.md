@@ -1,13 +1,15 @@
 # Stage 9 Combined Disposable Hardware Runbook
 
-## Current checkpoint - 2026-11-11
+## Current checkpoint - 2026-11-12
 
 The original October preparation notes below are historical. Use the
-[November handoff](stage9-resume-handoff-2026-11-11.md),
+[November 12 handoff](stage9-resume-handoff-2026-11-12.md),
 [full-cycle record](stage9-full-cycle-2026-11-08.md) and
 [final AMS/NFC evidence](stage9-ams-mapping-alignment-2026-11-08.md) for current
 outcomes. The NFC functional topic is closed by the operator; do not rerun it.
-Combined Stage 9 security/lifecycle acceptance is incomplete. Notify is next.
+Notify functional testing is also accepted by the operator, including the
+restored Status overlay. Combined Stage 9 security/lifecycle acceptance remains
+incomplete; the next task is a read-only readiness audit.
 
 Use the main Agent and terminal repositories for new local work; preserve old
 worktrees and artifacts. Never publish the main Agent repository's old history.
@@ -296,7 +298,7 @@ only what those records and the operator establish; partial rows stay partial.
 | AGENT-LIFECYCLE | Earlier re-pair evidence retained | Active-session final scope incomplete |
 | TERMINAL-LIFECYCLE | Existing binding retained through firmware updates | Full revoke/re-pair scope unexecuted |
 | RESTORE | Existing artifacts preserved; EXT restored by operator | Full formal restoration gate incomplete |
-| NOTIFY | Dedicated test bot available; exit 1 cause unclassified | Next bounded scope, real delivery NOT RUN |
+| NOTIFY | Tenant OWNER settings, polling, real delivery, Status photos and original overlay; November 12 operator acceptance | Functional topic CLOSED; security/lifecycle gates separate |
 
 Record timestamp, observation window, redacted evidence and operator decision
 per case. Mark PASS only on actual observations; distinguish FAIL, BLOCKED,

@@ -1,21 +1,30 @@
 package org.spon.edolnotify.service;
 
-import lombok.RequiredArgsConstructor;
 import org.spon.edol.model.PrinterState;
 import org.spon.edolnotify.model.PrinterSummary;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.MediaType;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class PrinterService {
 
+    static final int MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024;
     private final RestClient edolCoreClient;
+    private final RestClient snapshotClient;
+
+    public PrinterService(@Qualifier("edolCoreClient") RestClient edolCoreClient,
+                          @Qualifier("edolCoreSnapshotClient") RestClient snapshotClient) {
+        this.edolCoreClient = edolCoreClient;
+        this.snapshotClient = snapshotClient;
+    }
 
     public List<PrinterSummary> getPrinters() {
         PrinterSummary[] printers = edolCoreClient.get()
@@ -40,11 +49,32 @@ public class PrinterService {
         return states == null ? List.of() : Arrays.asList(states);
     }
 
-    public Path getLatestStatusImagePath(UUID printerId) {
-        return edolCoreClient.get()
-                .uri("/api/printers/{printerId}/camera/status-image", printerId)
-                .retrieve()
-                .body(Path.class);
+    public byte[] getStatusImage(UUID printerId) {
+        try {
+            return snapshotClient.get()
+                    .uri("/api/printers/{printerId}/camera/status-image/content", printerId)
+                    .accept(MediaType.IMAGE_JPEG)
+                    .exchange((request, response) -> {
+                        MediaType type = response.getHeaders().getContentType();
+                        if (response.getStatusCode().value() != 200 || type == null
+                                || !MediaType.IMAGE_JPEG.isCompatibleWith(type)
+                                || response.getHeaders().getContentLength() > MAX_SNAPSHOT_BYTES) {
+                            return null;
+                        }
+                        byte[] bytes = response.getBody().readNBytes(MAX_SNAPSHOT_BYTES + 1);
+                        return isBoundedJpeg(bytes) ? bytes : null;
+                    });
+        } catch (RestClientException | InvalidMediaTypeException exception) {
+            // Snapshot failure must not hide an already authorized printer's text status.
+            // Never log response bodies or authentication/transport exception messages.
+            return null;
+        }
+    }
+
+    private boolean isBoundedJpeg(byte[] bytes) {
+        return bytes.length >= 4 && bytes.length <= MAX_SNAPSHOT_BYTES
+                && bytes[0] == (byte) 0xff && bytes[1] == (byte) 0xd8
+                && bytes[bytes.length - 2] == (byte) 0xff && bytes[bytes.length - 1] == (byte) 0xd9;
     }
 
     public void sendStopCommand(UUID printerId) {
