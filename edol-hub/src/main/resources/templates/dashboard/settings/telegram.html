@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Telegram Settings • Edol Hub</title>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.7.0/dist/css/tabler.min.css" rel="stylesheet"
+          integrity="sha384-/ZecLhD4wkLsbjdJWUEWeSZJJSEQ3XCPdtLmmm6SW128l+eSNplV12po3tSK7pdy" crossorigin="anonymous">
+    <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+</head>
+<body class="layout-fluid">
+<div class="page">
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark">
+        <div th:replace="~{dashboard/sidebar :: sidebar}"></div>
+    </aside>
+    <main class="page-wrapper">
+        <div class="page-body"><div class="container-xl mt-4">
+            <div class="card">
+                <div class="card-header"><h1 class="card-title">Tenant Telegram Settings</h1></div>
+                <div class="card-body">
+                    <p>Use a dedicated bot for this tenant. All its printer notifications go to the configured chat.
+                        Members of that chat can use printer commands. Only the tenant owner can change these settings.</p>
+                    <p class="alert alert-success" th:if="${param.saved}">Settings saved. Notify applies changes automatically.
+                        No test message has been sent.</p>
+                    <p class="alert alert-danger" th:if="${param.invalid}">Settings were not saved. Check the chat ID,
+                        token format and secret storage availability. A bot cannot be shared by multiple tenants.</p>
+                    <p class="alert alert-warning" th:unless="${telegram.storageAvailable}">Secret storage is unavailable.
+                        Contact the administrator before configuring or enabling a bot.</p>
+                    <form method="post" th:action="@{/settings/telegram}" autocomplete="off">
+                        <div class="mb-3">
+                            <label class="form-check">
+                                <input name="enabled" type="checkbox" value="true" class="form-check-input" th:checked="${telegram.enabled}">
+                                <span class="form-check-label">Enable Telegram notifications and commands</span>
+                            </label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="chatId" class="form-label">Chat ID</label>
+                            <input id="chatId" name="chatId" class="form-control" type="text" maxlength="20"
+                                   pattern="-?[0-9]+" th:value="${telegram.chatId}" aria-describedby="chatHelp">
+                            <div id="chatHelp" class="form-hint">The exact private or group chat for this tenant. Start the bot in that chat first.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="botToken" class="form-label">Bot Token</label>
+                            <input id="botToken" name="botToken" class="form-control" type="password" maxlength="256"
+                                   autocomplete="new-password" aria-describedby="tokenHelp">
+                            <div id="tokenHelp" class="form-hint">Leave blank to keep the saved token. Saved tokens are never displayed.</div>
+                            <div class="form-hint" th:text="${telegram.tokenConfigured ? 'A token is saved.' : 'No token is saved.'}"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-check">
+                                <input name="clearToken" type="checkbox" value="true" class="form-check-input">
+                                <span class="form-check-label">Remove the saved token (disable Telegram first)</span>
+                            </label>
+                        </div>
+                        <p class="text-muted">Enabling starts receiving bot commands and delivering printer events.
+                            Saving does not send a startup or test message. Disabling stops delivery and commands after Notify refreshes the settings.</p>
+                        <button class="btn btn-primary" type="submit">Save Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div></div>
+    </main>
+</div>
+</body>
+</html>

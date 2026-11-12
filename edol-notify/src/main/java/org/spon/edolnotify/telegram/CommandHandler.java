@@ -22,11 +22,18 @@ public class CommandHandler implements MessageHandler {
 
     @Override
     public void handleMessage(BotContext ctx, Message message) {
-        String commandText = message.getText().split(" ")[0].substring(1);
+        String text = message.getText();
+        if (text == null || !text.startsWith("/")) {
+            return;
+        }
+        String commandText = text.split("\\s+")[0].substring(1).split("@", 2)[0];
         Command command = commandMap.get(commandText);
+        if (command == null) {
+            return;
+        }
         log.info("{} command was received from user_id {}. Mapped Command: {}",
                 commandText, message.getChat().getId(), command);
-        try (NotifyTenantContext.Scope ignored = recipientResolver.openForChat(message.getChat().getId())) {
+        try (NotifyTenantContext.Scope ignored = recipientResolver.openForChat(ctx, message.getChat().getId())) {
             command.runCommand(ctx, message);
         }
     }

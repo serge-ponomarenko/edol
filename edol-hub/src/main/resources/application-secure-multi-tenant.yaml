@@ -26,6 +26,9 @@ edol-hub:
   security:
     required-audience: ${EDOL_HUB_REQUIRED_AUDIENCE:edol-hub-api}
     trusted-ams-client-id: ${EDOL_AMS_SERVICE_CLIENT_ID:edol-ams-service}
+    trusted-notify-client-id: ${EDOL_NOTIFY_SERVICE_CLIENT_ID:edol-notify-service}
+  telegram:
+    encryption-key: ${EDOL_HUB_TELEGRAM_ENCRYPTION_KEY:}
   runtime:
     mqtt-enabled: ${EDOL_HUB_MQTT_ENABLED:false}
   mqtt:

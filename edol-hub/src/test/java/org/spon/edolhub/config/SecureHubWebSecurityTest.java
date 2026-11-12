@@ -3,6 +3,7 @@ package org.spon.edolhub.config;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.spon.edolhub.controller.TenantSelectionController;
 import org.spon.edolhub.model.entity.Tenant;
 import org.spon.edolhub.model.entity.TenantMembership;
@@ -59,7 +60,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @WebMvcTest(
-        controllers = {TenantSelectionController.class, org.spon.edolhub.controller.CorePrinterProxyController.class},
+        controllers = {TenantSelectionController.class, org.spon.edolhub.controller.CorePrinterProxyController.class,
+                org.spon.edolhub.controller.TelegramSettingsController.class,
+                org.spon.edolhub.controller.NotifyTelegramConfigurationController.class},
         properties = {"edol.deployment.mode=secure-multi-tenant", "edol-core.url=http://synthetic.invalid"},
         excludeAutoConfiguration = OAuth2ClientAutoConfiguration.class
 )
@@ -71,6 +74,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         AmsCompatibilityIngressFilter.class,
         IdentityContext.class,
         TenantContext.class,
+        org.spon.edolhub.service.TenantOwnerAuthorizationService.class,
         SecureHubWebSecurityTest.OAuthClientTestConfiguration.class
 })
 class SecureHubWebSecurityTest {
@@ -84,6 +88,19 @@ class SecureHubWebSecurityTest {
     @Autowired
     private SecurityFilterChain secureSecurityFilterChain;
 
+    @Autowired
+    private TenantContext tenantContext;
+
+    @Autowired
+    private org.springframework.web.context.WebApplicationContext webContext;
+
+    @BeforeEach
+    void installSecurityChainWithoutDuplicateServletFilterRegistration() {
+        mockMvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(webContext)
+                .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity())
+                .build();
+    }
+
     @MockitoBean
     private org.springframework.web.client.RestTemplate restTemplate;
 
@@ -95,6 +112,69 @@ class SecureHubWebSecurityTest {
 
     @MockitoBean
     private PrinterAccessService printerAccessService;
+
+    @MockitoBean
+    private org.spon.edolhub.service.TenantTelegramSettingsService telegramSettings;
+
+    @Test
+    void telegramSettingsRequireOwnerAndCsrfAndNeverReturnTheStoredToken() throws Exception {
+        UUID tenant = UUID.randomUUID();
+        MockHttpSession session = authenticatedSession();
+        session.setAttribute(HubSessionAttributes.ACTIVE_TENANT_ID, tenant);
+        when(membershipService.hasActiveMembership(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(tenant)))
+                .thenReturn(true);
+        mockMvc.perform(get("/settings/telegram").session(session)).andExpect(status().isForbidden());
+        when(membershipService.hasActiveOwnerMembership(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(tenant)))
+                .thenReturn(true);
+        when(telegramSettings.status()).thenReturn(new org.spon.edolhub.service.TenantTelegramSettingsService.Status(true, -100L, true, true));
+        mockMvc.perform(get("/settings/telegram").session(session))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().string(containsString("A token is saved.")));
+        mockMvc.perform(post("/settings/telegram").session(session).param("botToken", "fake-test-token"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/settings/telegram").session(session).with(csrf())
+                        .param("enabled", "true").param("chatId", "-100").param("botToken", "fake-test-token"))
+                .andExpect(redirectedUrl("/settings/telegram?saved"));
+        verify(telegramSettings).save(true, -100L, "fake-test-token", false);
+        verify(telegramSettings, never()).runtimeSettings();
+    }
+
+    @Test
+    void telegramInternalSettingsRequireExactNotifyClientScopesAndTenantHeader() throws Exception {
+        UUID tenant = UUID.randomUUID();
+        var trusted = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(jwt -> jwt.claim("azp", "edol-notify-service"))
+                .authorities(AuthorityUtils.createAuthorityList("SCOPE_tenant.context", "SCOPE_hub.notify.read"));
+        when(telegramSettings.runtimeSettings()).thenAnswer(invocation -> {
+            org.assertj.core.api.Assertions.assertThat(tenantContext.getCurrentTenantId()).isEqualTo(tenant);
+            return new org.spon.edolhub.service.TenantTelegramSettingsService.RuntimeSettings(true, -100L, "fake-test-token");
+        });
+        mockMvc.perform(get("/internal/notify/telegram/settings").with(trusted)
+                        .header("X-EDOL-Tenant-Id", tenant.toString()))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"));
+        mockMvc.perform(get("/internal/notify/telegram/settings").with(trusted))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/internal/notify/telegram/settings").with(trusted)
+                        .header("X-EDOL-Tenant-Id", tenant.toString(), UUID.randomUUID().toString()))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/internal/notify/telegram/tenants")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.claim("azp", "edol-ams-service"))
+                                .authorities(AuthorityUtils.createAuthorityList("SCOPE_tenant.context", "SCOPE_hub.notify.read"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/internal/notify/telegram/tenants")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.claim("azp", "edol-notify-service"))
+                                .authorities(AuthorityUtils.createAuthorityList("SCOPE_hub.notify.read"))))
+                .andExpect(status().isForbidden());
+        MockHttpSession browser = authenticatedSession();
+        browser.setAttribute(HubSessionAttributes.ACTIVE_TENANT_ID, tenant);
+        when(membershipService.hasActiveMembership(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(tenant)))
+                .thenReturn(true);
+        mockMvc.perform(get("/internal/notify/telegram/tenants").session(browser))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void startsAuthorizationCodeLoginWithStateAndPkce() throws Exception {

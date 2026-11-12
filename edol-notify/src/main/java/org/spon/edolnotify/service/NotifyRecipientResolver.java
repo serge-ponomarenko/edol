@@ -4,6 +4,10 @@ import jakarta.annotation.PostConstruct;
 import org.spon.edol.deployment.DeploymentMode;
 import org.spon.edolnotify.config.NotifyRecipientProperties;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
+import org.spon.edolnotify.telegram.TenantTelegramBotRegistry;
+import io.github.natanimn.telebof.BotContext;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -22,6 +26,12 @@ public class NotifyRecipientResolver {
     private boolean telegramEnabled = true;
     private Map<UUID, List<Long>> recipientsByTenant = Map.of();
     private Map<Long, UUID> tenantsByRecipient = Map.of();
+    private TenantTelegramBotRegistry hubBots;
+
+    @Autowired
+    void configureHubBots(ObjectProvider<TenantTelegramBotRegistry> registry) {
+        hubBots = registry.getIfAvailable();
+    }
 
     public NotifyRecipientResolver(
             DeploymentMode deploymentMode,
@@ -37,10 +47,20 @@ public class NotifyRecipientResolver {
 
     @PostConstruct
     void validateMappings() {
+        if (hubBots != null) {
+            if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
+                throw new IllegalStateException("Hub Telegram settings require secure multi-tenant mode");
+            }
+            return;
+        }
         if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
             validateHomeAdmin();
             return;
         }
+        validateSecureMappings();
+    }
+
+    private void validateSecureMappings() {
         Map<UUID, List<Long>> byTenant = new HashMap<>();
         Map<Long, UUID> byRecipient = new HashMap<>();
         for (NotifyRecipientProperties.TenantRecipient mapping : properties.mappings()) {
@@ -73,13 +93,16 @@ public class NotifyRecipientResolver {
         if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
             return null;
         }
-        if (!recipientsByTenant.containsKey(tenantId)) {
+        if (!configured(tenantId)) {
             throw new IllegalArgumentException("No Notify recipients are configured for tenant " + tenantId);
         }
         return tenantContext.open(tenantId);
     }
 
     public NotifyTenantContext.Scope openForChat(long chatId) {
+        if (hubBots != null) {
+            throw new IllegalStateException("Hub Telegram commands require a bound bot context");
+        }
         if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
             if (chatId != homeAdminChatId) {
                 throw new IllegalArgumentException("Telegram chat is not authorized");
@@ -94,9 +117,28 @@ public class NotifyRecipientResolver {
     }
 
     public List<Long> currentRecipients() {
+        if (hubBots != null) {
+            return hubBots.recipients();
+        }
         if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
             return List.of(homeAdminChatId);
         }
         return recipientsByTenant.get(tenantContext.currentTenantId());
+    }
+
+    public boolean configured(UUID tenantId) {
+        return hubBots == null ? recipientsByTenant.containsKey(tenantId) : hubBots.configured(tenantId);
+    }
+
+    public boolean hubManaged() {
+        return hubBots != null;
+    }
+
+    public NotifyTenantContext.Scope openForChat(BotContext context, long chatId) {
+        if (hubBots == null) {
+            return openForChat(chatId);
+        }
+        hubBots.requireChat(context, chatId);
+        return null; // The owned polling task already established the bot's trusted tenant scope.
     }
 }

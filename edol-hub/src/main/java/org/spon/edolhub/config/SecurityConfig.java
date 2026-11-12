@@ -58,6 +58,8 @@ public class SecurityConfig {
                         .requestMatchers("/", "/favicon.svg", "/favicon_*.svg", "/img/**", "/css/**", "/js/**", "/error").permitAll()
                         .requestMatchers("/oauth2/**", "/login/**").permitAll()
                         .requestMatchers("/tenants/select").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/internal/notify/telegram/tenants", "/internal/notify/telegram/settings")
+                        .hasAuthority("SCOPE_hub.notify.read")
                         .requestMatchers(HttpMethod.GET, "/api/spools/find", "/api/spools/find-by-id")
                         .hasAnyAuthority("SCOPE_hub.spool.read", "ROLE_AMS_COMPATIBILITY")
                         .requestMatchers(HttpMethod.POST, "/s/*/*/*")

@@ -9,6 +9,7 @@ import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.env.MockPropertySource;
+import org.spon.edolnotify.service.HubTelegramSettingsClient;
 
 import java.io.IOException;
 import java.util.List;
@@ -16,8 +17,29 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class TelegramDisabledStartupTest {
+    @Test
+    void hubManagedTelegramStartsWithoutGlobalTokenOrMappingsAndAnEmptyDirectorySendsNothing() throws IOException {
+        try (var context = context(true)) {
+            new YamlPropertySourceLoader().load("secure-production", new ClassPathResource("application-secure-multi-tenant.yaml"))
+                    .forEach(source -> context.getEnvironment().getPropertySources().addFirst(source));
+            HubTelegramSettingsClient hub = mock(HubTelegramSettingsClient.class);
+            when(hub.tenants()).thenReturn(List.of());
+            context.registerBean(HubTelegramSettingsClient.class, () -> hub);
+            context.registerBean(NotifyRecipientResolver.class);
+            context.registerBean(TenantTelegramBotRegistry.class);
+            context.refresh();
+            TelegramBotService bot = context.getBean(TelegramBotService.class);
+            bot.onAppReady();
+            bot.ensureBotRunning();
+            context.getBean(TenantTelegramBotRegistry.class).refresh();
+            assertThat(bot.getBot()).isNull();
+            assertThat(context.getBean(NotifyRecipientResolver.class).hubManaged()).isTrue();
+        }
+    }
+
     @Test
     void disabledTelegramStartsWithProductionYamlAndNoOperationalTelegramConfiguration() throws IOException {
         try (var context = context(false)) {

@@ -71,6 +71,11 @@ a concrete reviewed scope. Device HTTPS uses port 18443, Hub 18082, Core 18081.
 
 ## Next scope: Notify and a dedicated test Telegram bot
 
+Follow-up: [2026-11-12 tenant Telegram settings and pending rollout](stage9-notify-tenant-settings-2026-11-12.md)
+records the fresh retained startup diagnosis and the operator's decision to
+configure a bot/chat per tenant through Hub OWNER settings before the print test.
+The original sending/deployment boundaries below still apply.
+
 The operator has a dedicated test bot and is willing to perform a test print.
 Start with read-only source/configuration and current retained-container evidence.
 Classify current startup/exit 1 independently; historical Telegram failures are

@@ -9,7 +9,7 @@ EDOL is a Java 21, Spring Boot 4 Maven reactor with four services, PostgreSQL an
 | `edol-core-api` | Shared printer-state and AMS DTOs. | Consumed by all services; changes are cross-service API changes. |
 | `edol-core` | Printer provisioning, direct/agent telemetry, commands, model metadata, camera, runtime and recovery state. | Bambu printer protocols, agents, MQTT, `core` PostgreSQL schema, HTTP state API. |
 | `edol-hub` | Persistent operational domain and dashboard: inventory, spools, print jobs, allocation, maintenance, labels. | `hub` PostgreSQL schema, Core HTTP API, Core MQTT events, browser clients. |
-| `edol-notify` | Printer-scoped Telegram commands and printer/print notifications. | Core HTTP API, Core MQTT events, Telegram. |
+| `edol-notify` | Printer-scoped Telegram commands and printer/print notifications. | Core HTTP API, Core MQTT events, Hub tenant Telegram configuration, Telegram. |
 | `edol-ams` | Printer-scoped AMS workflow and secure terminal enrollment. | Core and Hub HTTP APIs, Core MQTT events, `ams` PostgreSQL schema. |
 
 ## Runtime and Data Flows
@@ -183,14 +183,15 @@ was reverted during cleanup. This is not deployment configuration, TLS,
 production broker-identity, retention-operation, live-device, development
 database, or production evidence. Stage 7 source now gives Notify and AMS
 independent client-credentials contracts and restricts their secure MQTT topic
-sets. Notify establishes its tenant from a deployment-managed tenant-to-chat
-mapping; AMS establishes it from a deployment-managed printer-to-tenant mapping
+sets. The Stage 7 acceptance used deployment-managed Notify tenant-to-chat
+mappings; AMS establishes its tenant from a deployment-managed printer-to-tenant mapping
 or the validated v2 envelope, never from an untrusted terminal parameter.
 AMS can start with an empty printer mapping; unknown printers/envelopes are
-still rejected before downstream work. Notify can start with Telegram disabled
-and no recipients; an empty mapping authorizes no tenant or chat. Enabling
-Telegram requires a bot token and, in secure mode, nonempty validated recipient
-mappings. Disabling Telegram never starts polling.
+still rejected before downstream work. The current secure Notify profile reads
+tenant Telegram settings from Hub instead of global token/chat environment
+variables. Empty settings authorize no bot, tenant or chat and do not prevent
+startup. Home retains its environment-managed single bot/admin chat; disabling
+Telegram never starts polling.
 Core accepts the tenant header only from allowlisted service clients, and Hub
 accepts AMS service JWT ingress only on the exact spool routes. Keycloak
 clients, broker identities/ACLs, and mappings were provisioned only in an
@@ -209,6 +210,59 @@ deployment, TLS, development-database, live-device, home-mode, terminal
 identity, or production behavior. Compatibility source paths remain subject to
 the Stage 9 removal gate. Stage 8 owns terminal enrollment and per-device
 credentials.
+
+### Tenant Telegram configuration
+
+Hub owns one Telegram bot/chat configuration per tenant. Only an authenticated
+active OWNER can read its settings page or save changes; browser writes require
+CSRF. Hub V10 adds forced-RLS `hub.telegram_settings`. Tokens use AES-256-GCM
+with a fresh nonce and tenant UUID as authenticated data. The independent
+`EDOL_HUB_TELEGRAM_ENCRYPTION_KEY` is a base64-encoded 32-byte installation key,
+never a database value or browser field. A missing key permits startup and
+disabling settings but prevents storing/enabling a bot. Losing/changing it
+without a deliberate migration makes existing tokens unreadable. Token status,
+chat ID and enabled state are the only browser read fields; blank token input
+keeps the saved value. Token removal is explicit and requires disabling the bot.
+A unique token fingerprint prevents two tenants from polling the same bot.
+
+`hub.telegram_tenant_directory` is an intentional non-secret catalog of enabled
+tenant UUIDs only. Its SELECT RLS policy permits discovery without a tenant;
+INSERT/DELETE remain tenant-scoped. It contains no token, fingerprint or chat.
+Settings and directory writes share a transaction; settings updates lock the
+existing row before retaining/replacing a token. No service obtains an RLS
+bypass or database-owner credentials for this flow.
+
+Notify's exact GET routes `/internal/notify/telegram/tenants` and
+`/internal/notify/telegram/settings` require the configured Notify `azp`,
+`hub.notify.read`, `tenant.context`, and the normal Hub JWT issuer/audience
+validation. The settings route additionally requires exactly one tenant UUID
+header and opens that RLS scope before reading/decrypting. Responses are
+`no-store`. The secret-bearing service response must use the approved private
+transport; this source change does not establish deployment TLS acceptance.
+
+With `edol-notify.telegram.settings-source=hub` (the secure profile), Notify
+refreshes the directory and each tenant's settings every 15 seconds by default.
+Each enabled tenant has its own bot context, chat authorization and polling
+offset. Incoming commands must match both that context and its chat; a shared
+chat ID on distinct bots does not infer a tenant. Validated MQTT events select
+the bot using their trusted tenant, while Core's printer checks remain in force.
+An unconfigured tenant is skipped before downstream reads or messages. Bot
+replacement/disable invalidates the old context and cancels its polling task.
+Hub directory failure suspends all tenant bots; a settings failure suspends only
+that tenant, with no environment fallback. Refresh latency and already in-flight
+requests remain bounded operational considerations, not immediate revocation
+or guaranteed-delivery acceptance.
+
+Secure polling is EDOL-owned: it uses Telebof request/formatting objects without
+`BotClient.startPolling/stop`, whose 1.4.0 lifecycle calls `System.exit(1)`.
+Bot requests are serialized per context because Telebof has a mutable request
+builder. Exceptions are sanitized and Telebof URL/response logging is disabled.
+Historical commands are discarded on activation/replacement; activation sends
+no startup/test message. Notification cadence/topics and Core printer command
+contracts are unchanged. There is no durable Telegram retry/outbox. Chat members
+can use the existing commands, so choosing a group chat grants that operational
+access. Source checks do not establish real Telegram delivery or the remaining
+Stage 9 secret rotation, identity lifecycle, TLS and lockdown gates.
 
 Stage 8 uses an AMS-owned `ams` schema with tenant-scoped terminal and pairing
 records, forced RLS, and narrow security-definer functions for pre-tenant

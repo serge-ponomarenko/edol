@@ -86,6 +86,17 @@ must never be copied into the repository or a Codex configuration file.
   subscriptions and existing infrastructure. No generic Compose up, authority
   broadening, production recipient, credential rotation or printer command is
   implicit. Use the 2026-11-11 handoff for the next chat.
+  On 2026-11-12 read-only inspection classified retained exit 1 as missing
+  recipient mappings, not an established Telegram API failure. The operator
+  chose tenant-owned Hub Telegram settings managed by OWNER before any real
+  print test. Source configuration, V10 encrypted storage and the exact Notify
+  read API are described in
+  [tenant settings and pending rollout](deployment/stage9-notify-tenant-settings-2026-11-12.md).
+  Runtime V10, secret-key provisioning, narrow Notify Hub scope/audience and
+  Hub/Notify image changes need a concrete reviewed retained-environment plan.
+  Do not turn a nominal progress cadence into a hard message cap; agree an
+  enforceable test-only bound including the DIRECT/AGENT mirror before enabling
+  the dedicated bot. Retain the separate Stage 9 security/lifecycle gates.
 
 - Reconcile secure Hub metadata when it joins an already running print after
   Core parsed the model. The 2026-11-08 recovery logs show one successful parse

@@ -34,7 +34,7 @@ public class CallbackHandler {
         }
         log.info("{} callback has been received from user_id {}. Mapped Callback: {}",
                 callbackName, callbackQuery.getMessage().getChat().getId(), callback);
-        try (NotifyTenantContext.Scope ignored = recipientResolver.openForChat(callbackQuery.getMessage().getChat().getId())) {
+        try (NotifyTenantContext.Scope ignored = recipientResolver.openForChat(context, callbackQuery.getMessage().getChat().getId())) {
             callback.handleCallback(context, callbackQuery);
         }
     }

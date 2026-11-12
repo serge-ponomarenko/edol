@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -37,20 +38,26 @@ public class TelegramBotService {
     private final CommandHandler commandHandler;
     private final CallbackHandler callbackHandler;
 
+    @Autowired(required = false)
+    private TenantTelegramBotRegistry tenantBots;
+
     @PostConstruct
     void validateConfiguration() {
-        if (telegramServiceEnable && (botToken == null || botToken.isBlank())) {
+        if (tenantBots == null && telegramServiceEnable && (botToken == null || botToken.isBlank())) {
             throw new IllegalStateException("Enabled Telegram requires a bot token");
         }
     }
 
     public BotContext getContext() {
+        if (tenantBots != null) {
+            return tenantBots.context();
+        }
         return bot == null ? null : bot.context;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onAppReady() {
-        if (!telegramServiceEnable) {
+        if (tenantBots != null || !telegramServiceEnable) {
             return;
         }
 
@@ -67,7 +74,7 @@ public class TelegramBotService {
 
     @Scheduled(fixedDelay = 60000)
     public void ensureBotRunning() {
-        if (!telegramServiceEnable) {
+        if (tenantBots != null || !telegramServiceEnable) {
             return;
         }
 

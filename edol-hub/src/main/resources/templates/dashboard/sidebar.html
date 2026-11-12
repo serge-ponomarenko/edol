@@ -5,8 +5,7 @@
 
         <div class="navbar-brand d-flex align-items-center">
             <a href="/">
-                <img class="p-3" src="/logo-edol-small.svg">
-                <!--                <span class="navbar-brand">Edol</span>-->
+                <img class="p-3" src="/logo-edol-small.svg" alt="Edol">
             </a>
         </div>
 
@@ -30,6 +29,14 @@
             <ul class="navbar-nav pt-lg-3">
 
                 <li class="nav-item px-3 pt-2 text-muted small text-uppercase">Tenant</li>
+
+                <li class="nav-item" th:if="${@environment.getProperty('edol.deployment.mode') == 'secure-multi-tenant'}">
+                    <a class="nav-link" href="/settings/telegram"
+                       th:classappend="${currentPath.equals('/settings/telegram')} ? ' active'">
+                        <span class="nav-link-icon"><i class="ti ti-brand-telegram"></i></span>
+                        <span class="nav-link-title">Telegram Settings</span>
+                    </a>
+                </li>
 
                 <li class="nav-item">
                     <a class="nav-link"
@@ -140,10 +147,10 @@
                         isConfigActive=${isFilaments or isVendors or isMaterials}
                     ">
 
-                    <a class="nav-link d-flex justify-content-between align-items-center"
+                    <button class="nav-link d-flex justify-content-between align-items-center w-100"
                        data-bs-toggle="collapse"
-                       href="#configMenu"
-                       role="button"
+                       data-bs-target="#configMenu"
+                       type="button"
                        th:attr="aria-expanded=${isConfigActive}">
 
                             <span>
@@ -152,7 +159,7 @@
                             </span>
 
                         <i class="ti ti-chevron-down"></i>
-                    </a>
+                    </button>
 
                     <div class="collapse"
                          id="configMenu"

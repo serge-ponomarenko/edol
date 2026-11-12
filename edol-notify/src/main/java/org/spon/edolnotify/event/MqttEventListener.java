@@ -66,6 +66,9 @@ public class MqttEventListener {
                 ingress.validated(envelope.schemaVersion(), json.has(LEGACY_EVENT));
                 validatedEnvelope = true;
                 log.info("Core MQTT ingress validated: consumer=notify, counters={}", ingress.snapshot());
+                if (recipientResolver.hubManaged() && !recipientResolver.configured(envelope.tenantId())) {
+                    return;
+                }
                 tenantScope = recipientResolver.openForEvent(envelope.tenantId());
                 event = envelope.eventType();
                 printerId = envelope.printerId();
@@ -76,7 +79,7 @@ public class MqttEventListener {
                 eventPayload = json;
             }
 
-            try {
+            try (NotifyTenantContext.Scope ignored = tenantScope) {
                 if (deploymentMode != DeploymentMode.SECURE_MULTI_TENANT) {
                     log.info("EdolCore MQTT EVENT: {}", event);
                 }
@@ -107,10 +110,6 @@ public class MqttEventListener {
                     case "print.timelapse" -> handlePrintTimelapse(printerId, eventPayload);
 
                     default -> log.debug("Unhandled event: {}", event);
-                }
-            } finally {
-                if (tenantScope != null) {
-                    tenantScope.close();
                 }
             }
 
