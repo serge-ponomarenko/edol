@@ -1,0 +1,23 @@
+name: dev-secure-deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ gitea.sha }}
+          persist-credentials: false
+      - name: Deploy selected commit and retain manually entered data
+        env:
+          EDOL_DEV_SSH_HOST: ${{ secrets.EDOL_DEV_SSH_HOST }}
+          EDOL_DEV_SSH_USER: ${{ secrets.EDOL_DEV_SSH_USER }}
+          EDOL_DEV_SSH_PORT: ${{ secrets.EDOL_DEV_SSH_PORT }}
+          EDOL_DEV_SSH_KEY: ${{ secrets.EDOL_DEV_SSH_KEY }}
+          EDOL_DEV_SSH_KNOWN_HOSTS: ${{ secrets.EDOL_DEV_SSH_KNOWN_HOSTS }}
+          EDOL_SOURCE_SHA: ${{ gitea.sha }}
+        run: bash docker/deploy/dispatch.sh secure

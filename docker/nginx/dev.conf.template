@@ -1,0 +1,40 @@
+# Merge these locations into the EXISTING HTTPS dev.edol server block.
+# Keep certificate paths, ACME and TLS policy managed by the host nginx owner.
+# The example instance proxy_address must match nginx-home's actual Docker IP.
+# Do not install this routing for Home mode, which is trusted-LAN only.
+resolver 127.0.0.11 valid=10s ipv6=off;
+set $edol_hub_upstream edol-hub-dev:8090;
+set $edol_core_upstream edol-core-dev:8080;
+set $edol_ams_upstream edol-ams-dev:8099;
+
+location /api/agent/v1/ {
+    client_max_body_size 128m;
+    proxy_request_buffering off;
+    proxy_pass http://$edol_core_upstream;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Forwarded "";
+}
+location /api/terminal/v1/ {
+    proxy_pass http://$edol_ams_upstream;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Forwarded "";
+}
+location / {
+    proxy_pass http://$edol_hub_upstream;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Forwarded "";
+}
+# auth.dev.edol's existing edol-keycloak-dev:8080 alias remains valid.
+# Retain its /admin/ and /realms/master/ management-network restrictions.

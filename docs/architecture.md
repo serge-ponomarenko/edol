@@ -96,6 +96,18 @@ Secure mode uses OIDC, active memberships, independent service identities
 and forced RLS. Database conversion requires its own reviewed migration.
 See [operations](operations.md) for deployment and recovery constraints.
 
+Deployment assets share one explicit Home/secure model in `docker/deploy`.
+Each instance has its own PostgreSQL cluster and broker state. Its first
+deployment provisions empty databases and applies immutable migrations without
+creating application users, printers, inventory or print history. Users
+register and populate the environment through the normal application flows.
+Subsequent deployments retain all databases, broker authority, keys and media;
+there is no automatic data reset or dataset import. Home and secure state
+remain separate; Home creates no OIDC users or memberships. Compose-native
+healthchecks cover the dependencies and HTTP services; Notify exposes only a
+clearly labelled process-liveness check. Future reusable data snapshots require
+a separate accepted dataset and are not part of current deployment.
+
 Hub owns EDOL users, tenants, memberships and roles. Keycloak owns OIDC
 identity and credential lifecycle. Hub is a confidential OIDC BFF with
 Authorization Code + PKCE S256, server-side session and token storage, CSRF,

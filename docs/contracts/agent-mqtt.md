@@ -116,11 +116,13 @@ configured JVM trust-store properties; private trust must be supplied to all
 four services. A CA/SAN-valid connection must be checked from each service
 network, including internal hostname `mqtt` where used.
 
-`docker/compose.yaml` and `compose.home.yaml` select Mosquitto with the trusted
-Home listener. Secure deployment MUST additionally apply
-`compose.mosquitto-secure.yaml`, which replaces that configuration mount and
-uses the TLS-only listener on the same broker service. Do not run the base
-composition as a secure deployment.
+`docker/deploy/dev_deploy.py` renders an explicit Home or secure instance into
+protected external Compose JSON. Home selects `mosquitto/home.conf`; secure
+selects `mosquitto/secure.conf` and its TLS-only listener, persistent authority
+directory and separately provisioned certificates. The modes never share
+database volumes or broker authority. See [operations](../operations.md) for
+empty first initialization and data-preserving redeploys; no generic Compose base or
+secure broker override is required.
 
 ## Verification and rollback
 
