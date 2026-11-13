@@ -13,11 +13,31 @@ import sys
 import time
 
 import database
-from model import SERVICES, compose, realm, validate
+from model import AMS_READINESS_HEADERS, SERVICES, compose, realm, validate
 
 
 ROOT = Path(__file__).resolve().parents[2]
 DEV_PROJECTS = ("edol-dev-secure", "edol-dev-home")
+KNOWN_SERVICES = frozenset(SERVICES) | {"postgres", "mqtt", "keycloak"}
+
+
+class DeploymentFailure(RuntimeError):
+    """Only fixed operation/service identifiers and an HTTP status may reach Actions logs."""
+
+    def __init__(self, stage, services, status=None):
+        super().__init__("Deployment operation failed")
+        stages = {"http-readiness", "compose-up", "compose-build", "compose-config", "compose-pull",
+                  "compose-exec", "compose-ps", "compose-stop"}
+        self.stage = stage if stage in stages else "deployment"
+        self.services = tuple(service for service in services if service in KNOWN_SERVICES)
+        self.status = status if isinstance(status, int) and 100 <= status <= 599 else None
+
+
+def failure_summary(error):
+    if isinstance(error, DeploymentFailure):
+        status = f" last_http_status={error.status}" if error.status is not None else ""
+        return f"Deployment stopped: stage={error.stage} services={','.join(error.services) or 'deployment'}{status}"
+    return f"Deployment stopped: {type(error).__name__}. Review the current step and protected configuration."
 
 
 def run(args, data=None, env=None):
@@ -103,7 +123,29 @@ class Deployment:
         self.command = ["docker", "compose", "--project-name", config["project"], "-f", str(state / "compose.json")]
 
     def dc(self, *args):
-        return run(self.command + list(args))
+        try:
+            return run(self.command + list(args))
+        except RuntimeError as error:
+            services = tuple(arg for arg in args if arg in KNOWN_SERVICES)
+            if args and args[0] == "up":
+                services = self.failed_services(services)
+            raise DeploymentFailure("compose-" + args[0], services) from error
+
+    def failed_services(self, services):
+        failed = []
+        for service in services:
+            try:
+                identities = run(self.command + ["ps", "-a", "-q", service]).split()
+                if not identities:
+                    failed.append(service)
+                    continue
+                state = run(["docker", "inspect", "--format",
+                             "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}", identities[0]]).strip()
+                if state != "running healthy":
+                    failed.append(service)
+            except RuntimeError:
+                return services
+        return tuple(failed) or services
 
     def sql(self, content, database_name="postgres"):
         return run(self.command + ["exec", "-T", "postgres", "psql", "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1",
@@ -116,22 +158,24 @@ class Deployment:
         info = json.loads(run(["docker", "inspect", identity]))[0]
         return info["NetworkSettings"]["Networks"][self.config["project"] + "_private"]["IPAddress"]
 
-    def wait_http(self, service, port, path, codes, timeout=180):
+    def wait_http(self, service, port, path, codes, timeout=180, headers=None):
         address = self.ip(service)
         end = time.monotonic() + timeout
+        last_status = None
         while time.monotonic() < end:
             try:
                 connection = http.client.HTTPConnection(address, port, timeout=3)
                 try:
-                    connection.request("GET", path)
-                    if connection.getresponse().status in codes:
+                    connection.request("GET", path, headers=headers or {})
+                    last_status = connection.getresponse().status
+                    if last_status in codes:
                         return
                 finally:
                     connection.close()
-            except OSError:
+            except (OSError, http.client.HTTPException):
                 pass
             time.sleep(2)
-        raise RuntimeError(f"Readiness timeout: {service}")
+        raise DeploymentFailure("http-readiness", (service,), status=last_status)
 
     def migrate(self, module):
         secure = self.config["mode"] == "secure"
@@ -198,7 +242,9 @@ class Deployment:
             self.wait_http("edolhub", 8090, "/login" if c["mode"] == "secure" else "/", {200, 302})
             self.dc("up", "-d", "--wait", "--wait-timeout", "240", "edolcore", "edolams", "edolnotify")
             self.wait_http("edolcore", 8080, "/api/printers", {401} if c["mode"] == "secure" else {200})
-            self.wait_http("edolams", 8099, "/api/terminal/v1/state" if c["mode"] == "secure" else "/ams/state", {401} if c["mode"] == "secure" else {400})
+            self.wait_http("edolams", 8099, "/api/terminal/v1/state" if c["mode"] == "secure" else "/ams/state",
+                           {401} if c["mode"] == "secure" else {400},
+                           headers=AMS_READINESS_HEADERS if c["mode"] == "secure" else None)
             time.sleep(5)
             info = json.loads(run(["docker", "inspect", self.dc("ps", "-q", "edolnotify").strip()]))[0]
             if not info["State"]["Running"] or info["RestartCount"]:
@@ -206,8 +252,14 @@ class Deployment:
             write_private(self.state / "deployed.json", json.dumps({"revision": c["revision"], "mode": c["mode"]}))
             print("Dev deploy complete. HTTP readiness passed; Notify process liveness only. Physical acceptance remains separate.")
         except BaseException:
-            self.dc("stop")
+            self.stop_after_failure()
             raise
+
+    def stop_after_failure(self):
+        try:
+            self.dc("stop")
+        except Exception as cleanup_error:
+            print("Cleanup failed. " + failure_summary(cleanup_error), file=sys.stderr)
 
     def guard_database(self):
         info = json.loads(run(["docker", "inspect", self.dc("ps", "-q", "postgres").strip()]))[0]
@@ -278,5 +330,5 @@ if __name__ == "__main__":
         main()
     except Exception as error:
         # Never print exception text from HTTP/SQL/subprocess libraries carrying secrets.
-        print(f"Deployment stopped: {type(error).__name__}. Review the current step and protected configuration.", file=sys.stderr)
+        print(failure_summary(error), file=sys.stderr)
         sys.exit(1)

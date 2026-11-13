@@ -224,7 +224,7 @@ database. Switching mode is not a database conversion.
 | Keycloak | HTTP 200 from `/health/ready` on management port. |
 | Hub | HTTP 200/302 from login/home. |
 | Core | Mapped printer API: secure unauthenticated 401, Home 200. |
-| AMS | Secure terminal auth rejection 401, Home parameter-validation 400. |
+| AMS | Secure: `EDOL-Terminal readiness-probe` is deliberately malformed and must return 401 before DB access; Home parameter-validation 400 is unchanged. |
 | MQTT | Successful subscribe acknowledgement; secure TLS/auth, no publish. |
 | Notify | Java PID liveness only, labelled `process-liveness-only`, not Telegram readiness. |
 
@@ -232,6 +232,24 @@ Use `docker compose -f /srv/edol-dev/secure/state/compose.json ps` and
 `docker inspect --format '{{.State.Health.Status}}' <exact-container>` for
 status. Do not export full container config/environments into public logs.
 Healthchecks do not prove SMTP, registration, Telegram delivery or real printing.
+
+Secure AMS requires an Authorization header at its mapped terminal route. A
+missing header produces HTTP 400, not the terminal-authentication rejection.
+Both its native healthcheck and the host HTTP probe send the same non-secret,
+invalid terminal credential; arbitrary 400/403/404/5xx and an unexpected 200
+remain failures. No real terminal credential, pairing, DB lookup or printer
+operation is needed for this check.
+
+Failure summaries expose only fixed stage/service identifiers and, for HTTP
+timeouts, the last numeric status. If Compose startup fails, the deployer
+queries only container state/health metadata to identify the failed service;
+if that diagnostic query fails, it retains the original service group. Original
+exception text, response bodies, authorization headers, SQL parameters and
+expanded command output remain hidden. Cleanup is still attempted on failure;
+a cleanup failure is reported safely without replacing the original failure. For example:
+`Deployment stopped: stage=http-readiness services=edolams last_http_status=400`.
+An old generic `RuntimeError` message alone cannot establish which command or
+probe originally failed. SMTP failures remain a separate diagnostic track.
 
 Offline checks:
 

@@ -12,6 +12,7 @@ SERVICES = {
     "edolhub": ("hub", 8090), "edolcore": ("core", 8080),
     "edolams": ("ams", 8099), "edolnotify": ("notify", None),
 }
+AMS_READINESS_HEADERS = {"Authorization": "EDOL-Terminal readiness-probe"}
 SCOPES = {
     "hub": "tenant.context core.printer.read core.printer.manage core.state.read core.command.execute core.media.read core.agent.manage ams.terminal.manage",
     "ams": "tenant.context core.state.read hub.spool.read hub.spool.change",
@@ -288,9 +289,10 @@ def app_container(c, module, port, env, repo, state):
     return app
 
 
-def http_healthcheck(port, path, statuses):
+def http_healthcheck(port, path, statuses, headers=None):
+    extra_headers = "".join(f"{name}: {value}\\r\\n" for name, value in (headers or {}).items())
     script = (f"exec 3<>/dev/tcp/127.0.0.1/{port}; "
-              f"printf 'GET {path} HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; "
+              f"printf 'GET {path} HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n{extra_headers}\\r\\n' >&3; "
               "IFS=' ' read -r version status rest <&3; "
               f"case \"$status\" in {'|'.join(map(str, statuses))}) exit 0;; *) exit 1;; esac")
     return {"test": ["CMD", "bash", "-ec", script], "interval": "10s", "timeout": "5s",
@@ -301,7 +303,8 @@ def add_healthchecks(services, config, state):
     secure = config["mode"] == "secure"
     services["edolhub"]["healthcheck"] = http_healthcheck(8090, "/login" if secure else "/", (200, 302))
     services["edolcore"]["healthcheck"] = http_healthcheck(8080, "/api/printers", (401,) if secure else (200,))
-    services["edolams"]["healthcheck"] = http_healthcheck(8099, "/api/terminal/v1/state" if secure else "/ams/state", (401,) if secure else (400,))
+    services["edolams"]["healthcheck"] = http_healthcheck(8099, "/api/terminal/v1/state" if secure else "/ams/state",
+                                                         (401,) if secure else (400,), AMS_READINESS_HEADERS if secure else None)
     services["edolnotify"]["healthcheck"] = {
         "test": ["CMD-SHELL", "test \"$(cat /proc/1/comm)\" = java && kill -0 1"],
         "interval": "10s", "timeout": "3s", "start_period": "60s", "retries": 3}
