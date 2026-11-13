@@ -102,8 +102,11 @@ deployment provisions empty databases and applies immutable migrations without
 creating application users, printers, inventory or print history. Users
 register and populate the environment through the normal application flows.
 Subsequent deployments retain all databases, broker authority, keys and media;
-there is no automatic data reset or dataset import. Home and secure state
-remain separate; Home creates no OIDC users or memberships. Compose-native
+there is no automatic data reset or dataset import. Secure Dev reconciles only
+the managed Keycloak SMTP map via the Admin API after readiness on every
+deployment, including API key changes; startup realm import remains create-only
+and other realm settings are preserved. Home and secure state remain separate;
+Home creates no OIDC users or memberships. Compose-native
 healthchecks cover the dependencies and HTTP services; Notify exposes only a
 clearly labelled process-liveness check. Future reusable data snapshots require
 a separate accepted dataset and are not part of current deployment.

@@ -81,6 +81,19 @@ def validate_crypto(secrets):
 
 
 
+def smtp_settings(config):
+    """Keycloak compares SMTP boolean strings case-sensitively."""
+    settings = {key: str(config.get("smtp", {}).get(key, ""))
+                for key in ("host", "port", "from", "auth", "user", "password", "starttls")}
+    for flag in ("auth", "starttls"):
+        value = settings[flag].strip().lower()
+        if value not in ("true", "false"):
+            raise ValueError("SMTP auth/starttls must be booleans or true/false strings")
+        settings[flag] = value
+    settings["fromDisplayName"] = "EDOL"
+    return settings
+
+
 def realm(config, source):
     """Extend the reviewed browser realm with narrowly scoped service clients."""
     c = config
@@ -88,7 +101,7 @@ def realm(config, source):
         "EDOL_KEYCLOAK_SSL_REQUIRED": "all", "EDOL_HUB_WEB_CLIENT_SECRET": c["secrets"]["web"],
         "EDOL_HUB_WEB_REDIRECT_URI": c["hub_origin"] + "/login/oauth2/code/edol-keycloak",
         "EDOL_HUB_WEB_ORIGIN": c["hub_origin"], "EDOL_HUB_WEB_POST_LOGOUT_REDIRECT_URI": c["hub_origin"] + "/",
-        **{f"EDOL_SMTP_{k.upper()}": str(v) for k, v in c.get("smtp", {}).items()},
+        **{f"EDOL_SMTP_{k.upper()}": v for k, v in smtp_settings(c).items()},
     }
     for key in ("HOST", "PORT", "FROM", "AUTH", "USER", "PASSWORD", "STARTTLS"):
         values.setdefault("EDOL_SMTP_" + key, "")

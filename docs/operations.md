@@ -199,6 +199,24 @@ missing databases/roles, migrates and starts dependencies/apps with Compose
 both modes. Failure stops the target dev project while retaining its state.
 Existing realms are never overwritten by startup import.
 
+After Keycloak readiness, every Secure Dev deployment authenticates with the
+protected technical admin on the instance's private Docker network and sends
+`PUT /admin/realms/edol` containing only `smtpServer`. This applies the current
+`instance.json` SMTP map to both newly imported and existing realms before apps
+start. A changed SMTP API key is applied on the next deployment; it is not part
+of the persistent device-identity fingerprint. No realm export/import override,
+database reset, user/client/role replacement or read-back of a masked password
+is used. Other realm settings remain operator-owned.
+
+SMTP `auth` and `starttls` accept JSON booleans or true/false strings and are
+rendered as lowercase strings. Keycloak 26.7.4 compares these values to the exact
+string `"true"`; Python-style `"True"` disables the corresponding feature. The
+previous boolean conversion could therefore skip SMTP AUTH and cause provider
+`530 authentication Required` despite a valid API key. Configuration failures
+stop deployment with `stage=smtp-config services=keycloak`; admin/SMTP credentials,
+tokens and HTTP error bodies are never logged. Applying settings does not send
+an email or prove external provider availability.
+
 ### 7. Register and populate manually
 
 Open `https://dev.edol.s-pon.dev`, register, verify the email and log in. The
@@ -259,6 +277,16 @@ bash -n docker/deploy/dispatch.sh
 node docker/keycloak/realm/validate-realm-schema.mjs
 python3 -B docker/deploy/tests/postgres_smoke.py --pg-bin /path/to/postgresql/bin
 ```
+
+The optional `docker/deploy/tests/keycloak_smtp_smoke.py` uses disposable
+Keycloak 26.7.4, PostgreSQL 17 and a local SMTP sink with synthetic credentials.
+It reproduces the AUTH casing failure, checks delivery after configuration,
+restarts Keycloak with the same PostgreSQL state, rotates the SMTP password,
+applies the update twice and verifies retained realm settings/users/clients/roles.
+It does not deploy EDOL or contact Resend. The fixture tests AUTH without TLS;
+STARTTLS normalization is covered by unit tests. Run through the remote-Docker
+Skill wrapper when local Docker is unavailable; it removes only its own test
+containers, anonymous volume and network.
 
 The SQL smoke check owns temporary localhost clusters on random ports. It
 executes migration SQL directly, checks empty domain tables/RLS and that

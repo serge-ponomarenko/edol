@@ -13,6 +13,7 @@ import sys
 import time
 
 import database
+import keycloak_smtp
 from model import AMS_READINESS_HEADERS, SERVICES, compose, realm, validate
 
 
@@ -27,7 +28,7 @@ class DeploymentFailure(RuntimeError):
     def __init__(self, stage, services, status=None):
         super().__init__("Deployment operation failed")
         stages = {"http-readiness", "compose-up", "compose-build", "compose-config", "compose-pull",
-                  "compose-exec", "compose-ps", "compose-stop"}
+                  "compose-exec", "compose-ps", "compose-stop", "smtp-config"}
         self.stage = stage if stage in stages else "deployment"
         self.services = tuple(service for service in services if service in KNOWN_SERVICES)
         self.status = status if isinstance(status, int) and 100 <= status <= 599 else None
@@ -212,6 +213,12 @@ class Deployment:
         self.sql(database.post_migration(self.config))
         print("Empty-database provisioning/migrations complete; existing application data retained.")
 
+    def configure_smtp(self):
+        try:
+            keycloak_smtp.configure(self.config, self.ip("keycloak"))
+        except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError, RuntimeError) as error:
+            raise DeploymentFailure("smtp-config", ("keycloak",)) from error
+
     def apply(self):
         c = self.config
         if c["environment"] != "dev" or c["project"] not in DEV_PROJECTS:
@@ -237,6 +244,8 @@ class Deployment:
             if c["mode"] == "secure":
                 self.dc("up", "-d", "--wait", "--wait-timeout", "240", "keycloak")
                 self.wait_http("keycloak", 9000, "/health/ready", {200})
+                print("Applying managed Keycloak SMTP settings", flush=True)
+                self.configure_smtp()
             self.dc("up", "-d", "--wait", "--wait-timeout", "120", "mqtt")
             self.dc("up", "-d", "--wait", "--wait-timeout", "240", "edolhub")
             self.wait_http("edolhub", 8090, "/login" if c["mode"] == "secure" else "/", {200, 302})
