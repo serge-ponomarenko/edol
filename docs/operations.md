@@ -82,6 +82,45 @@ flow, service account, device grant, token exchange or offline access for this
 browser client. Validate discovery/issuer, login and logout, negative grants,
 and the approved SMTP/account lifecycle with disposable identities.
 
+### Branded login and self-registration
+
+The Keycloak image bundles `docker/keycloak/themes/edol/login`. It inherits the
+native Keycloak forms, changing only local CSS, the existing EDOL logo and English
+messages. Login, registration, email verification, required actions and password
+recovery share the theme. No external CDN or browser credential handler is added.
+Run `node docker/keycloak/realm/validate-realm-schema.mjs` before building.
+
+A fresh realm import selects `loginTheme=edol` and `registrationAllowed=true`.
+**Startup import does not update an existing realm.** For an approved rollout:
+
+1. Record the current realm login theme and registration settings, Hub self-service
+   setting, image identity and exact service-specific Compose chain. Keep identities,
+   volumes, client secrets and bootstrap state intact.
+2. Build and deploy the reviewed Keycloak image with the theme using that instance's
+   existing composition. In the EDOL realm Admin Console, select **Realm settings >
+   Themes > Login theme > edol**. Under **Login**, enable **User registration**;
+   retain email-as-username, unique email, email verification and brute-force protection.
+   Do not change the master realm or open the legacy-owner claim window.
+3. Verify that the realm's approved SMTP delivery works before inviting users.
+   Keep email verification required; incomplete SMTP setup is not a reason to disable it.
+4. Deploy the matching Hub configuration with
+   `EDOL_HUB_SELF_SERVICE_REGISTRATION_ENABLED=true`. The secure profile defaults to
+   true, but an existing explicit false overrides it. For invitation-only operation,
+   disable Keycloak registration and set this Hub control to false together.
+5. With an approved disposable identity, open Hub, follow **Create account**, submit
+   the form, verify the email and complete login. Confirm a new personal tenant with
+   OWNER membership, an empty printer list, and no access to existing tenant data.
+   Sign out and in again: the same membership must be reused. Verify wrong-password,
+   duplicate-email and invalid-form feedback, reset email delivery, desktop/mobile
+   layout, keyboard focus and existing-user login. Check verification and recovery
+   pages as well as the initial form. Do not record credentials or verification links.
+
+If legacy data has not yet been claimed and bootstrap is closed, the existing JIT
+safety gate still blocks provisioning; resolve that installation's approved bootstrap
+procedure before enabling public registration. Do not reopen the claim window for
+public users. Roll back by restoring the recorded realm settings, Hub control and
+matching image; retain accounts and tenant data created during the rollout.
+
 Keep a checksummed, restricted instance-specific PostgreSQL backup and test
 an isolated restore before an upgrade. Roll back Keycloak by restoring the
 matching database backup, image and configuration. Keycloak schema downgrades

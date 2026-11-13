@@ -106,6 +106,18 @@ context and resource ownership. See [ADR 0002](adr/0002-secure-multi-tenant-arch
 for the cross-service trust model and [tenant ownership](contracts/tenant-ownership.md)
 for persisted boundaries.
 
+Secure browser login, self-registration, email verification and password recovery
+use the bundled `edol` Keycloak login theme, inheriting native Keycloak forms
+and validation. The realm template permits email-based registration and requires
+email verification. On first successful OIDC login, Hub's existing JIT provisioning
+creates a personal tenant and active OWNER membership when self-service is enabled.
+The secure profile enables this by default; an explicit
+`EDOL_HUB_SELF_SERVICE_REGISTRATION_ENABLED=false` disables new personal tenants.
+Existing memberships and the closed-by-default legacy-owner bootstrap retain
+their existing checks. Registration never grants membership of an existing tenant.
+Keycloak registration and Hub provisioning are separate operator controls; see
+[operations](operations.md) for enabling both in an existing installation.
+
 ### Printer HTTP and Service Events
 
 Core resolves the current tenant's persisted printer before mapped secure

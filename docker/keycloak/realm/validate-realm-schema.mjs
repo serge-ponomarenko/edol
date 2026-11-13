@@ -8,6 +8,7 @@ const allowedRealmKeys = new Set([
     "realm",
     "enabled",
     "displayName",
+    "loginTheme",
     "sslRequired",
     "registrationAllowed",
     "registrationEmailAsUsername",
@@ -63,6 +64,13 @@ function requireKnownKeys(value, allowedKeys, description) {
 
 requireKnownKeys(realm, allowedRealmKeys, "Realm representation");
 requireCondition(realm.realm === "edol", "Expected the edol realm");
+requireCondition(realm.loginTheme === "edol", "Expected the bundled EDOL login theme");
+requireCondition(realm.registrationAllowed === true, "Self-registration must be available");
+requireCondition(realm.registrationEmailAsUsername === true, "Registration must use email as username");
+requireCondition(realm.verifyEmail === true, "Email verification must remain required");
+requireCondition(realm.resetPasswordAllowed === true, "Password recovery must remain available");
+requireCondition(realm.duplicateEmailsAllowed === false, "Duplicate emails must remain disabled");
+requireCondition(realm.bruteForceProtected === true, "Brute-force protection must remain enabled");
 requireCondition(
     basename(realmPath.pathname) === `${realm.realm}-realm.json`,
     "Realm import filename must follow Keycloak's <realm>-realm.json convention"
