@@ -12,3 +12,4 @@ Use this skill when modifying JPA entities, repositories, relationship mappings,
 3. Check that migration SQL, JPA mapping, constraints, IDs, and data-access code remain consistent. Account for existing data and startup validation.
 4. Run the affected module tests. If no isolated PostgreSQL migration check is available, report that limitation rather than claiming database compatibility.
 5. Update `docs/architecture.md` only when ownership, persistence boundaries, or another documented architectural fact changes. Record an ADR only for an explicitly accepted architecture decision.
+6. Keep immutable Flyway contracts and regression tests in Git. Record authorized migration planning, database evidence, risk/rollback decisions and task follow-ups in scoped Obsidian notes via `edol-knowledge-management`; never assume a migration was applied.

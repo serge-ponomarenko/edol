@@ -12,7 +12,8 @@ Hibernate and PostgreSQL row-level security must enforce isolation.
 
 The matrix is based on the current Hub and Core Flyway schemas, JPA entities,
 repository access, native SQL, and runtime/background processing. It describes
-the target schema; entries marked as new are not implemented yet.
+the approved ownership model. Flyway and application mappings define which
+constraints are active in each release and deployment mode.
 
 ## Ownership Rules
 
@@ -54,12 +55,16 @@ the target schema; entries marked as new are not implemented yet.
 | Hub `MaintenanceDefinition` / `maintenance_definition` | Printer | `printer_id -> printers.tenant_id` | No | Derived association | `EXISTS` through printer | Hub V5 makes the printer FK non-null after guarded validation |
 | Hub `MaintenanceExecution` / `maintenance_execution` | Maintenance definition | Definition to printer | No | Derived association | Nested `EXISTS` through definition and printer | No tenant duplication; retain mandatory definition FK |
 | Hub `PrintAllocationPreview` / `print_allocation_preview` | Print job | Job to printer | No | Derived association | `EXISTS` through job and printer | No tenant duplication; retain one preview per job |
-| Hub `PrintAllocationGroup` / `print_allocation_group` | Allocation preview plus optional filament | Backfilled from preview/job/printer | Yes, new | `@TenantId` | Direct predicate plus same-tenant checks | Add and backfill tenant; composite FK to optional filament and constraint trigger validating preview-derived ownership |
-| Hub `PrintAllocationItem` / `print_allocation_item` | Allocation group plus optional spool | Backfilled from group | Yes, new | `@TenantId` | Direct predicate plus same-tenant checks | Add and backfill tenant; composite FK to group and constraint trigger validating spool-derived ownership |
-| Hub `JobSpoolUsage` / `job_spool_usage` | Print job plus spool | Backfilled from job/printer and validated against spool/filament | Yes, new | `@TenantId` | Direct predicate plus same-tenant checks | Add tenant; reject historical mismatches; constraint triggers validate job- and spool-derived ownership |
-| Core `Printer` / `core.printers` | Core printer, assigned to an EDOL tenant | Trusted Hub provisioning context | Yes, new | `@TenantId` for tenant-scoped application operations | Direct predicate | Add nullable column, migration-only Hub projection backfill, validate, then make non-null; no FK to Hub |
+| Hub `PrintAllocationGroup` / `print_allocation_group` | Allocation preview plus optional filament | Backfilled from preview/job/printer | Yes | `@TenantId` | Direct predicate plus same-tenant checks | Add and backfill tenant; composite FK to optional filament and constraint trigger validating preview-derived ownership |
+| Hub `PrintAllocationItem` / `print_allocation_item` | Allocation group plus optional spool | Backfilled from group | Yes | `@TenantId` | Direct predicate plus same-tenant checks | Add and backfill tenant; composite FK to group and constraint trigger validating spool-derived ownership |
+| Hub `JobSpoolUsage` / `job_spool_usage` | Print job plus spool | Backfilled from job/printer and validated against spool/filament | Yes | `@TenantId` | Direct predicate plus same-tenant checks | Add tenant; reject historical mismatches; constraint triggers validate job- and spool-derived ownership |
+| Core `Printer` / `core.printers` | Core printer, assigned to an EDOL tenant | Trusted Hub provisioning context | Yes | `@TenantId` for tenant-scoped application operations | Direct predicate | Add nullable column, migration-only Hub projection backfill, validate, then make non-null; no FK to Hub |
 | Core `PrinterConnectionConfiguration` / `printer_connection_configurations` | Core printer | `printer_id -> core.printers.tenant_id` | No | Derived association | `EXISTS` through Core printer | No tenant duplication; retain one-to-one printer FK |
 | Core `ActivePrintContext` / `active_print_context` | Core printer | `printer_id -> core.printers.tenant_id` | No | Derived association | `EXISTS` through Core printer | V7 adds the printer FK after a fail-fast orphan check; retain unique printer constraint |
+| Hub Telegram settings / `hub.telegram_settings` | Tenant | Active owner or validated Notify service context | Yes, direct | Transaction-local tenant context | Direct predicate with forced RLS | Encrypted bot token and tenant-local settings |
+| Hub Telegram directory / `hub.telegram_tenant_directory` | Tenant | Matching settings transaction | Yes, direct | Minimal tenant UUID directory | Global read for discovery, tenant-scoped writes | Contains enabled tenant IDs only |
+| Core Agent identity / `core.agents` | Core printer | Current persisted Agent/printer binding | Yes, direct | Transaction-local tenant context | Forced RLS with constrained pre-tenant functions | One live Agent per printer. See [Agent pairing](agent-pairing.md). |
+| Core MQTT authority / `core.agent_mqtt_authorities` | Core Agent | Persisted Agent/tenant/printer binding | Yes, direct | Transaction-local tenant context | Forced RLS with constrained lifecycle functions | Retains revocation tombstones. See [Agent MQTT](agent-mqtt.md). |
 | AMS `Terminal` / `ams.terminals` | Tenant-owned terminal | Trusted Hub management call; terminal credential lookup returns only its persisted binding | Yes, direct | Transaction-local `edol.tenant_id` plus forced RLS; a dedicated no-login, narrow `BYPASSRLS` function owner performs only pre-tenant authentication lookup | Direct predicate | UUID, one allowed printer, lifecycle, keyed credential digest/version and revoke/reset/replacement metadata; one live terminal per tenant/printer |
 | AMS `TerminalPairing` / `ams.terminal_pairings` | Tenant-owned enrollment | Trusted Hub management call; atomic pairing consume is a narrow security-definer function | Yes, direct | Transaction-local `edol.tenant_id` plus forced RLS; the dedicated no-login function owner performs the only pre-tenant code path | Direct predicate | Keyed code digest/version, five-minute expiry, durable five-failure exhaustion, consumed/revoked/expired state; no plaintext pairing code or legacy backfill |
 
@@ -69,7 +74,7 @@ Adding a tenant discriminator to a link table is not sufficient by itself. The
 database must prevent a valid row from connecting resources owned by different
 tenants.
 
-The implementation stages must create equivalent constraints for these paths:
+These paths require equivalent constraints.
 
 ```text
 Filament(tenant_id, vendor_id)       -> Vendor(tenant_id, id)
@@ -121,7 +126,7 @@ USING (exists (
 ```
 
 Policies must be tested with Hibernate-generated SQL and direct native SQL.
-Indexes on each ownership join path are part of the stage acceptance criteria.
+Indexes on each ownership join path are part of the isolation contract.
 
 `User` and `TenantMembership` are pre-tenant access cases. Authentication
 establishes trusted OIDC identity context before those rows are queried. Set
@@ -151,5 +156,4 @@ This matrix was reviewed and approved before ADR 0002 was finalized. Future
 implementation findings may refine indexes, constraint mechanics, or table
 names. A change to which aggregate owns an entity, whether tenant identity is
 direct or derived, or which service owns the source of truth is an
-architectural change and requires explicit escalation under the post-stage
-audit procedure.
+architectural change and requires an explicit architecture decision.

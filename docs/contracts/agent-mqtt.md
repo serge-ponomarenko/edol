@@ -1,20 +1,10 @@
-# Stage 9.3b secure MQTT contract
+# Agent MQTT Contract
 
-## Approved decision and boundary
-
-On 2026-10-22 the operator selected one Mosquitto broker for both internal
-service events and Core/Agent communication. Server-authenticated TLS plus
-independent per-client credentials is the selected MQTT identity model.
-Per-Agent mTLS is not required for this increment. This explicitly resolves
-the previous client-certificate alternative; it does not waive server CA,
-hostname, expiry checks, ACLs, active-session revocation, or later database TLS
-and service asymmetric-authentication decisions.
-
-The source candidate is `eclipse-mosquitto:2.0.22` with its bundled Dynamic
-Security plugin. Record the resolved image digest with acceptance/rollout
-evidence. The broker remains a shared availability boundary. No running
-NanoMQ, accepted Stage 7 installation, working database, hardware or public
-repository is changed by these source files.
+Secure mode uses one Mosquitto broker with Dynamic Security for service
+events and Agent traffic. Independent per-client credentials authenticate
+clients over server-authenticated TLS. Agent client certificates are optional
+in the architectural decision. The broker is a shared availability boundary.
+The [pairing contract](agent-pairing.md) defines the separate HTTPS identity.
 
 ## One broker, separate identities
 
@@ -130,73 +120,17 @@ network, including internal hostname `mqtt` where used.
 Home listener. Secure deployment MUST additionally apply
 `compose.mosquitto-secure.yaml`, which replaces that configuration mount and
 uses the TLS-only listener on the same broker service. Do not run the base
-composition as a secure deployment. The historical Stage 6 NanoMQ fixture is
-retained as previous acceptance evidence; its plaintext client configuration
-does not satisfy the new secure TLS prerequisites.
+composition as a secure deployment.
 
-## Acceptance and rollback
+## Verification and rollback
 
-Run the new broker/routing/migration tests through the remote Docker skill.
-The fixture generates run-owned TLS material and service authorities, and uses
-the production configuration/policy generator in fresh containers only.
-Synthetic commands never reach a real printer. Report exact Surefire totals
-and distinguish fake firmware transport tests from actual broker handshakes.
-
-Required source/disposable cases include shared service traffic; paired
-TLS/auth; unknown/revoked credentials; foreign/wildcard/shared topics; spoofed
-identity; current-session disconnect; broker restart persistence; Core routing;
-provisioning/revoke failures; and Home builds/contracts. Physical execution,
-power-cycle behavior and real printer effects remain NOT RUN until the combined
-[Agent + AMS hardware runbook](stage9-disposable-hardware-runbook.md) is executed
-with the operator.
-
-Verification record, 2026-10-22 (at verification time, a local increment over backend
-`d701243e6da9e6bed86baecefb561c480a3f6b62` and firmware
-`a51249d9f00d3a008cb9a23df468418764fac344`):
-
-- Remote-Docker `mvn -B clean verify`: 294 tests, zero failures/errors/skips.
-  Core API 11, Core 93, Hub 127, Notify 15, AMS 48. Real PostgreSQL and
-  Mosquitto containers executed, including paired identity through broker to
-  persisted Core routing, active-session revoke, and service recovery.
-  Service broker recovery uses Paho clients with the production service
-  accounts/ACLs; coordinated four-service runtime cutover remains a rollout
-  rehearsal. After the final analyzer timing fixes, nine targeted broker,
-  migration and management tests passed with no failures/errors/skips.
-- Resolved broker image digest:
-  `eclipse-mosquitto@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21`.
-- Firmware: eight native executables, three Python trust-hook tests, and all
-  Home/secure/secure_smoke builds passed. Both secure builds without CA failed
-  as required. The temporary public CA fixture was removed.
-- Read-only Sonar covered all supported modified Java/Python/HTML files.
-  Actionable findings were fixed. Remaining Java S1598 reports have an empty
-  analyzer path and are the known snippet artifact; no suppression was added.
-  Available snippet analysis does not support C++ or SQL.
-- Static SnakeYAML parsing passed for the three changed/new Compose files and
-  Core secure YAML. Docker Compose merge/interpolation is NOT RUN because the
-  local CLI has no Compose plugin; it remains a rollout preparation check.
-- At verification time no physical observation, working DB migration, live
-  broker change, commit or push had occurred. Subsequent local commits are
-  recorded in the hardware runbook execution record; no continuous
-  legacy-traffic observation window is claimed.
-
-Resumed-session review on 2026-10-22 found and fixed a feature-disable lifecycle
-gap: a missing MQTT component could previously bypass the broker retirement
-check. Core now consults durable pending state independently of that component
-and rechecks before code insertion under the printer lock. HTTPS retirement
-still commits before the management route reports pending broker work.
-The targeted remote-Docker regression passed 16 tests with zero failures,
-errors or skips: management 2, real broker 2, mode isolation 2, secure HTTP 3,
-PostgreSQL pairing/migration 7. This is a targeted continuation, not another
-full-reactor run. Read-only Sonar rechecked the four changed Java files; only
-the known pathless S1598 artifact remained. Firmware and physical observations
-were unchanged, and no running installation was modified.
-
-Working migration is a later Stage 9 gate: inventory clients/settings, preserve
-the existing broker rollback configuration, prepare roles/V11 and authority
-storage, verify TLS/ACL/reconnect for every service, and explicitly approve the
-cutover. Do not copy NanoMQ password files or invent mappings to secure Agents.
-Keep feature flags OFF until coordinated acceptance. No observed legacy-usage
-window is established by synthetic tests.
+Verify service traffic, per-Agent ACL isolation, denied unknown/revoked
+credentials, foreign and wildcard topic rejection, spoofed identities,
+active-session disconnect, broker restart persistence, Core routing,
+provisioning/revoke failure handling and Home compatibility. Use isolated
+broker authorities and synthetic commands disconnected from real printers.
+Physical device evidence covers MQTT TLS rejection, reconnect, power-cycle
+recovery and restoration under separately approved scope.
 
 Rollback disables Agent features and restores the coordinated release/broker
 configuration, preserving V11 and the latest authority/tombstone data. Never

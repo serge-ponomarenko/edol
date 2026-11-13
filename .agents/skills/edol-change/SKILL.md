@@ -11,5 +11,6 @@ Use this skill for non-trivial changes that cross a module, API, persistence bou
 2. Identify affected module boundaries and choose the narrowest complete implementation and validation scope.
 3. If the change alters a responsibility, dependency boundary, flow, lifecycle, or integration contract described in `docs/architecture.md`, update that document and verify it against the final code. Otherwise leave documentation unchanged.
 4. Use `edol-runtime-contract` for printer runtime, telemetry, MQTT, or cross-service state contracts. Use `edol-schema-change` for Flyway or persistent-domain changes.
+5. Use `edol-knowledge-management` for authorized Obsidian task status, design decisions, verification evidence and handoffs. Keep current normative behavior in Git, not only in Obsidian.
 
 Do not use this skill for a simple isolated edit with an obvious local check.

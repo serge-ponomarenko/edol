@@ -2,7 +2,7 @@
 
 ## System Map
 
-EDOL is a Java 21, Spring Boot 4 Maven reactor with four services, PostgreSQL and MQTT. Source composition now selects Mosquitto; replacing an existing NanoMQ installation remains a separately approved rollout. The root `pom.xml` is the build entry point; Docker Compose is the local/self-hosted runtime composition.
+EDOL is a Java 21, Spring Boot 4 Maven reactor with four services, PostgreSQL and MQTT. The Compose definitions use Mosquitto. The root `pom.xml` is the build entry point; Docker Compose is the local/self-hosted runtime composition.
 
 | Module | Responsibility | Main boundaries |
 | --- | --- | --- |
@@ -62,7 +62,7 @@ Secure bulk operations verify EDOL HTTPS before opening printer bulk TLS,
 reuse that prepared connection, and never intentionally disconnect printer or
 EDOL MQTT. Record-buffer admission is only a necessary memory floor; failed
 handshakes/transient allocations reject the transfer without weakening trust.
-No filesystem, partition, NVS or credential migration is introduced. All TLS
+All TLS
 clients preserve the invalid socket descriptor after SDK cleanup.
 
 Agent model transfer requires a validated positive FTPS SIZE, exactly that many
@@ -80,136 +80,65 @@ RestTemplate interceptor and printer ownership check; Core selects DIRECT Bambu
 or the persisted, usable Agent MQTT authority. HTTP acceptance is distinct from
 observing a printer state change in subsequent telemetry.
 
-Hub projects Core printers with the same UUID and assigns the projection to a Hub tenant. Hub runtime state, print recovery, jobs, allocation, maintenance, statistics, commands, dashboard routes and printer-management UI are printer-scoped. In `secure-multi-tenant` mode, Hub is an OIDC BFF: a validated OIDC identity discovers active memberships before a request establishes the fail-closed `TenantContext`. The historical default-tenant request bridge is removed. Stage 5 establishes authenticated Hub-to-Core tenant propagation. The `stage5-smoke` profile deliberately keeps Core printer runtime, Hub MQTT, catalog, recovery, AMS, and Notify disabled; later MQTT and consumer stages must not infer a tenant. AMS retains only its separately trusted three-route internal compatibility ingress. Home uses its independent installation-owned tenant scope. AMS staging and Notify progress state are keyed by printer UUID. See `docs/adr/0001-hub-printer-projection-and-tenant-bootstrap.md` and `docs/migrations/multi-printer-multi-tenant.md`.
+Hub projects Core printers with the same UUID. Jobs, maintenance, allocation,
+recovery, statistics, command routes and dashboard state are printer-scoped.
+Catalog unavailability permits serving existing projections, but ambiguous
+ownership blocks migration and a catalog mismatch blocks runtime validation.
+Core decommissioning marks the Hub projection unavailable while preserving
+Hub history. AMS staging and Notify progress are also printer-scoped.
 
-## Accepted Multi-Tenant Direction
+## Deployment Modes and Trust Boundaries
 
-The secure multi-tenant target is accepted. The Stage 4 Hub BFF and Stage 5
-authenticated Hub-to-Core foundation are implemented and accepted for their
-source and disposable remote-development scopes; production acceptance and the
-later MQTT and consumer-migration stages remain outstanding. Hub owns EDOL users,
-tenants, memberships and roles while Keycloak provides OIDC identity and
-credential lifecycle. Hub operates as a BFF, and services will use separate
-OAuth client identities. Authentication identity and trusted tenant context
-remain separate.
+`EDOL_DEPLOYMENT_MODE` (`edol.deployment.mode`) must explicitly select
+`home` or `secure-multi-tenant`. Home is a single-owner installation on
+a trusted network and derives its tenant from `hub.home_installations`.
+Secure mode uses OIDC, active memberships, independent service identities
+and forced RLS. Database conversion requires its own reviewed migration.
+See [operations](operations.md) for deployment and recovery constraints.
 
-Stage 2 adds the Hub user and membership domain, direct tenant ownership for
-allocation and usage links, tenant-safe cross-aggregate constraints, and
-nullable opaque tenant ownership on Core printers with a guarded one-time
-Hub-projection backfill. Source, local-development, and production acceptance
-are complete. On 2026-09-24, the controlled production Hub V2 history repair
-updated only the historical checksum, then the matching release applied Hub V5
-and V6 and served the read-only root request. Stage 2 does not enable Hibernate
-tenancy, RLS, authentication, service transport, or MQTT tenant propagation.
+Hub owns EDOL users, tenants, memberships and roles. Keycloak owns OIDC
+identity and credential lifecycle. Hub is a confidential OIDC BFF with
+Authorization Code + PKCE S256, server-side session and token storage, CSRF,
+and an active-membership check before establishing the request tenant. Hub
+authorizes browser actions and calls downstream APIs with its service identity.
+Each resource server validates the caller, audience, scope, trusted tenant
+context and resource ownership. See [ADR 0002](adr/0002-secure-multi-tenant-architecture.md)
+for the cross-service trust model and [tenant ownership](contracts/tenant-ownership.md)
+for persisted boundaries.
 
-Tenant persistence will use Hibernate discriminator tenancy together with
-forced PostgreSQL row-level security. Normal tenant resolution will be
-fail-closed. The current default-tenant behavior may survive only as a named,
-measured migration compatibility scope before user authentication and will be
-removed in that authentication stage.
+### Printer HTTP and Service Events
 
-The Stage 3 source implementation adds this Hub boundary: approved direct
-tenant entities use Hibernate discriminators, tenant state is transaction-local
-on the runtime connection, and PostgreSQL policies provide the native-SQL
-boundary. The controlled production rollout provisioned the separate Hub schema
-owner, Flyway executor, and runtime roles and applied Hub V7 successfully on
-2026-09-28. A follow-up Stage 3 release prepares an eager serialization graph
-for the unchanged legacy spool payload, logs compatibility-counter values, and
-contains a controlled runtime-grant correction that removes access to Flyway
-history. The follow-up was deployed successfully: runtime Flyway-history
-privileges were removed, Flyway privileges were preserved, and compatibility
-logs now expose incrementing metric values. A production request matching an
-active spool returned `HTTP 200` with the complete unchanged JSON graph and no
-lazy-proxy serialization error. Stage 3 was formally accepted on 2026-09-28.
-Stage 4 source replaces the pre-auth Hub ingress with Keycloak Authorization
-Code + PKCE BFF login, server-side servlet sessions and authorized-client
-storage, active-membership tenant selection, and idempotent JIT provisioning.
-V8 adds transaction-local OIDC identity RLS policies and a closed-by-default,
-serialized legacy first-owner claim. It deliberately does not drop
-`tenants.is_default`: that cleanup is authored only after a recorded claim.
-Remote-dev and source-development acceptance completed on 2026-10-04 from the
-immutable rollout commit `b849831fbf17d39db33c735883af63ca1b5ab6b2`. Empty and
-data-bearing clone smoke tests passed, followed by a backup-first V8 rollout
-and one guarded persistent-owner OIDC claim on the source development
-database. The source result retained legacy data counts and integrity, created
-one active `OWNER` membership, and cleared the claimed tenant's
-`is_default` marker. Browser OIDC, CSRF, session-expiry, and logout behavior
-passed using the same Hub-only secure profile during the acceptance smokes.
-Core, MQTT, AMS, Notify, printer-facing services, and secure-mode background
-work did not start. This is development evidence only: production Keycloak,
-production Hub deployment, and trusted production AMS ingress remain
-unaccepted.
-Stage 5 source and final fresh disposable acceptance completed on 2026-10-05
-from immutable commit `7e5f66a295675d8b365a667ead3d5a997d71e2b0`. A fresh
-restricted-role PostgreSQL cluster applied Core V1-V9 and Hub V1-V8; Core and
-Hub started under `secure-multi-tenant,stage5-smoke`; BFF login, authenticated
-Hub provisioning, Core/Hub projection, RLS, and catalog-role isolation passed.
-The acceptance also confirmed fail-closed tenant-header and service-token
-responses and the scalar Hub printer-stats response. It used the accepted
-remote-development Keycloak issuer only, with no MQTT broker, live printer or
-agent, AMS, Notify, development database, or production resource. It is not a
-development-database or production rollout.
-Spring Data repositories initialize lazily so framework bootstrap has no tenant
-context; their first actual use still requires the normal fail-closed resolver.
-A clean installation may have no migration tenant because Stage 2 removes an
-empty historical seed. In that state, compatibility background work is logged
-and metered as unavailable and does not run; HTTP and MQTT persistence remain
-fail-closed until an explicitly configured, verified migration tenant exists.
+Core resolves the current tenant's persisted printer before mapped secure
+`/api/printers/**` handlers with a `printerId` path variable execute.
+Aggregate state is tenant-filtered. Runtime discovery uses a distinct
+read-only catalog identity. Home retains trusted-network access.
+Connection response DTOs omit printer access codes in both modes. A blank
+or omitted code on update preserves the current value. Deploy the compatible
+Core implementation before the corresponding Hub editor.
 
-Core will remain passive. Its printer records will store an opaque tenant UUID
-assigned by a one-time migration backfill or an authenticated Hub provisioning
-request; Core will never call Hub to infer ownership. Core background runtime
-discovery will use a narrow read-only catalog identity, not a universal RLS
-bypass. Stage 6 source publishes each tenant-owned Core integration event as
-one additive v2 message: its trusted envelope has a schema version, event ID,
-event type, tenant and printer IDs, RFC 3339 timestamp, and nested payload,
-while the legacy `event` and top-level fields remain in that same message. Core
-derives the tenant only from persisted printer ownership. Secure Hub MQTT
-ingress is disabled by default and uses tenant/printer validation plus a
-tenant-RLS receipt ledger before it mutates its projection. Hub publishes
-printer-scoped current-job, allocation-ready and allocation-preview cache
-updates after transaction commit; the processing transaction can read its own
-pending values, while rollback discards those updates. The
-`stage6-smoke` profiles and `docker/compose.stage6-smoke.yaml` provide a
-local-loopback, disposable ACL harness only: generic agent MQTT and printer
-runtime remain disabled, while the dedicated Core publisher and Hub subscriber
-are enabled. On 2026-10-09, the Stage 6 disposable MQTT integration/security
-acceptance passed with a fresh PostgreSQL cluster and NanoMQ 0.25.6 harness.
-It verified authenticated Core publish and Hub subscribe ACLs, additive v2
-delivery, tenant-RLS receipt persistence, QoS 1 duplicate idempotency,
-reverse-timestamp receipt persistence, and malformed, unknown-printer, and
-cross-tenant rejection. A temporarily approved Hub browser ingress deviation
-was reverted during cleanup. This is not deployment configuration, TLS,
-production broker-identity, retention-operation, live-device, development
-database, or production evidence. Stage 7 source now gives Notify and AMS
-independent client-credentials contracts and restricts their secure MQTT topic
-sets. The Stage 7 acceptance used deployment-managed Notify tenant-to-chat
-mappings; AMS establishes its tenant from a deployment-managed printer-to-tenant mapping
-or the validated v2 envelope, never from an untrusted terminal parameter.
-AMS can start with an empty printer mapping; unknown printers/envelopes are
-still rejected before downstream work. The current secure Notify profile reads
-tenant Telegram settings from Hub instead of global token/chat environment
-variables. Empty settings authorize no bot, tenant or chat and do not prevent
-startup. Home retains its environment-managed single bot/admin chat; disabling
-Telegram never starts polling.
-Core accepts the tenant header only from allowlisted service clients, and Hub
-accepts AMS service JWT ingress only on the exact spool routes. Keycloak
-clients, broker identities/ACLs, and mappings were provisioned only in an
-isolated disposable Stage 7 smoke. The initial 2026-10-09 run was partial; its
-AMS lookup and unmapped-printer defects were remediated with a narrow AMS
-Hub-spool read DTO and a pre-downstream `404`. Final disposable secure
-multi-tenant acceptance passed on 2026-10-10 at
-`88145ac1af2b8b4936e7595f674af062dd3622ee`: four safe AMS HTTP cases,
-Tenant B Notify v2 ingestion, recipient/mapping/counter regression coverage,
-and the previously recorded RLS, Flyway, ACL, and service-token evidence were
-reconciled. Core legacy compatibility ingress was explicitly disabled in that
-disposable configuration; Hub's retained compatibility ingress initialized its
-counter at zero and accepted no legacy requests during the recorded observation
-window. This is source/disposable acceptance only. It does not accept
-deployment, TLS, development-database, live-device, home-mode, terminal
-identity, or production behavior. Compatibility source paths remain subject to
-the Stage 9 removal gate. Stage 8 owns terminal enrollment and per-device
-credentials.
+Core derives event tenancy from persisted printer ownership and publishes one
+additive v2 event with schema version, event ID/type, tenant and printer UUIDs,
+RFC 3339 timestamp and nested payload alongside the legacy fields. Secure Hub,
+Notify and AMS readers validate v2 and envelope-only v3. V2 requires a matching
+legacy `event` marker. V3 accepts its absence and rejects a contradictory
+marker. Home uses the legacy consumer contract.
+
+Secure Hub MQTT ingress is opt-in. Hub verifies tenant/printer ownership and
+uses a tenant-RLS receipt ledger for idempotent delivery. Printer-scoped
+current-job and allocation caches publish updates after transaction commit.
+The processing transaction can see its own pending values and rollback
+discards them. Secure readers log restart-scoped counters for validated v2/v3,
+legacy markers, rejected envelopes and processing failures, without logging
+payloads or using tenant/printer/topic IDs as counter dimensions. Validated
+delivery includes duplicates and later processing failures or denials.
+
+AMS resolves tenant context from a validated v2/v3 envelope, an authenticated
+terminal binding or an approved printer mapping. Unknown mappings fail before
+downstream calls. Hub restricts AMS JWT ingress to the exact spool routes and
+Core accepts tenant headers only from allowlisted service clients. Notify
+selects recipients from the trusted processing tenant.
+The trusted-LAN AMS routes `/ams/state`, `/ams/find` and `/ams/set-spool`
+require a printer ID. Spool staging and its expiration belong to that printer.
 
 ### Tenant Telegram configuration
 
@@ -237,8 +166,7 @@ Notify's exact GET routes `/internal/notify/telegram/tenants` and
 `hub.notify.read`, `tenant.context`, and the normal Hub JWT issuer/audience
 validation. The settings route additionally requires exactly one tenant UUID
 header and opens that RLS scope before reading/decrypting. Responses are
-`no-store`. The secret-bearing service response must use the approved private
-transport; this source change does not establish deployment TLS acceptance.
+`no-store`. Use the approved private transport for the secret-bearing service response.
 
 With `edol-notify.telegram.settings-source=hub` (the secure profile), Notify
 refreshes the directory and each tenant's settings every 15 seconds by default.
@@ -275,13 +203,13 @@ reuses the existing status-image renderer and metadata prerequisites without
 changing the overlay. It returns 204 when no readable image is available, with
 Cache-Control: no-store. It does not substitute a raw camera snapshot. No Core
 volume, new authority or fresh printer capture command is introduced.
-Notification cadence/topics and Core printer command
-contracts are unchanged. There is no durable Telegram retry/outbox. Chat members
+Telegram delivery has no durable retry or outbox. Chat members
 can use the existing commands, so choosing a group chat grants that operational
-access. Source checks do not establish real Telegram delivery or the remaining
-Stage 9 secret rotation, identity lifecycle, TLS and lockdown gates.
+access.
 
-Stage 8 uses an AMS-owned `ams` schema with tenant-scoped terminal and pairing
+### AMS Terminal Identity and Operations
+
+AMS uses its own `ams` schema with tenant-scoped terminal and pairing
 records, forced RLS, and narrow security-definer functions for pre-tenant
 pairing consumption and terminal credential lookup. AMS runtime remains a
 non-owner, `NOSUPERUSER`, `NOBYPASSRLS` role. A dedicated `NOLOGIN`,
@@ -297,7 +225,8 @@ pending pairing by HMAC digest and derives the bound tenant and printer from
 that record; the terminal never supplies tenant or printer identity. A
 successful enrollment returns one random `EDOL-Terminal terminalId.secret`
 credential with `Cache-Control: no-store`, and all operational terminal calls
-authenticate with that credential. Codes are eleven uppercase Latin letters, expire in five minutes, and are single-use. Eleven letters preserve at least the former 50-bit code entropy while avoiding numeric input on the terminal touchscreen. Invalid attempts are rate-limited
+authenticate with that credential. Codes are eleven uppercase Latin letters, expire in five minutes, and are single-use.
+Invalid attempts are rate-limited
 by source without disclosing pairing state. Pairing-code HMAC verification
 accepts only current and immediately previous configured key versions.
 Plaintext codes and credentials are neither persisted nor logged.
@@ -307,13 +236,15 @@ and does not require Secure Boot, Flash Encryption, encrypted NVS, eFuses, or
 hardware-backed storage. Its transport is explicit: HTTP is allowed only for a
 trusted LAN and exposes credentials to a network interceptor; HTTPS continues
 to validate its configured CA and never falls back to HTTP after a TLS failure.
-Home retains its existing trusted-network routes. Disposable backend checks,
-firmware builds and the physical trusted-LAN functional smoke have passed.
-Secure/disposable acceptance completed on 2026-10-21 with the real ESP32
-SEC-06 TLS rejection/no-downgrade regression. The optional CA build hook now
-uses a build-local header to preserve PEM newlines on Windows; see the
-[Stage 8 acceptance record](deployment/stage8-terminal-acceptance-record.md).
-Home compatibility and production rollout remain separate gates.
+Home retains its existing trusted-network routes.
+
+Enrollment uses `POST /api/terminal/v1/enroll`. The credential authorizes
+`GET /api/terminal/v1/state`, `GET /api/terminal/v1/find` and
+`POST /api/terminal/v1/set-spool` for the persisted printer binding.
+Hub management calls AMS under `/internal/terminals`. Revoke, rotate,
+replace and factory reset retire the previous credential. The terminal returns
+to enrollment on an authentication or authorization rejection. Home retains
+its separate trusted-network routes.
 
 The terminal firmware HTTP service dispatches its two request slots to one
 FreeRTOS worker. DNS, clock readiness and HTTP/TLS transport run there; the
@@ -327,176 +258,23 @@ The main screen renders a pending lookup before a spool becomes assignable and
 readies its existing LVGL timer on staging-version changes. Repeated scans of
 the same ID during its lookup are coalesced; a different pending ID is retained
 for a subsequent lookup. This does not cache or bypass server ownership checks.
-These source responsibilities do not establish physical responsiveness or heap
-acceptance for an uploaded image.
 
-Stage 9.1 adds a secure-mode HTTP ownership interceptor for mapped
-`/api/printers/**` handlers with a `printerId` path variable. It resolves the
-persisted printer under the current tenant before runtime, camera, media, or
-command handlers run. The aggregate state endpoint returns only printers visible
-to the current tenant. Background runtime enumeration remains independent of
-this HTTP boundary. Home does not install the interceptor and retains its
-trusted-network state and command access without OAuth or tenant headers.
+### Agent Integration
 
-Connection response DTOs contain no printer access code in either deployment
-mode. Creation and update requests still accept a code. Core preserves the
-existing code when an update omits it or supplies a blank value; a nonblank value
-replaces it. Hub no longer reads the old code before editing a connection.
-Deploy this Core contract before the corresponding Hub change; an older Core
-can overwrite a code with the new Hub's blank-input request. This source change
-does not accept a deployment, change stored credential protection, or remove
-HTTP/MQTT compatibility.
+The opt-in secure Agent derives its tenant and printer from Core's persisted
+binding. [Agent pairing](contracts/agent-pairing.md) defines HTTPS enrollment,
+device and management APIs, upload guards and firmware trust. [Agent MQTT](contracts/agent-mqtt.md)
+defines broker authentication, ACLs, command routing and revocation. Home
+uses its own trusted-network Agent endpoints and topics.
 
-Stage 9.2 prepares secure Hub, Notify, and AMS readers for additive v2 and
-envelope-only v3. V2 still requires a matching legacy `event` marker; v3 does
-not require it, but rejects a contradictory marker if present. Both versions
-retain mandatory envelope identity, timestamp, payload, and the existing
-tenant/ownership checks. Core still publishes additive v2; topics, QoS, Hub
-receipt idempotency, and Home legacy consumers are unchanged.
+## Persistence and Lifecycle
 
-Each secure reader logs process-local ingress snapshots with a restart-specific
-observation ID and fixed counters for validated v2/v3 deliveries, presence of
-legacy `event`, rejected envelopes, and processing failures. These are log-based
-observations, not a new metrics exporter or proof of a zero-use deployment
-window. Validated delivery counts include duplicates and messages later denied
-by tenant/processing checks. No payload, credential, tenant, printer, or topic
-value is used as a counter dimension. Home does not initialize or record these
-secure observations.
+Core initializes enabled printer runtimes after application readiness. Hub
+validates the catalog projection and attempts recovery independently per
+enabled printer. Core and Hub validate their ORM schema against Flyway.
+Core, Hub and AMS each own their schema and migrations. Core stores models
+and snapshots on application-owned mounted paths. See [tenant ownership](contracts/tenant-ownership.md)
+for isolation and [operations](operations.md) for migration constraints.
 
-Stage 9.3a bounds agent model and snapshot uploads in both deployment modes.
-Core resolves the configured agent before reading the body; Home still uses
-`X-Agent-Id` as trusted-network routing, not authentication. Secure
-`/api/agent/**` remains denied pending a separately accepted machine identity.
-Models use portable basename validation, no-link directory/target checks, and
-same-directory staging with atomic replacement only after package validation.
-Upload-filter rejection preserves the previous model and emits no
-`ModelAvailableEvent`. JPEG snapshots are byte-bounded and decoded only after
-dimension checks, before replacing the in-memory snapshot.
-
-`edol-core.upload` defaults are 256 MiB per model, 8 MiB per snapshot, 16 MiB
-per selected metadata entry, 64 MiB total inflated metadata including package
-markers, 10,000 archive entries, and 40 million snapshot pixels. Limits are
-configurable without enabling OAuth or tenancy. Package checks require ZIP
-structure and the two package markers, safe distinct entry names, and bounded
-CRC-checked reads of selected metadata; they do not validate the full 3MF/XML
-schema or inflate unused model/G-code entries. Metadata extraction stages all
-selected outputs before per-file atomic promotion. It is not a multi-file disk
-transaction if an I/O failure occurs during promotion. Slice-info XML parsers
-reject DTDs and external entities. Storage assumes application-owned directories
-with permissions preventing concurrent local replacement by another user;
-remote path/link defenses do not provide a privileged-local-process boundary.
-
-Stage 9.3b.1 adds an opt-in secure agent pairing/HTTPS foundation. Core owns
-`core.agents`; Hub checks OWNER membership/printer access and calls its
-printer-scoped management API with the dedicated `core.agent.manage` scope.
-One-time five-minute codes are atomically exchanged for an agent-specific
-credential; only keyed digests persist. A separate stateless `/api/agent/v1/**`
-chain derives tenant/printer from the active credential before uploads and
-rejects device tenant/agent headers and plaintext requests. Forced RLS and two
-narrow pre-tenant functions protect the new secure-only V10 table; their
-NOLOGIN owner has NOBYPASSRLS and runtime cannot assume it. Home initializes
-none of this. Both service feature flags default off. Firmware pairing,
-broker identity/ACLs and MQTT session revocation are not implemented by this
-foundation; generic agent MQTT remains a separate outstanding boundary, not
-accepted secure ingress. See the
-[agent pairing contract](deployment/stage9-agent-pairing-contract.md).
-
-Stage 9.3b.2 firmware source adds an explicit secure PlatformIO profile for
-one-time HTTPS pairing and credential-bound streamed uploads, with a public CA
-provided through a build-local header and a separate device identity namespace.
-The Home profile remains the default and retains legacy settings/contracts.
-Secure EDOL HTTPS/MQTT clients on the audited Arduino-ESP32 2.0.17 / mbedTLS
-2.28.7 SDK add strict IPv4 SAN verification through a per-session callback.
-Canonical IPv4 requires an exact binary iPAddress SAN; CN and textual DNS SAN
-cannot authorize an IP endpoint. DNS retains native matching, and all chain,
-signature, time and usage checks remain required. No server certificate or
-deployment change is required; physical acceptance remains a separate gate.
-The owner explicitly deferred setup AP hardening: its existing open Wi-Fi and
-local portal trust boundary remain. Secure setup now uses one Save & Reboot form
-with bounded progress/retry through Wi-Fi, NTP, verified TLS, enrollment and MQTT
-provisioning/connection, then reboots into normal operation. Pending pairing codes
-exist only in RAM with a five-minute local limit; server expiry remains authoritative.
-Pre-send transport failures are retryable, but uncertain one-time responses require
-owner recovery. Existing identity and persistent MQTT attempt markers survive
-restart; an attempted issuance without a usable secret reopens setup without
-replaying provisioning. No backend route, MQTT topic or NVS key is changed.
-Secure agent MQTT is
-implemented by the following coordinated increment; this is not complete
-secure-agent or physical TLS acceptance.
-
-The opt-in `lolin_d32_secure_smoke` lab environment adds bounded USB entry points
-into the same production camera/FTPS-to-HTTPS services and an explicit return
-to the existing setup portal without clearing identity/settings. Normal Home
-and secure builds contain no lab console. See the Stage 9 disposable smoke
-workbook; direct USB-triggered uploads do not establish secure MQTT operation.
-
-Stage 9.3b secure MQTT source uses one Mosquitto/Dynamic Security broker for
-service events and Agent traffic, with independent identities/ACLs. The approved
-transport is server-authenticated TLS plus distinct client credentials, not
-mandatory Agent mTLS. Secure Paho clients require TLS/credentials; Home remains
-trusted-network and uses its legacy contracts. Authenticated HTTPS provisioning
-issues a separate MQTT secret once. Secure-only V11 stores authority lifecycle
-metadata and durable revocation tombstones with forced RLS. Core resolves
-`edol/agent/v1/{agentId}/...` through persisted active Agent/printer/tenant
-bindings for ingress and commands. Retirement, printer disable/mode changes and
-deletion invalidate routing and enqueue broker disconnection; failed operations
-remain pending and are retried. Replace waits for confirmed broker retirement.
-Pending retirement also blocks successful revoke and new codes when the MQTT
-feature is disabled after authority issuance; feature disable is not revocation.
-Firmware keeps separate MQTT readiness/attempt markers, verifies TLS and
-restores subscriptions on reconnect. See the
-[MQTT contract](deployment/stage9-agent-mqtt-contract.md) for configuration,
-failure windows, compatibility and rollback. This is source/disposable work,
-not working-broker replacement, database rollout or physical acceptance.
-
-See `docs/adr/0002-secure-multi-tenant-architecture.md`,
-`docs/migrations/tenant-ownership-matrix.md`, and
-`docs/migrations/secure-multi-tenant-migration-plan.md`. These documents define
-the target and rollout; the system map and flows above remain the implemented
-current state until individual stages are completed and audited.
-
-## Planned Deployment Profiles
-
-The accepted target includes two explicitly selected, mutually exclusive
-profiles. `home` will be a single-owner, trusted-network installation with
-Core, Hub, PostgreSQL, and MQTT only; it has one internally controlled tenant
-and does not start Keycloak, OIDC, user memberships, service OAuth, or
-multi-tenant RLS. Notify and AMS will be opt-in home add-ons. It is not
-appropriate for untrusted users, public exposure, or data isolation between
-people.
-
-`secure-multi-tenant` remains the ADR 0002 target: Keycloak, authenticated
-memberships, separate service identities, trusted tenant propagation, and
-forced RLS are required. The required `EDOL_DEPLOYMENT_MODE` /
-`edol.deployment.mode` selection will fail on an absent or unknown value, and
-mode changes will not convert an existing database; a later controlled,
-backup-first home-to-secure migration is required. Stage H is accepted and
-provides the explicit home Compose template and fail-closed mode selection, but
-is not deployed. Secure Hub now requires its BFF OIDC configuration and starts
-only with those prerequisites; it does not expose the former pre-auth ingress.
-
-## Lifecycle and Persistence
-
-- On `ApplicationReadyEvent`, Core creates and starts runtime for enabled printers. Hub synchronizes the Core printer catalog and validates its UUID projection and printer-owned Hub data. Hub V5 rechecks Hub ownership paths, makes the Hub job, maintenance, and statistics printer relationships mandatory, and removes the legacy integer job printer ID without inferring a mapping. Missing, orphaned, or duplicate Hub ownership blocks the migration; a Core catalog mismatch blocks runtime validation, while catalog unavailability skips that validation and reports the catalog unavailable. Hub then attempts recovery independently for every enabled projected printer.
-- Core and Hub each use Flyway with PostgreSQL and `hibernate.ddl-auto=validate`; their schemas are `core` and `hub` respectively. Flyway migrations are the database contract. Core V7 adds the foreign key from `active_print_context.printer_id` to `printers.id` after failing on existing orphaned contexts; Hub V5 contracts the validated printer ownership columns. Stage 2 Core V8 adds nullable opaque printer ownership without requiring a Hub schema when Core has no printers, and uses the Hub projection only to backfill a non-empty Core catalog. Local migration, mapping, and runtime checks passed. The controlled production Hub V2 history repair completed on 2026-09-24 from the exact corrected release, after which Hub V5 and V6 applied successfully; the evidence is recorded in the Stage 2 migration audit. PostgreSQL extensions required by immutable historical migrations are database-administrator bootstrap prerequisites; restricted Flyway and runtime roles do not receive database `CREATE` for extension provisioning.
-- Core stores models and camera snapshots on mounted volumes. Docker Compose also mounts service logs.
-
-## Operational Contracts
-
-- MQTT event type, payload fields (including printer and session identity), topic, and ordering/recovery expectations are cross-service contracts.
-- Core HTTP state and command endpoints are cross-service contracts. Printer commands may affect physical devices.
-- Docker Compose resolves its environment files and persistent volumes relative to the parent of the repository. Do not assume versioned root `.env_edol_*` files are the runtime configuration used by Compose.
-
-## Testing and Checks
-
-- The reactor check used by CI is `mvn -B clean verify`, followed by SonarQube analysis.
-- Hub has Mockito-based unit tests and optional Testcontainers coverage for the Flyway PostgreSQL chain. There is no automated integration coverage for Core/Hub HTTP, MQTT, or physical printers.
-- Validate changes at the narrowest affected module first, then broaden checks when a shared contract, migration, or runtime boundary changes.
-
-## Decision Records
-
-Use `docs/adr/README.md` for decisions that are explicitly established or newly accepted. Do not create ADRs from inferred or unfinished work.
-
-Accepted target decisions do not imply that their implementation stages are
-complete. Update this document after each stage only with behavior verified in
-the repository and deployment contract.
+Use the [ADR index](adr/README.md) for accepted decisions and
+[AI workflow](ai-workflow.md) for developer verification and MCP setup.

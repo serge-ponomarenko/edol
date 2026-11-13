@@ -146,7 +146,7 @@ Initial clients and audiences are:
 | --- | --- | --- |
 | `edol-hub-web` | Hub login callback | Browser OIDC client |
 | `edol-hub-service` | `edol-core-api`, later `edol-ams-api` | Hub service calls |
-| `edol-notify-service` | `edol-core-api` | Notify service calls |
+| `edol-notify-service` | `edol-core-api`, `edol-hub-api` | Notify service calls |
 | `edol-ams-service` | `edol-core-api`, `edol-hub-api` | AMS service calls |
 
 Initial resource scopes are deliberately operation-oriented rather than
@@ -160,7 +160,8 @@ tenant-specific:
 | `core.state.read` | Read current printer/AMS state | Hub, Notify, AMS |
 | `core.command.execute` | Pause, resume, stop, push state, fetch metadata, and other printer commands | Hub, Notify |
 | `core.media.read` | Read camera, plate, and timelapse media | Hub, Notify |
-| `core.agent.upload` | Upload agent telemetry/media for an assigned printer | Future per-agent identities only |
+| `core.agent.manage` | Manage pairing and retirement for a tenant-owned printer | Hub only |
+| `hub.notify.read` | Discover enabled tenants and read their Telegram settings | Notify only |
 | `hub.spool.read` | Resolve tenant-visible spool information | AMS only |
 | `hub.spool.change` | Apply the existing validated spool-change workflow | AMS only |
 | `ams.terminal.manage` | Create, revoke, rotate, and re-pair terminals | Hub only |
@@ -198,7 +199,7 @@ actor header as authorization.
 ### Trust boundaries and communication map
 
 The table describes the target contract. Compatibility exceptions are limited
-to the migration stages described later in this ADR.
+to the explicitly scoped migration compatibility below.
 
 | Edge | Caller identity | Authentication | Authorization | Tenant-context source | User delegation | Trust assumptions |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -215,7 +216,7 @@ to the migration stages described later in this ADR.
 | AMS to Hub | `edol-ams-service` | OAuth client credentials over TLS | Hub audience and narrow AMS scopes | AMS trusted processing context | None | Hub validates service identity, tenant, scope, and target ownership |
 | Hub to AMS | `edol-hub-service` | OAuth client credentials over TLS | AMS audience, terminal-management scope, and Hub `OWNER` decision | Hub active tenant | No user token delegation; Hub authorizes the user before the service call | AMS trusts tenant context only from the Hub service client |
 | AMS Terminal to AMS | Individual terminal identity | Opaque device credential over server-authenticated TLS | Active credential, terminal, endpoint, tenant, and printer scope | Persisted AMS terminal record | None | Pairing input is untrusted until atomically verified; a pairing code is never an operational credential |
-| Printer or agent to Core | Individual printer protocol identity or future agent machine identity | Printer protocol security or scoped agent credential over TLS | Assigned printer and telemetry/upload scope | Persisted Core printer mapping | None | Device-provided printer, path, and file metadata remain untrusted inputs |
+| Printer or agent to Core | Individual printer protocol identity or Agent machine identity | Printer protocol security or scoped agent credential over TLS | Assigned printer and telemetry/upload scope | Persisted Core printer mapping | None | Device-provided printer, path, and file metadata remain untrusted inputs |
 
 ### Passive Core ownership contract
 
@@ -239,15 +240,8 @@ dependency.
 
 Use Hibernate discriminator tenancy and PostgreSQL row-level security together.
 
-Directly tenant-owned entities use Hibernate `@TenantId` and a
-`CurrentTenantIdentifierResolver`. Child entities normally do not duplicate
-`tenant_id` when ownership can be derived safely through a mandatory foreign
-key. Cross-aggregate association entities carry `tenant_id` where it is needed
-to enforce that both sides belong to the same tenant. Composite foreign keys
-enforce links to direct tenant-owned parents. Links to parents whose ownership
-is derived use PostgreSQL constraint triggers and RLS `WITH CHECK`; the trigger
-functions use invoker privileges and schema-qualified objects rather than a
-general security-definer bypass.
+The [tenant ownership contract](../contracts/tenant-ownership.md) defines
+discriminator placement, derived ownership and cross-aggregate constraints.
 
 The tenant resolver is fail-closed. A missing tenant never resolves to the
 legacy default tenant. Open EntityManager in View is disabled, and tenant-owned
@@ -255,21 +249,10 @@ work executes within explicit transactions. Background and asynchronous work
 must carry a trusted tenant and establish a new tenant-scoped transaction; it
 must not pass a live entity or persistence session between threads.
 
-At transaction start, the application sets tenant state on the same database
-connection with parameterized `set_config('edol.tenant_id', value, true)`.
-Transaction-local state prevents tenant leakage when pooled connections are
-returned. Policies use null-safe `current_setting(..., true)`, `USING`, and
-`WITH CHECK`. A missing or malformed setting denies access.
-
-Pre-tenant user and membership discovery uses a separate authenticated
-`IdentityContext`, never an invented tenant. Hub sets the validated OIDC issuer
-and subject transaction-locally as `edol.oidc_issuer` and
-`edol.oidc_subject`. User policies allow only the row matching that pair;
-membership and tenant-selection policies allow only memberships belonging to
-that user. A clean JIT flow generates the new tenant UUID, establishes that
-tenant context, and creates the tenant and owner membership atomically. The
-legacy first-owner claim is a distinct bootstrap transaction guarded by the
-zero-user/zero-membership invariant and bootstrap window.
+Tenant and OIDC identity are set transaction-locally on the runtime
+connection. New-tenant JIT provisioning is atomic. The legacy first-owner
+claim has a separate, closed-by-default bootstrap window and requires zero
+existing users and memberships.
 
 Schema ownership, Flyway execution, and application runtime use separate roles.
 Runtime roles are not table owners, superusers, or `BYPASSRLS` roles. Tenant
@@ -289,7 +272,7 @@ following restrictions:
   through an HTTP controller or general repository.
 
 After enumeration, operational reads and writes use the normal datasource in a
-tenant-scoped transaction. Each post-stage audit must re-check the catalog
+tenant-scoped transaction. Changes to this boundary must re-check the catalog
 role's grants, policies, dependency paths, and negative access tests.
 
 ### MQTT tenancy
@@ -317,16 +300,9 @@ QoS 1 duplicate delivery. Producer and subscriber identities, TLS, and broker
 ACLs are introduced without breaking older consumers and are required before
 legacy event fields are removed.
 
-MQTT decision clarification, accepted 2026-10-22: use one Mosquitto broker for
-internal service events and Core/Agent communication, with independent client
-credentials and least-privilege topic ACLs. Server-authenticated TLS is required;
-per-Agent client certificates are not mandatory for this deployment model.
-Pairing provisions a distinct MQTT secret rather than reusing the HTTPS
-credential. Dynamic Security provides targeted disconnection of revoked active
-sessions; Core persists lifecycle intent and does not report broker completion
-while it is pending. Home retains its independent trusted-network contracts.
-This decision does not authorize a working-broker cutover or waive database
-TLS/service asymmetric-authentication decisions. See the Stage 9 MQTT contract.
+Use one Mosquitto broker and independent client identities over server-
+authenticated TLS. Agent client certificates are optional. See the
+[Agent MQTT contract](../contracts/agent-mqtt.md) for ACLs and revocation.
 
 ### AMS Terminal identity
 
@@ -334,37 +310,11 @@ AMS owns the terminal and pairing registry. An authenticated Hub `OWNER`
 creates, revokes, or re-pairs a terminal through an authenticated Hub-to-AMS
 management API.
 
-The initial protocol uses a short-lived, single-use EDOL pairing credential.
-The terminal submits only that code to AMS and receives a persistent per-device
-credential exactly once. AMS resolves the tenant and printer from the persisted
-pairing, so the terminal does not supply either identity at enrollment. The
-pairing code is tenant-bound, source-rate-limited, expires after five minutes,
-is stored only as a digest, and is consumed atomically.
-
-The persistent credential is an opaque random 256-bit secret represented with
-a terminal identifier. AMS stores only a keyed digest and validates it in
-constant time. The ESP32 stores it in standard Preferences (NVS); secure boot,
-flash encryption, encrypted NVS, eFuse provisioning, and hardware-backed
-storage are not enrollment prerequisites. Transport is explicitly selected:
-HTTP is supported only on a trusted LAN, while configured HTTPS remains
-server-authenticated and never downgrades to HTTP after a TLS failure.
-Credentials are endpoint- and printer-scoped, revocable, rotatable, and
-replaceable through re-pairing. Factory reset or terminal replacement requires
-revocation and a new pairing operation.
-
-OAuth 2.0 Device Authorization Grant is not used for the first implementation.
-It adds authorization-server, polling, and user-code UX complexity without a
-current requirement for the terminal to hold delegated OAuth authority. It may
-be reconsidered if terminals later need direct, standardized user delegation.
-
-| Concern | EDOL-managed enrollment | RFC 8628 / Keycloak Device Authorization Grant |
-| --- | --- | --- |
-| User experience | User starts pairing in EDOL and enters the resulting code on the terminal | Terminal obtains and displays a user code; user opens a verification URI and authorizes while the terminal polls |
-| Resulting identity | Narrow AMS terminal record and opaque per-device credential | OAuth tokens issued to a device client, with token refresh and authorization-server lifecycle |
-| Tenant binding | Hub-authorized tenant is bound when the pairing record is created | Requires mapping the authorized IdP user back to EDOL tenant selection during device authorization |
-| ESP32 complexity | One TLS exchange plus ordinary authenticated AMS calls | Device authorization request, interval-aware polling, OAuth error handling, token storage, expiry, and refresh |
-| Revocation and rotation | Implemented directly on the AMS terminal record | Requires OAuth client/token revocation plus EDOL terminal lifecycle mapping |
-| Best fit | Current fixed-purpose AMS API | Future device needing standardized delegated OAuth access across resource servers |
+AMS-managed enrollment keeps the terminal credential scoped to one device
+and one printer. OAuth device authorization would add polling and user
+delegation without a requirement for either. Use the
+[terminal contract](../architecture.md#ams-terminal-identity-and-operations)
+for the current protocol and transport boundary.
 
 ### Authorization and response semantics
 
@@ -389,16 +339,14 @@ network controls. Legacy access cannot provision printers or reach new tenants.
 Hub user authentication also retains a temporary AMS-only compatibility
 boundary for the existing spool lookup and spool-change calls. It is restricted
 to the exact current endpoints, the legacy tenant, and internal network ingress;
-it is not part of the browser security chain. The boundary is removed when AMS
-receives its service identity.
+it is not part of the browser security chain. Retained compatibility must be explicitly enabled, scoped and measured until
+retirement. See [operations](../operations.md#database-changes-and-recovery).
 
 Before Keycloak is introduced, Hub may temporarily run current legacy traffic
 inside an explicitly named `LegacyDefaultTenantCompatibilityScope`. This is a
 migration boundary, not resolver behavior: it sets the known legacy tenant only
 at enumerated entry points, logs and meters every use, and leaves normal
-`TenantContext` resolution fail-closed. The scope, its configuration, and its
-tests are removed in the user-authentication stage, not deferred to final
-hardening.
+`TenantContext` resolution fail-closed. Authenticated Hub requests use active membership in place of that scope.
 
 ## Rationale
 
@@ -446,9 +394,9 @@ general application escape from RLS.
 
 ## Alternatives
 
-- **Use the Stage 3 `LegacyDefaultTenantCompatibilityScope` as permanent home
+- **Use the legacy default-tenant scope as permanent home
   mode:** rejected because it is a measured pre-auth migration bridge, not a
-  deployment boundary, and secure mode must delete it in Stage 4.
+  deployment boundary with its own installation tenant.
 - **Make secure multi-tenancy optional feature flags within one running service
   graph:** rejected because a partial or inconsistent flag set could silently
   expose unauthenticated or cross-tenant paths. A single required deployment
@@ -511,8 +459,7 @@ general application escape from RLS.
   rotation, audit logs, and later asymmetric client authentication reduce this
   residual risk.
 - Significant changes to this decision require an ADR amendment or superseding
-  ADR. The living implementation plan may be updated after each stage without
-  rewriting this decision history.
+  ADR.
 
 ## References
 

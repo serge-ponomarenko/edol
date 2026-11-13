@@ -16,5 +16,5 @@ Keep the record concise and update its status only when a later explicit decisio
 
 ## Index
 
-- `0001-hub-printer-projection-and-tenant-bootstrap.md` — Core-owned printer UUIDs, Hub tenant projections, default-tenant bootstrap, and expand/backfill/contract rollout.
-- `0002-secure-multi-tenant-architecture.md` — Accepted tenant ownership, authentication, persistence isolation, service trust, MQTT, and device-enrollment architecture.
+- [ADR 0001](0001-hub-printer-projection-and-tenant-bootstrap.md) covers Core-owned printer UUIDs, Hub projections and expand/backfill/contract. ADR 0002 supersedes its temporary tenant bootstrap.
+- [ADR 0002](0002-secure-multi-tenant-architecture.md) covers tenant ownership, authentication, persistence isolation, service trust, MQTT and device enrollment.

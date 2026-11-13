@@ -10,6 +10,13 @@
 - Treat the current request, this file, applicable Skills, configuration, tests, and implementation as separate inputs. Resolve conflicts explicitly; do not silently choose documentation over code.
 - Before non-trivial changes, state a short plan and verifiable success criteria. Surface material assumptions, ambiguity, and simpler viable options.
 
+## Knowledge Ownership
+
+- Git is canonical for current architecture, accepted normative ADRs, API/MQTT/tenant/security contracts, code, tests, immutable Flyway, and supported executable deployment or verification procedures.
+- The scoped Home MCP Obsidian project `edol` is canonical for development backlog, temporary plans, operator evidence, dated smoke results, checkpoints and handoffs. Use `.agents/skills/edol-knowledge-management/SKILL.md` for current paths and safe read/write behavior; verify MCP authentication and user authorization separately.
+- Do not move a repeatable safety procedure solely into Obsidian. Do not treat a historical note as authorization for live printer, firmware, Docker, database, identity or deployment operations.
+- `docs/ai-workflow.md` covers MCP, subagent setup and access to project knowledge. README is frozen until the multi-tenant migration is complete.
+
 ## Change Safety
 
 - Check the current branch and `git status` before editing. Preserve pre-existing changes and never discard, overwrite, or reformat them.
@@ -27,7 +34,7 @@
 
 ## Deferred Work
 
-- Do not leave source-code TODO comments for deferred work. Record postponed cross-cutting work in `docs/ai-workflow.md` under `Project TODO`, including the intended outcome and relevant safety constraints.
+- Do not leave source-code TODO comments for deferred work. Maintain postponed cross-cutting work in the authorized Home MCP Obsidian EDOL backlog (`projects/edol/work/EDOL-048/backlog.md`), recording intended outcomes and safety constraints. Follow `edol-knowledge-management`; if Obsidian is unavailable, report the missing write and give a concise in-conversation handoff, never an ad hoc Git TODO.
 
 ## Workflow Improvement
 

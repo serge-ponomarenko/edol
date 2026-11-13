@@ -19,11 +19,11 @@ main agent.
 
 | Role | Model and effort | Scope and routing | Tools and skills | Escalate when |
 | --- | --- | --- | --- | --- |
-| `commit-agent` | `gpt-5.6-luna`, low | After a completed coherent stage, every explicit request to commit, including `закоміть це`, authorizes it to identify the stage, stage only its files, create one local commit, and report the hash and residue. | Git CLI; `edol-commit-preparation`. | The completed-stage scope is ambiguous; unrelated changes cannot be separated; a reset, stash, amend, push, or design decision would be needed. |
-| `test-agent` | `gpt-5.6-luna`, medium | Request to run, select, or report targeted verification. It chooses the smallest meaningful check and classifies failure evidence. | Maven; `edol-remote-docker-verification`; `edol-local-runtime-verification` only when a smoke check is explicit. | A failure needs substantial debugging or code change; a migration, security, cross-module, or external-state decision is involved. |
-| `db-inspect-agent` | `gpt-5.6-luna`, low | Need for current local PostgreSQL schema, constraint, data-shape, index, or Flyway evidence during analysis. It returns facts only. | Existing `edol-postgres` MCP, registered only in this role; `docs/ai-workflow.md`. | No local read-only profile exists; evidence conflicts with assumptions; the request needs migration design, DDL/DML, remediation, security, or deployment work. |
+| `commit-agent` | `gpt-6-luna`, low | After a completed coherent stage, every explicit request to commit, including `закоміть це`, authorizes it to identify the stage, stage only its files, create one local commit, and report the hash and residue. | Git CLI; `edol-commit-preparation`. | The completed-stage scope is ambiguous; unrelated changes cannot be separated; a reset, stash, amend, push, or design decision would be needed. |
+| `test-agent` | `gpt-6-luna`, medium | Request to run, select, or report targeted verification. It chooses the smallest meaningful check and classifies failure evidence. | Maven; `edol-remote-docker-verification`; `edol-local-runtime-verification` only when a smoke check is explicit. | A failure needs substantial debugging or code change; a migration, security, cross-module, or external-state decision is involved. |
+| `db-inspect-agent` | `gpt-6-luna`, low | Need for current local PostgreSQL schema, constraint, data-shape, index, or Flyway evidence during analysis. It returns facts only. | Existing `edol-postgres` MCP, registered only in this role; `docs/ai-workflow.md`. | No local read-only profile exists; evidence conflicts with assumptions; the request needs migration design, DDL/DML, remediation, security, or deployment work. |
 
-`gpt-5.6-luna` is selected from the locally available model catalog because it
+`gpt-6-luna` is selected from the locally available model catalog because it
 is the fast, efficient available model and these agents have narrow output
 contracts. Test selection and failure classification use medium reasoning;
 commit and read-only evidence gathering use low reasoning. The roles do not

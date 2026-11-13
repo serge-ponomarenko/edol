@@ -1,6 +1,6 @@
 name = "db-inspect-agent"
 description = "Low-cost read-only EDOL PostgreSQL evidence gatherer for current local schema, tables, constraints, indexes, data shape, and Flyway history. Returns facts to the parent; it never designs or applies migrations."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "low"
 sandbox_mode = "read-only"
 
