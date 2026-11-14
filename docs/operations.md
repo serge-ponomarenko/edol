@@ -102,7 +102,7 @@ openssl req -x509 -newkey rsa:3072 -nodes -days 3650 -sha256 \
   -keyout "$ca/ca-key.pem" -out "$ca/ca.pem" -subj '/CN=EDOL dev MQTT CA'
 openssl req -new -newkey rsa:2048 -nodes -keyout "$certs/mqtt/server-key.pem" \
   -out "$ca/server.csr" -subj '/CN=mqtt'
-printf '%s\n' 'subjectAltName=DNS:mqtt,IP:192.168.0.200' 'extendedKeyUsage=serverAuth' > "$ca/server.ext"
+printf '%s\n' 'subjectAltName=DNS:mqtt,DNS:dev.edol.s-pon.dev,IP:192.168.0.200' 'extendedKeyUsage=serverAuth' > "$ca/server.ext"
 openssl x509 -req -in "$ca/server.csr" -CA "$ca/ca.pem" -CAkey "$ca/ca-key.pem" \
   -CAcreateserial -out "$certs/mqtt/server.pem" -days 365 -sha256 -extfile "$ca/server.ext"
 install -m 0600 "$ca/ca.pem" "$certs/mqtt/ca.pem"
@@ -125,6 +125,49 @@ private key. The combined JVM store retains public roots for Keycloak/Telegram
 and adds the public MQTT CA. No printer or device is needed to start the empty
 web environment. Configure device endpoints, trust and pairing later through
 the supported setup flow; deployment changes no firmware, NVS or device trust.
+
+For an existing Secure Dev certificate missing the public DNS SAN, prepare a
+replacement with the existing CA and server key from the reviewed checkout:
+
+```bash
+python3 docker/deploy/mqtt_certificate.py --config /srv/edol-dev/secure/instance.json
+```
+
+This stages only `state/mqtt-server.pending.pem` under the shared deployment
+lock; it does not replace the active certificate or restart a service. The
+public hostname is derived from `hub_origin`, so both device transports use
+`dev.edol.s-pon.dev`. The current CA, server key, internal `mqtt`/LAN identities
+and existing DNS/IP SANs are preserved. The CA signing key stays in the
+instance's `ca/ca-key.pem`; it is never mounted into the broker or exported.
+
+On the next `dev-secure-deploy`, certificate staging/validation happens before
+stopping Dev. After stopping, the deployer validates the candidate against the
+same CA/server key and required DNS/IP SANs, keeps a fingerprint-named backup
+of the prior server certificate, and atomically installs only `server.pem`
+before starting services. If the active certificate already validates, it is
+left unchanged and no online CA signing key is required. Invalid/mismatched
+candidates fail closed with `stage=mqtt-certificate services=mqtt`. A stale
+candidate is never silently overwritten; inspect it locally before replacing
+that public certificate file. Home and production do not use this Dev signing
+procedure. Broker authority, PostgreSQL, device identities, CA, private keys,
+JVM truststore and ESP32 NVS are unchanged.
+
+### External MQTT access
+
+Secure Dev uses raw MQTT over TLS at `dev.edol.s-pon.dev:18884`. The DNS record
+must be DNS-only and resolve to the public ingress address for external
+clients. Publish/forward **TCP 18884** at the router/firewall to
+`192.168.0.200:18884` (adjust the destination to the protected instance's actual
+`bind_address`/`mqtt_port`). Existing Compose maps that listener to broker TLS
+port 8883. Keep anonymous access disabled and all existing Agent ACLs intact.
+Certificate preparation does not configure the router/firewall or prove WAN
+reachability; verify these separately from outside the LAN. Split DNS may map
+the same hostname to the LAN address while preserving hostname verification.
+
+HTTPS remains on 443. The current Agent uses raw MQTT, not WebSockets. Sharing
+the same hostname/IP/443 with HTTPS requires an explicitly designed transport
+proxy or a firmware transport change; an HTTP nginx location alone cannot
+route the current MQTT stream. No 443 sharing or nginx change is implemented.
 
 ### 4. Configure nginx and DNS
 
@@ -397,6 +440,48 @@ secret and rotate Hub's client secret in Keycloak and Hub together.
   contracts for credential transitions.
 
 ## Device TLS and restoration
+
+### Secure Dev Agent setup
+
+Save an enabled printer with connection mode `AGENT`, then open **Manage
+printer agent > Pair agent** as its tenant OWNER. Enter the new 12-character
+code in the secure Agent setup portal within five minutes. Codes are shown
+once; the Agent obtains its own identity and MQTT credentials. An identity
+from a retired environment does not create a binding in a fresh Core database.
+Use the owner pairing/replacement flow rather than erasing device storage.
+
+For the example Dev instance, use these device-side settings; confirm any
+operator overrides in the protected `instance.json` first:
+
+| Agent setup field | Value |
+| --- | --- |
+| Core Host / Port | `dev.edol.s-pon.dev` / `443`, no scheme in Host |
+| EDOL MQTT Host / Port | `dev.edol.s-pon.dev` / `18884` |
+| Printer Host / Serial / Access Code | Actual printer LAN settings, entered locally |
+| WiFi | Actual local network settings, entered locally |
+
+The public Agent HTTPS routes must reach Core through the trusted nginx
+location in `docker/nginx/dev.conf.template`. The MQTT endpoint uses the
+externally routed TLS listener with a matching DNS SAN, not the Cloudflare HTTP
+proxy or a Docker-only service name.
+
+The Agent's `EDOL_AGENT_ROOT_CA_FILE` must contain public trust anchors for
+**both** endpoints. Keep the instance's MQTT CA from
+`/srv/edol-dev/secure/certs/mqtt/ca.pem`; add the HTTPS issuer's trusted root
+certificates (ISRG Root X1/X2 for the current Let's Encrypt chain). Preserve
+existing anchors still needed by the device. Never substitute the HTTPS leaf
+certificate for a CA or include private keys in the firmware bundle. Updating
+the JVM truststore alone does not update the ESP32 trust bundle.
+
+Use the Agent repository's current isolated build procedure and corrected
+date-enforcing SDK; its `docs/dynamic-tls-experiment.md` describes the required
+guards. Keep generated CA files, SDKs and firmware outside Git. Before a manual
+app-only update, verify the artifact hash, embedded bundle hash and unchanged
+partition table; retain NVS, device identity and prior recovery artifacts.
+Host TLS verification and a successful build do not establish on-device TLS,
+enrollment, MQTT or printing acceptance. Record these results separately.
+
+### Bounded TLS verification
 
 Use a separately approved isolated fixture with the actual device transport
 and production TLS library. Confirm the board, port, exact build, intended

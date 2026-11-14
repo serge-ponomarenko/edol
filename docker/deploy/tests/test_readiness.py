@@ -129,6 +129,7 @@ class ReadinessTests(unittest.TestCase):
         with patch("dev_deploy.run"), patch("dev_deploy.stop_dev_containers"), \
                 patch.object(deployment, "dc", side_effect=compose_command), \
                 patch.object(deployment, "sql"), patch.object(deployment, "guard_database"), \
+                patch.object(deployment, "configure_mqtt_certificate"), \
                 patch.object(deployment, "migrate", side_effect=original), redirect_stderr(output):
             with self.assertRaises(dev_deploy.DeploymentFailure) as captured:
                 deployment.apply()

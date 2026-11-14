@@ -97,6 +97,7 @@ class KeycloakSmtpTests(unittest.TestCase):
                 patch.object(deployment, "dc", side_effect=command), patch.object(deployment, "sql"), \
                 patch.object(deployment, "guard_database"), patch.object(deployment, "migrate"), \
                 patch.object(deployment, "wait_http", side_effect=ready), \
+                patch.object(deployment, "configure_mqtt_certificate"), \
                 patch.object(deployment, "configure_smtp", side_effect=configure):
             with self.assertRaises(dev_deploy.DeploymentFailure) as captured:
                 deployment.apply()

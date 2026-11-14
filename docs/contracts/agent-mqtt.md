@@ -124,6 +124,15 @@ database volumes or broker authority. See [operations](../operations.md) for
 empty first initialization and data-preserving redeploys; no generic Compose base or
 secure broker override is required.
 
+Secure Dev uses the public Hub hostname for both Core HTTPS and raw MQTT TLS
+(separate ports 443 and 18884). The broker certificate must validate the public
+DNS name, the internal `mqtt` name and the configured LAN bind IP. Certificate
+preparation retains the existing CA/server key and broker/device authority;
+only the server certificate is replaced under the deployment lock after the
+broker stops. Router/firewall forwarding and DNS-only public resolution are
+separate operator responsibilities. MQTT over WebSockets or shared-port 443
+routing is not part of the current firmware/deployment contract.
+
 ## Verification and rollback
 
 Verify service traffic, per-Agent ACL isolation, denied unknown/revoked

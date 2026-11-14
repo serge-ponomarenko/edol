@@ -14,6 +14,7 @@ import time
 
 import database
 import keycloak_smtp
+import mqtt_certificate
 from model import AMS_READINESS_HEADERS, SERVICES, compose, realm, validate
 
 
@@ -28,7 +29,7 @@ class DeploymentFailure(RuntimeError):
     def __init__(self, stage, services, status=None):
         super().__init__("Deployment operation failed")
         stages = {"http-readiness", "compose-up", "compose-build", "compose-config", "compose-pull",
-                  "compose-exec", "compose-ps", "compose-stop", "smtp-config"}
+                  "compose-exec", "compose-ps", "compose-stop", "smtp-config", "mqtt-certificate"}
         self.stage = stage if stage in stages else "deployment"
         self.services = tuple(service for service in services if service in KNOWN_SERVICES)
         self.status = status if isinstance(status, int) and 100 <= status <= 599 else None
@@ -219,6 +220,13 @@ class Deployment:
         except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError, RuntimeError) as error:
             raise DeploymentFailure("smtp-config", ("keycloak",)) from error
 
+    def configure_mqtt_certificate(self, activate=False):
+        try:
+            operation = mqtt_certificate.activate if activate else mqtt_certificate.stage
+            operation(self.config, self.state)
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            raise DeploymentFailure("mqtt-certificate", ("mqtt",)) from error
+
     def apply(self):
         c = self.config
         if c["environment"] != "dev" or c["project"] not in DEV_PROJECTS:
@@ -229,8 +237,10 @@ class Deployment:
         self.dc("build")
         run(["docker", "pull", c["flyway_image"]])
         self.dc("pull", "--ignore-buildable")
+        self.configure_mqtt_certificate()
         stop_dev_containers()
         try:
+            self.configure_mqtt_certificate(activate=True)
             print("Starting persistent device storage", flush=True)
             self.dc("up", "-d", "--wait", "--wait-timeout", "120", "postgres")
             # Check instance ownership before provisioning or applying migrations.

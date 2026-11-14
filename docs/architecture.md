@@ -106,7 +106,14 @@ there is no automatic data reset or dataset import. Secure Dev reconciles only
 the managed Keycloak SMTP map via the Admin API after readiness on every
 deployment, including API key changes; startup realm import remains create-only
 and other realm settings are preserved. Home and secure state remain separate;
-Home creates no OIDC users or memberships. Compose-native
+Home creates no OIDC users or memberships.
+
+Secure Dev devices use the public Hub DNS name for HTTPS (443) and raw MQTT
+TLS (18884); DNS-only routing and external TCP forwarding are operator-owned.
+Deployment stages a missing MQTT DNS SAN certificate using the existing CA
+and server key, then installs it only after stopping Dev, retaining authority
+and a previous-certificate backup. It does not rotate device identities or CA.
+Compose-native
 healthchecks cover the dependencies and HTTP services; Notify exposes only a
 clearly labelled process-liveness check. Future reusable data snapshots require
 a separate accepted dataset and are not part of current deployment.
