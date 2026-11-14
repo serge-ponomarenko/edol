@@ -96,6 +96,13 @@ class DeploymentTests(unittest.TestCase):
         self.assertNotIn("reverse-proxy", result["networks"])
         self.assertNotIn("core_runtime", database.provision(c))
 
+    def test_secure_core_trusted_clients_use_value_compatible_csv(self):
+        for environment in ("dev", "prod"):
+            result = model.compose(fixture(environment=environment), Path("/source"), Path("/state"))
+            props = json.loads(result["services"]["edolcore"]["environment"]["SPRING_APPLICATION_JSON"])
+            self.assertEqual(props["edol-core.security.trusted-service-client-ids"],
+                             "edol-hub-service,edol-ams-service,edol-notify-service")
+
     def test_realm_has_no_application_user_in_any_environment(self):
         template = json.loads((dev_deploy.ROOT / "docker/keycloak/realm/edol-realm.json").read_text())
         for environment in ("dev", "prod"):

@@ -224,7 +224,7 @@ def secure_core(c, props, env):
     s = c["secrets"]
     env.update({"CORE_CATALOG_DB_URL": "jdbc:postgresql://postgres:5432/edol_devices",
                 "CORE_CATALOG_DB_USER": "edol_core_catalog_runtime", "CORE_CATALOG_DB_PASSWORD": s["catalog"]})
-    props.update({"edol-core.security.trusted-service-client-ids": [f"edol-{n}-service" for n in SCOPES],
+    props.update({"edol-core.security.trusted-service-client-ids": ",".join(f"edol-{n}-service" for n in SCOPES),
                   "edol-core.agent.enabled": True,
                   "edol-core.agent.pairing-keys": {"1": s["agent_pairing"]},
                   "edol-core.agent.credential-keys": {"1": s["agent_credential"]},
