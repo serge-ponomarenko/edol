@@ -8,7 +8,7 @@ import subprocess
 import time
 from urllib.parse import urlsplit
 
-from dev_deploy import Deployment, DeploymentFailure, write_private
+from dev_deploy import BackupFailure, Deployment, DeploymentFailure, write_private
 import mqtt_certificate
 
 
@@ -70,8 +70,11 @@ class ProductionDeployment(Deployment):
         destination.mkdir(mode=0o700)
         self.capture(destination / "globals.sql", self.command + ["exec", "-T", "postgres",
                      "pg_dumpall", "-U", "postgres", "--globals-only"])
-        existing = self.sql("SELECT datname FROM pg_database WHERE datname IN "
-                            "('edol_devices','edol_hub','edol_keycloak');").split()
+        try:
+            existing = self.sql("SELECT datname FROM pg_database WHERE datname IN "
+                                "('edol_devices','edol_hub','edol_keycloak');").split()
+        except RuntimeError as error:
+            raise BackupFailure("database-list") from error
         expected = {"edol_devices", "edol_hub"}
         if self.config["mode"] == "secure":
             expected.add("edol_keycloak")
@@ -93,8 +96,16 @@ class ProductionDeployment(Deployment):
 
     @staticmethod
     def capture(destination, command):
-        descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, "wb") as stream:
-            result = subprocess.run(command, stdout=stream, stderr=subprocess.PIPE, check=False, timeout=600)
+        artifacts = {"globals.sql": "globals", "instance.tar.gz": "instance",
+                     "edol_devices.dump": "edol_devices", "edol_hub.dump": "edol_hub",
+                     "edol_keycloak.dump": "edol_keycloak"}
+        artifact = artifacts.get(destination.name, "backup")
+        print(f"Creating protected backup artifact={artifact}", flush=True)
+        try:
+            descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "wb") as stream:
+                result = subprocess.run(command, stdout=stream, stderr=subprocess.PIPE, check=False, timeout=600)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise BackupFailure(artifact) from error
         if result.returncode:
-            raise RuntimeError("Protected backup failed; migration must not proceed")
+            raise BackupFailure(artifact, result.returncode)

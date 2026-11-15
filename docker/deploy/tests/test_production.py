@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import init_config
 import model
-from dev_deploy import execute_locked, validate_action
+from dev_deploy import BackupFailure, execute_locked, failure_summary, validate_action
 from prod_deploy import ProductionDeployment, validate_generation
 from test_deployment import fixture
 
@@ -63,6 +63,27 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(set(manifest["sha256"]), {"globals.sql", "edol_hub.dump", "edol_devices.dump",
                                                        "edol_keycloak.dump", "instance.tar.gz"})
             self.assertEqual(captures[-1], ["tar", "-czf", "-", "-C", str(state.parent.parent), "secure"])
+
+    def test_backup_diagnostics_identify_artifact_and_exit_code_without_secrets(self):
+        for name, artifact in (("globals.sql", "globals"), ("edol_hub.dump", "edol_hub"),
+                               ("instance.tar.gz", "instance")):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                with patch("prod_deploy.subprocess.run", return_value=SimpleNamespace(
+                        returncode=1, stderr=b"secret password and private path")):
+                    with self.assertRaises(BackupFailure) as caught:
+                        ProductionDeployment.capture(Path(directory) / name, ["private-command"])
+                self.assertEqual(failure_summary(caught.exception),
+                                 f"Deployment stopped: stage=backup artifact={artifact} exit_code=1")
+
+    def test_backup_timeout_and_os_errors_are_safe(self):
+        import subprocess
+        for error in (OSError("secret path"), subprocess.TimeoutExpired("secret command", 600)):
+            with tempfile.TemporaryDirectory() as directory:
+                with patch("prod_deploy.subprocess.run", side_effect=error):
+                    with self.assertRaises(BackupFailure) as caught:
+                        ProductionDeployment.capture(Path(directory) / "instance.tar.gz", ["tar"])
+                self.assertEqual(failure_summary(caught.exception),
+                                 "Deployment stopped: stage=backup artifact=instance")
 
     def test_backup_command_failure_cannot_create_complete_manifest(self):
         with tempfile.TemporaryDirectory() as directory:

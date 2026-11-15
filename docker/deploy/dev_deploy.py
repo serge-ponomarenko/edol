@@ -36,7 +36,20 @@ class DeploymentFailure(RuntimeError):
         self.status = status if isinstance(status, int) and 100 <= status <= 599 else None
 
 
+class BackupFailure(DeploymentFailure):
+    """Fixed backup identifiers only; subprocess diagnostics remain private."""
+
+    def __init__(self, artifact, exit_code=None):
+        super().__init__("deployment", ())
+        allowed = {"globals", "database-list", "edol_devices", "edol_hub", "edol_keycloak", "instance"}
+        self.artifact = artifact if artifact in allowed else "backup"
+        self.exit_code = exit_code if type(exit_code) is int else None
+
+
 def failure_summary(error):
+    if isinstance(error, BackupFailure):
+        code = f" exit_code={error.exit_code}" if error.exit_code is not None else ""
+        return f"Deployment stopped: stage=backup artifact={error.artifact}{code}"
     if isinstance(error, DeploymentFailure):
         status = f" last_http_status={error.status}" if error.status is not None else ""
         return f"Deployment stopped: stage={error.stage} services={','.join(error.services) or 'deployment'}{status}"

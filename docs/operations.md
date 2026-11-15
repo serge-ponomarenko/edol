@@ -979,3 +979,14 @@ snapshot and source release together** into a separately reviewed target,
 validate it, then switch ingress. Keep both failed and known-good backups.
 No generic destructive restore command is prescribed before actual volume,
 PostgreSQL version and source identity have been audited.
+
+## Production backup diagnostics
+
+Before migrations, backup progress reports fixed artifact identifiers: `globals`,
+`database-list`, `edol_devices`, `edol_hub`, `edol_keycloak`, and `instance`.
+A failed capture reports `stage=backup artifact=<identifier>` and the subprocess
+`exit_code` when available. Timeouts and file-access failures have no exit code.
+Command arguments, paths, stderr and protected file contents are never printed.
+Any nonzero exit, including tar exit 1, still blocks migrations; a backup is
+complete only when `complete.json` exists. A later successful archive attempt
+does not establish why an earlier capture failed.
