@@ -102,7 +102,7 @@ deployment provisions empty databases and applies immutable migrations without
 creating application users, printers, inventory or print history. Users
 register and populate the environment through the normal application flows.
 Subsequent deployments retain all databases, broker authority, keys and media;
-there is no automatic data reset or dataset import. Secure Dev reconciles only
+there is no automatic data reset or dataset import. Secure deployments reconcile only
 the managed Keycloak SMTP map via the Admin API after readiness on every
 deployment, including API key changes; startup realm import remains create-only
 and other realm settings are preserved. Home and secure state remain separate;
@@ -113,6 +113,16 @@ TLS (18884); DNS-only routing and external TCP forwarding are operator-owned.
 Deployment stages a missing MQTT DNS SAN certificate using the existing CA
 and server key, then installs it only after stopping Dev, retaining authority
 and a previous-certificate backup. It does not rotate device identities or CA.
+Production uses the same model through the `prod-deploy` job after main's
+reactor tests and Sonar Quality Gate succeed. Its host lock, project, private
+network, state, keys and database volume are independent of Dev. Production
+stops only its own writers and takes protected logical database and instance
+backups before provisioning/migrations. It validates operator-provisioned MQTT
+trust without using Dev's automatic certificate-signing procedure. Failed
+post-stop deployments remain stopped for operator recovery; schema downgrade
+and legacy-data imports are never automatic. See the production runbook in
+[operations](operations.md#production-installation-and-cutover).
+
 Compose-native
 healthchecks cover the dependencies and HTTP services; Notify exposes only a
 clearly labelled process-liveness check. Future reusable data snapshots require

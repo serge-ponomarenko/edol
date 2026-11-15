@@ -21,6 +21,7 @@ from model import AMS_READINESS_HEADERS, SERVICES, compose, realm, validate
 ROOT = Path(__file__).resolve().parents[2]
 DEV_PROJECTS = ("edol-dev-secure", "edol-dev-home")
 KNOWN_SERVICES = frozenset(SERVICES) | {"postgres", "mqtt", "keycloak"}
+COMPOSE_FILE = "compose.json"
 
 
 class DeploymentFailure(RuntimeError):
@@ -104,7 +105,7 @@ def prepare(config, state):
                           "-P " + config["secrets"]["mqtt_hub"], "-t edolcore/#", "-i " + config["project"] + "-health"]
         write_private(state / "mqtt-health.conf", "\n".join(health_options) + "\n")
     model = compose(config, ROOT, state)
-    destination = state / "compose.json"
+    destination = state / COMPOSE_FILE
     # Compose also interpolates dollar signs inside JSON strings. Preserve literal secrets.
     write_private(destination, json.dumps(model, indent=2).replace("$", "$$"))
     return model
@@ -122,7 +123,7 @@ def validate_certificates(config):
 class Deployment:
     def __init__(self, config, state):
         self.config, self.state = config, state
-        self.command = ["docker", "compose", "--project-name", config["project"], "-f", str(state / "compose.json")]
+        self.command = ["docker", "compose", "--project-name", config["project"], "-f", str(state / COMPOSE_FILE)]
 
     def dc(self, *args):
         try:
@@ -227,10 +228,10 @@ class Deployment:
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             raise DeploymentFailure("mqtt-certificate", ("mqtt",)) from error
 
-    def apply(self):
+    def apply(self, environment="dev"):
         c = self.config
-        if c["environment"] != "dev" or c["project"] not in DEV_PROJECTS:
-            raise ValueError("Only dedicated dev instances may use this deployment action")
+        if c["environment"] != environment or c["project"] != f"edol-{environment}-{c['mode']}":
+            raise ValueError("Deployment environment and instance ownership differ")
         run([sys.executable, "-B", "-m", "unittest", "discover", "-s", str(ROOT / "docker/deploy/tests")])
         print("Validating configuration and building the exact supplied source revision", flush=True)
         self.dc("config", "--quiet")
@@ -238,13 +239,14 @@ class Deployment:
         run(["docker", "pull", c["flyway_image"]])
         self.dc("pull", "--ignore-buildable")
         self.configure_mqtt_certificate()
-        stop_dev_containers()
+        self.stop_instances()
         try:
             self.configure_mqtt_certificate(activate=True)
             print("Starting persistent device storage", flush=True)
             self.dc("up", "-d", "--wait", "--wait-timeout", "120", "postgres")
             # Check instance ownership before provisioning or applying migrations.
             self.guard_database()
+            self.backup()
             print("Creating missing databases and applying migrations; keeping existing data", flush=True)
             self.sql(database.provision(c))
             for module in ("core", "hub", "ams"):
@@ -269,7 +271,7 @@ class Deployment:
             if not info["State"]["Running"] or info["RestartCount"]:
                 raise RuntimeError("Notify failed its process-liveness check")
             write_private(self.state / "deployed.json", json.dumps({"revision": c["revision"], "mode": c["mode"]}))
-            print("Dev deploy complete. HTTP readiness passed; Notify process liveness only. Physical acceptance remains separate.")
+            print("Deploy complete. HTTP readiness passed; Notify process liveness only. Physical acceptance remains separate.")
         except BaseException:
             self.stop_after_failure()
             raise
@@ -280,10 +282,16 @@ class Deployment:
         except Exception as cleanup_error:
             print("Cleanup failed. " + failure_summary(cleanup_error), file=sys.stderr)
 
+    def stop_instances(self):
+        stop_dev_containers()
+
+    def backup(self):
+        """Dev retains state; production overrides this with a pre-migration backup."""
+
     def guard_database(self):
         info = json.loads(run(["docker", "inspect", self.dc("ps", "-q", "postgres").strip()]))[0]
         labels = info["Config"]["Labels"]
-        if labels.get("com.docker.compose.project") != self.config["project"] or labels.get("dev.edol.environment") != "dev":
+        if labels.get("com.docker.compose.project") != self.config["project"] or labels.get("dev.edol.environment") != self.config["environment"]:
             raise ValueError("Refusing deployment: database container ownership mismatch")
         expected_volume = self.config["project"] + "_postgres-data"
         if not any(m.get("Name") == expected_volume and m["Destination"] == "/var/lib/postgresql/data" for m in info["Mounts"]):
@@ -297,20 +305,54 @@ def stop_dev_containers():
             run(["docker", "stop", *identities])
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("render", "provision-db", "deploy-dev"))
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--revision", required=True)
-    parser.add_argument("--mode", choices=("secure", "home"), required=True)
-    args = parser.parse_args()
-    if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
-        raise ValueError("A full source commit SHA is required")
-    config = validate(json.loads(args.config.read_text()))
+def validate_action(args, config):
     if config["mode"] != args.mode:
         raise ValueError("Workflow mode and protected instance configuration differ")
     if args.action == "deploy-dev" and config["environment"] != "dev":
         raise ValueError("Production must use the explicit operator workflow")
+    if args.action == "deploy-prod" and config["environment"] != "prod":
+        raise ValueError("Production deployment requires a production instance")
+    if args.action == "deploy-prod" and (args.source_generation is None or args.source_generation < 1):
+        raise ValueError("Production requires the full source history commit count")
+    if args.action == "provision-db" and config["environment"] != "dev":
+        raise ValueError("Use deploy-prod for production backup and ownership guards")
+
+
+def execute_locked(args, config, state):
+    if config["environment"] == "prod" and (state / "deployed.json").exists() and config["mode"] == "secure" \
+            and not (state / "mqtt/dynamic-security.json").is_file():
+        raise ValueError("Restore missing broker authority before rendering production state")
+    if args.action == "deploy-prod":
+        from prod_deploy import validate_generation
+        validate_generation(state, args.source_generation, args.revision)
+        if (state / COMPOSE_FILE).is_file():
+            write_private(state / "compose.previous.json", (state / COMPOSE_FILE).read_text())
+    prepare(config, state)
+    if args.action == "deploy-dev":
+        Deployment(config, state).apply()
+    elif args.action == "deploy-prod":
+        from prod_deploy import ProductionDeployment
+        write_private(state / "source-generation.json", json.dumps({"generation": args.source_generation,
+                                                                   "revision": args.revision}))
+        ProductionDeployment(config, state).apply()
+    elif args.action == "provision-db":
+        Deployment(config, state).provision_database()
+    else:
+        print("Rendered protected Compose configuration. No runtime operation performed.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=("render", "provision-db", "deploy-dev", "deploy-prod"))
+    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--revision", required=True)
+    parser.add_argument("--mode", choices=("secure", "home"), required=True)
+    parser.add_argument("--source-generation", type=int)
+    args = parser.parse_args()
+    if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
+        raise ValueError("A full source commit SHA is required")
+    config = validate(json.loads(args.config.read_text()))
+    validate_action(args, config)
     if os.name != "posix":
         raise ValueError("Deployment rendering/execution requires the Linux operator host")
     if args.config.stat().st_mode & 0o077:
@@ -324,16 +366,10 @@ def main():
         raise ValueError("Instance state must be outside the source checkout")
     import fcntl
     # One lock covers secure/home deployments and local invocations, independent of Actions concurrency support.
-    lock = args.config.resolve().parent.parent / ".dev-deploy.lock"
+    lock = args.config.resolve().parent.parent / f".{config['environment']}-deploy.lock"
     with lock.open("a") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        prepare(config, state)
-        if args.action == "deploy-dev":
-            Deployment(config, state).apply()
-        elif args.action == "provision-db":
-            Deployment(config, state).provision_database()
-        else:
-            print("Rendered protected Compose configuration. No runtime operation performed.")
+        execute_locked(args, config, state)
 
 
 def validate_local_docker():

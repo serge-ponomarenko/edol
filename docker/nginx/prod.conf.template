@@ -1,0 +1,96 @@
+# Merge in nginx's http context; values are initial per-source limits to review.
+limit_req_zone $binary_remote_addr zone=edol_prod_enroll:10m rate=1r/s;
+limit_req_zone $binary_remote_addr zone=edol_prod_terminal:10m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=edol_prod_connections:10m;
+
+# Merge the following into the existing HTTPS edol.s-pon.dev server block.
+# Retain its ssl_certificate, ssl_certificate_key, ACME and TLS policy.
+resolver 127.0.0.11 valid=10s ipv6=off;
+set $edol_prod_hub edol-hub-prod:8090;
+set $edol_prod_core edol-core-prod:8080;
+set $edol_prod_ams edol-ams-prod:8099;
+limit_conn edol_prod_connections 40;
+client_body_timeout 30s;
+
+location = /api/agent/v1/enroll {
+    limit_req zone=edol_prod_enroll burst=5 nodelay;
+    limit_req_status 429;
+    client_max_body_size 16k;
+    proxy_pass http://$edol_prod_core;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Forwarded "";
+}
+location /api/agent/v1/ {
+    client_max_body_size 128m;
+    proxy_request_buffering off;
+    proxy_read_timeout 300s;
+    proxy_pass http://$edol_prod_core;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Forwarded "";
+}
+location = /api/terminal/v1/enroll {
+    limit_req zone=edol_prod_enroll burst=5 nodelay;
+    limit_req_status 429;
+    client_max_body_size 16k;
+    proxy_pass http://$edol_prod_ams;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Forwarded "";
+}
+location /api/terminal/v1/ {
+    limit_req zone=edol_prod_terminal burst=20 nodelay;
+    limit_req_status 429;
+    client_max_body_size 16k;
+    proxy_pass http://$edol_prod_ams;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Forwarded "";
+}
+location / {
+    proxy_pass http://$edol_prod_hub;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Forwarded "";
+}
+
+# In the separate existing HTTPS auth.edol.s-pon.dev server block, use:
+# resolver 127.0.0.11 valid=10s ipv6=off;
+# set $edol_prod_auth edol-keycloak-prod:8080;
+# location ~ ^/(admin|realms/master)(/|$) {
+#     allow <YOUR_MANAGEMENT_CIDR>;
+#     deny all;
+#     proxy_pass http://$edol_prod_auth;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Forwarded-For $remote_addr;
+#     proxy_set_header X-Forwarded-Host $host;
+#     proxy_set_header X-Forwarded-Port 443;
+#     proxy_set_header X-Forwarded-Proto https;
+#     proxy_set_header Forwarded "";
+# }
+# location / {
+#     proxy_pass http://$edol_prod_auth;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Forwarded-For $remote_addr;
+#     proxy_set_header X-Forwarded-Host $host;
+#     proxy_set_header X-Forwarded-Port 443;
+#     proxy_set_header X-Forwarded-Proto https;
+#     proxy_set_header Forwarded "";
+# }
+# Configure port80 ACME/HTTPS redirects using the existing host procedure.

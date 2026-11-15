@@ -1,352 +1,122 @@
-# Edol
+# EDOL
 
-Edol is a self-hosted automation, monitoring, and workflow ecosystem for 3D printing. Built around Bambu Lab printers and modern maker workflows, Edol combines real-time printer communication, filament inventory management, event-driven automation, notifications, and maintenance tracking into a single integrated platform.
-
-The system connects directly to printers using MQTT, FTP, and camera streaming APIs to provide live printer state synchronization, automated event processing, spool tracking, print history management, and operational monitoring across one or multiple printers.
-
-Edol is designed for makers, print farms, educational labs, and automation enthusiasts who want deeper control over their printing environment and a centralized platform for managing printers, filament, maintenance, and production workflows.
+EDOL is a self-hosted system for Bambu Lab printer monitoring, print history,
+filament inventory, spool allocation, maintenance, camera/model media and
+Telegram notifications. Core connects directly to a reachable printer or
+through an EDOL Agent. AMS terminals support printer-scoped spool workflows.
 
 ![Demo](edol_demo.gif)
 
-## Features
+## Current architecture
 
-- Real-time printer monitoring via MQTT
-- Live printer state synchronization
-- Print event detection and automation workflows
-- Telegram notifications and alerts
-- Camera stream integration
-- Filament and spool inventory management
-- Remaining spool weight tracking
-- Automatic filament consumption calculation
-- Multi-spool support for complex prints
-- Material, brand, and color organization
-- Print history and spool usage linkage
-- Printer maintenance tracking based on printing hours
-- Maintenance scheduling and service history
-- REST API for integrations and external tooling
-- Event-driven architecture for extensibility
-- Docker-based self-hosted deployment
+The Java 21 / Spring Boot 4 Maven reactor contains:
 
-## Supported Printers
+| Module | Responsibility |
+| --- | --- |
+| `edol-core-api` | Shared runtime and AMS DTOs |
+| `edol-core` | Printer connections, telemetry, commands, agents and media |
+| `edol-hub` | Web dashboard, users, tenants, inventory and print history |
+| `edol-notify` | Tenant Telegram integration |
+| `edol-ams` | AMS workflows and terminal enrollment |
 
-Edol currently supports Bambu Lab printers with LAN mode enabled, including:
+PostgreSQL 17 stores application and identity data. Mosquitto handles MQTT.
+Secure installations also run Keycloak with the bundled EDOL login theme.
+See [architecture](docs/architecture.md) and [tenant ownership](docs/contracts/tenant-ownership.md).
 
-- Bambu Lab X1 Series
-- Bambu Lab P1 Series
-- Bambu Lab A1 Series
+## Choose an installation mode
 
----
+| Mode | Intended use | Identity and access |
+| --- | --- | --- |
+| `home` | One owner on a trusted private network | Installation tenant; no OIDC registration; keep every endpoint private |
+| `secure` | HTTPS access with multiple isolated tenants | Keycloak OIDC, verified email, OWNER membership, service identities and forced database RLS |
 
-## Bambulab Firmware Versions
+Secure Dev functional testing has been completed by the owner. The production
+cutover and legacy-data restore require their own acceptance. Deployment code
+and readiness checks alone do not establish Internet-facing or physical-device
+acceptance.
 
-Throughout 2025, Bambulab released firmware updates that introduced a software mechanism called **“Authorization Control”**, which restricts certain MQTT communications while the printer is in **Cloud Connected** mode. These MQTT messages remain available in **LAN Only** mode when **Developer Mode** is enabled.
+## Fresh installation
 
-### To use the EDOL, you have two options
+Use a Linux Docker host with Docker Compose v2 (`up --wait` support), Python
+3.11+, OpenSSL, Git and tar. Source builds use the supplied Dockerfiles;
+a host Java/Maven installation is needed only for local development.
 
- 1. Use an older firmware version released before the Authorization change.
-This allows EDOL to work fully while keeping **Cloud Connected** mode enabled.
-
- 2. Use a newer firmware version and switch the printer to LAN Only mode with Developer Mode enabled.
-This allows to continue working on newer firmware versions.
-
-### Compatible Firmware Versions
-
-Below are the latest firmware versions for each Bambulab printer line that do **not** include the Authorization restrictions. Using versions up to (and including) these will allow you to fully enjoy all EDOL features and Cloud Connected mode without switching to LAN Only mode with Developer Mode enabled.
-
-| Printer Line | Latest Compatible Firmware |
-|---|---|
-| A1 | `01.04.00.00` |
-| P1 | `01.08.01.00` |
-| X1 | `01.08.02.00` |
-| H2 | All H2 printers include Authorization Control |
-| P2 | All P2 printers include Authorization Control |
-
----
-
-
-## Use Cases
-
-- Home maker setups
-- Multi-printer environments
-- Print farms
-- Educational laboratories
-- Automated filament accounting systems
-- Printer fleet monitoring
-- Maintenance and service management
-- Custom automation and notification workflows
-
-
-# Build and Run
-
-## Prerequisites
-
-Before starting, make sure you have the following installed:
-
-* Docker
-* Docker Compose
-
-You can verify the installation with:
+Clone this repository into a source directory separate from persistent state.
+For example, with an accessible repository URL:
 
 ```bash
-docker --version
-docker compose version
+git clone <your-repository-url> ~/edol-source
+cd ~/edol-source
+sudo install -d -m 0700 -o "$(id -un)" -g "$(id -gn)" /srv/edol
+install -d -m 0700 /srv/edol/releases /srv/edol/home
+python3 docker/deploy/init_config.py --environment prod --mode home \
+  --output /srv/edol/home/instance.json
 ```
 
----
-
-## Project Structure
-
-The project consists of the following services:
-
-* `edolcore-api` — library with common model entities
-* `edolcore` — Bambu printer integration service
-* `edolhub` — main backend service
-* `edolnotify` — Notifying service (Telegram Bot)
-* `edolams` — AMS controlling service for EDOL RFID Reader
-* `mqtt` (`nanoMQ`) — MQTT broker used for communication
-
----
-
-## Clone the Repository
-
-Create a workspace directory for the project and persistent data:
+Review the generated private address, ports and subnet in a protected editor.
+Keep the generated passwords. Then deploy Home from the reviewed checkout:
 
 ```bash
-mkdir -p ~/edol-project/{db-files,logs,models,camera_snapshots}
-cd ~/edol-project
+revision="$(git rev-parse HEAD)"
+python3 docker/deploy/dev_deploy.py deploy-prod --mode home \
+  --config /srv/edol/home/instance.json --revision "$revision" \
+  --source-generation "$(git rev-list --count HEAD)"
 ```
 
-Clone the repository:
+Open the private `hub_origin` from the configuration and add a printer. Home
+requires a trusted network; do not publish its ports to the Internet.
+
+For **Secure production**, follow the complete
+[production installation and cutover runbook](docs/operations.md#production-installation-and-cutover):
+create independent secrets and MQTT trust, configure public HTTPS and SMTP,
+then render and deploy. All example domains, addresses and ports are operator
+inputs; third-party installations must replace them. Gitea is optional for a
+manual installation.
+
+The first deployment provisions empty databases and immutable migrations. It
+creates no application account, printer, filament, spool or print history.
+Secure users register, verify their email and receive a personal tenant with
+OWNER access on first login. Add printers through Hub; pairing and enabling
+connections are explicit steps. Configure Telegram in the tenant's settings.
+
+Later deployments preserve databases, device bindings, broker authority,
+installation keys and media. Protect the entire instance configuration,
+certificate/key directories, state, retained source releases and PostgreSQL
+volume. Never use `docker compose down -v` as an update procedure.
+
+## Updates and CI
+
+Gitea PRs targeting `main` run deployment/realm checks, the full Maven reactor
+(including Docker-dependent tests) and SonarQube Quality Gate. A push to `main`
+repeats those checks for the resulting commit; only a successful `build` job
+permits automatic `prod-deploy`. Protect `main` against direct pushes and
+require the CI status. Production SSH secrets are separate from Dev secrets.
+
+Dev deployment remains manual (`dev-secure-deploy` / `dev-home-deploy`).
+Production changes use the independent `/srv/edol` instance. See
+[operations](docs/operations.md) for server preparation, secrets, ingress,
+backups, readiness, failure recovery and legacy-data migration gates.
+
+Upgrading a legacy single-tenant installation requires a coordinated backup,
+an isolated restore rehearsal and an explicit mapping to the new tenant and
+printer. Do not restore an old full database over a registered Secure instance
+or run the current migrations blindly against the old production volume.
+
+## Development
+
+Use JDK 21, Maven and an available Docker daemon for migration/RLS tests:
 
 ```bash
-git clone https://github.com/serge-ponomarenko/edol.git
+mvn -B clean verify
+python3 -B -m unittest discover -s docker/deploy/tests
+node docker/keycloak/realm/validate-realm-schema.mjs
 ```
 
-Navigate into the project code directory:
-
-```bash
-cd edol
-```
-
----
-
-## Environment Variables
-
-For security and persistence reasons, keep the environment files outside of the Git repository.
-
-Create (or copy) the following files in the project root directory:
-
-```text
-../.env_edol_core
-../.env_edol_hub
-../.env_edol_notify
-../.env_edol_ams
-```
-These files are mounted into containers by Docker Compose and will remain safe during repository updates or re-cloning.
-
-The resulting structure should look like this:
-
-```text
-edol-project/
-│
-├── .env_edol_core
-├── .env_edol_hub
-├── .env_edol_notify
-├── .env_edol_ams
-│
-├── edol/
-│   ├── docker/
-│   │   ├── compose.yaml
-│   │   └── *.Dockerfile
-│   │   
-│   ├── edol-core-api/
-│   ├── edol-core/
-│   ├── edol-hub/
-│   ├── edol-notify/
-│   └── edol-ams/
-│
-├── db-files/
-├── logs/
-├── models/
-└── camera_snapshots/
-```
-
----
-
-## Project Configuration
-
-### Edol Core Configuration
-
-Edit `.env_edol_core` and configure:
-
-* Bambu printer IP address
-* Access token / printer credentials
-* MQTT settings
-* Camera or snapshot settings
-* File storage paths if needed
-
-For details see [section](#printer-connection-settings) below.
-
-### Edol Hub Configuration
-
-Edit `.env_edol_hub` and configure:
-
-* The URL that be added to QR code on the spool label
-
-### Edol Notify Configuration
-
-Edit `.env_edol_notify` and configure:
-
-* The Telegram tokens
-
----
-
-## Build and Start
-
-To build and start all services:
-
-```bash
-cd docker
-docker compose up --build -d
-```
-
-This command will:
-
-* Build the `edolcore`, `edolhub`, `edolams` and `edolnotify` images
-* Start all containers in detached mode
-* Automatically restart containers unless stopped manually
-
----
-
-## Services and Ports
-
-| Service     | Port Mapping | Description               |
-|-------------|--------------|---------------------------|
-| edolcore    | `8091:8080`  | Bambu integration service |
-| edolhub     | `8090:8090`  | Main backend API          |
-| edolams     | `8099:8099`  | AMS Service               |
-| edolnotify  | `-:-`        | Notify service            |
-| mqtt/nanomq | `-:1883`     | MQTT broker               |
-
----
-
-## Viewing Logs
-
-To view logs for all services:
-
-```bash
-docker compose logs -f
-```
-
-To view logs for a specific service:
-
-```bash
-docker compose logs -f edolhub
-```
-
-or
-
-```bash
-docker compose logs -f edolcore
-```
-
----
-
-## Stop the Project
-
-To stop all running containers:
-
-```bash
-docker compose down
-```
-
-To stop and remove volumes:
-
-```bash
-docker compose down -v
-```
----
-
-## Update program
-
-Navigate into the project docker directory:
-
-```bash
-cd ~/edol-project/edol/docker
-```
-
-Stop running containers:
-
-```bash
-docker compose down
-```
-
-Pull the latest changes:
-
-```bash
-cd ..
-git pull
-```
-
-Build and start all services:
-
-```bash
-cd docker
-docker compose up --build -d
-```
-
----
-## Printer Connection Settings
-
-```.env_edol_core``` file
-
-```env
-# URL of your printer
-BAMBU_CONNECT_URL=ssl://192.168.0.153:8883
-
-# FTP address of the printer used for downloading models
-BAMBU_FTP_URL=192.168.0.153
-
-# Directory where printer stores model files.
-# Depending on firmware and printer model it can be:
-# - root directory (leave empty)
-# - cache
-# Connect to your printer over FTP (see in README) and check where the models are stored. 
-BAMBU_MODEL_DIRECTORY=
-
-# Printer camera stream address
-CAMERA_URL=192.168.0.153
-
-# Printer serial number
-BAMBU_SERIAL=
-
-# Printer LAN access code
-# Can be found in printer network settings
-BAMBU_ACCESS_CODE=
-
-# Enable verbose MQTT logging.
-# Useful for debugging printer communication.
-# Recommended to disable in production.
-BAMBU_SHOW_RAW_MQTT=true
-```
-
----
-
-# Bambu FTP connection
-
-URL: `ftps://{DEVICE_IP}:990`
-
-TLS: implicit
-
-**Username:** `bblp`
-
-**Password:** `dev_access_code` from a `Device` object (aka the LAN access code).
-
----
-
-# Useful links
-* https://github.com/Doridian/OpenBambuAPI
-* https://synman.github.io/bambu-printer-manager/
-* https://www.spoolease.io/index.html
-* https://github.com/yanshay/spoolease
-
+Printers need supported LAN access and compatible firmware/settings. The
+application does not bypass vendor authorization restrictions. Register
+connection details in Hub; old single-printer `BAMBU_*` environment setup and
+NanoMQ Compose instructions are retired.
+
+[Operations](docs/operations.md) · [Architecture](docs/architecture.md) ·
+[Agent pairing](docs/contracts/agent-pairing.md) ·
+[Agent MQTT](docs/contracts/agent-mqtt.md)

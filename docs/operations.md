@@ -24,8 +24,8 @@ are required. A future reusable SQL snapshot is a separate requested task.
 Supported assets: application Dockerfiles, Keycloak image/theme/browser realm,
 Mosquitto configuration/authority initializer, [deployment code](../docker/deploy/dev_deploy.py),
 its tests/configuration helper and [nginx template](../docker/nginx/dev.conf.template).
-Legacy Compose/NanoMQ smoke assets and automatic push-to-main deployment are
-retired. README remains frozen; use this procedure for deployment.
+Legacy Compose/NanoMQ smoke assets are retired. Production deployment runs
+after successful main CI; see [production cutover](#production-installation-and-cutover).
 
 ## First secure dev launch on edol-server
 
@@ -340,15 +340,15 @@ Actions/SSH, public routing, SMTP/login and devices need runtime evidence.
 ## Production rendering
 
 The same model supports `environment=prod`, `project=edol-prod-home` or
-`edol-prod-secure` with separate state/networks/ports/secrets. No production
-Actions workflow or dataset/reset path exists. After the approved backup and
-preflight, `provision-db` creates missing roles/databases and applies migrations
-without resetting data. Start the reviewed generated composition in dependency
-order with health checks. `deploy-dev` rejects production.
+`edol-prod-secure` with separate state/networks/ports/secrets. The `prod-deploy`
+job follows successful main CI; `deploy-prod` owns the scoped backup, migration
+and readiness sequence. Neither a dataset/reset path nor a production
+`provision-db` bypass is supported. `deploy-dev` rejects production. Complete
+the [production runbook](#production-installation-and-cutover) before launch.
 
 ```bash
-python3 docker/deploy/dev_deploy.py render --mode secure --config /srv/edol-prod/secure/instance.json --revision <full-commit-sha>
-docker compose -f /srv/edol-prod/secure/state/compose.json config --quiet
+python3 docker/deploy/dev_deploy.py render --mode secure --config /srv/edol/secure/instance.json --revision <full-commit-sha>
+docker compose -f /srv/edol/secure/state/compose.json config --quiet
 ```
 
 Secure runtime and migration roles are distinct; runtime users have no object
@@ -481,6 +481,37 @@ partition table; retain NVS, device identity and prior recovery artifacts.
 Host TLS verification and a successful build do not establish on-device TLS,
 enrollment, MQTT or printing acceptance. Record these results separately.
 
+### Secure Dev AMS terminal
+
+The terminal uses HTTPS through the existing public nginx listener; no separate
+WAN port to AMS is required. Configure secure mode with:
+
+| Terminal setting | Value |
+| --- | --- |
+| AMS Host | `dev.edol.s-pon.dev`, without scheme or path |
+| AMS Port / HTTPS | `443` / enabled |
+| Enrollment | Fresh **Pair AMS Terminal** code from the owned printer edit page |
+| Code format / expiry | 11 Latin letters / five minutes, single use |
+
+nginx routes `/api/terminal/v1/` to `edol-ams-dev:8099`. The host's private
+AMS mapping (example `192.168.0.200:18099`) is not a public terminal endpoint;
+do not forward 18099 or 8099 from WAN. The terminal does not need MQTT access.
+Secure API operations authenticate with the terminal's own credential and use
+its server-bound tenant/printer; Hub management requires OWNER access and a
+separate trusted service identity. See [AMS identity](architecture.md#ams-terminal-identity-and-operations).
+
+The terminal has its own compiled CA configuration via
+`EDOL_AMS_ROOT_CA_FILE`. It must trust the public HTTPS issuer and have a valid
+clock; rebuilding Agent firmware does not update terminal trust. Keep HTTPS
+enabled for external use, without plaintext fallback or device/NVS erasure.
+
+Keep the plaintext AMS upstream restricted to the trusted proxy/private
+network. Review ingress request/body/connection limits before external device
+enrollment; application authentication and the per-source enrollment limiter
+do not establish DoS protection or full Internet-facing acceptance. Verify
+malformed/missing credentials separately from a real enrollment; never test
+spool assignment or lifecycle operations against a live printer as a probe.
+
 ### Bounded TLS verification
 
 Use a separately approved isolated fixture with the actual device transport
@@ -504,3 +535,377 @@ Stop only the test fixtures, remove temporary test trust and confirm original
 authenticated operation where authorized. Record the exact firmware and source
 revisions, bounded counters, operator observations and restoration in the
 authorized Obsidian project.
+
+## Production installation and cutover
+
+This procedure prepares a fresh Secure installation or replaces a legacy
+single-tenant installation. Production is `/srv/edol`, project
+`edol-prod-secure`; Dev stays in `/srv/edol-dev`. For a third-party fresh
+installation, skip the legacy audit/archive steps and substitute your own
+DNS names, private addresses, networks and repository URL. Home uses
+`--environment prod --mode home`, no Keycloak/TLS proxy, and must stay private.
+
+Preparation in Git does not execute server commands. Confirm the maintenance
+window and the reviewed audit/backup results before stopping the old runtime,
+renaming directories, changing nginx or merging the deployment PR. Stop at
+any failed command or unexplained schema/checksum/ownership difference.
+
+### 1. Audit the legacy runtime and freeze the migration baseline
+
+Use the existing trusted server connection. Do not run `docker inspect` without
+selecting fields: environments contain credentials. Record privately:
+
+```bash
+set -euo pipefail
+umask 077
+docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Label "com.docker.compose.project"}}'
+docker volume ls
+docker network ls
+sudo ss -lntp
+```
+
+Identify the old Compose project, exact source commit/images, all application
+writers, PostgreSQL container(s), database names, credentials' protected file
+locations, media directories and every bind/volume. For each selected container:
+
+```bash
+legacy_container='<reviewed-container-name>'
+docker inspect --format '{{json .Mounts}}' "$legacy_container"
+docker inspect --format '{{json .NetworkSettings.Networks}}' "$legacy_container"
+```
+
+Never infer storage from `/srv/edol` alone. Named volumes and media/configuration
+outside that directory need separate backup coverage. Identify external
+Notify/AMS/Agent connections that could still write. Do not publish printer
+commands as a probe. Confirm no active print/recovery work before downtime.
+
+For each reviewed database, inspect in a read-only transaction using its actual
+admin user (examples assume `postgres`). Save results under a private backup
+root outside `/srv/edol`; do not export credentials or data to CI logs:
+
+```bash
+backup_root="$HOME/edol-production-backups/$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$backup_root"
+legacy_pg='<reviewed-postgres-container>'
+legacy_db='<reviewed-database-name>'
+cluster_backup="$backup_root/$legacy_pg"
+install -d -m 0700 "$cluster_backup"
+docker exec -i "$legacy_pg" psql -X -v ON_ERROR_STOP=1 -U postgres -d "$legacy_db" \
+  > "$cluster_backup/$legacy_db-audit.txt" <<'SQL'
+BEGIN READ ONLY;
+SET LOCAL statement_timeout = '30s';
+SELECT version();
+SELECT schemaname, tablename FROM pg_tables
+ WHERE schemaname NOT IN ('pg_catalog','information_schema') ORDER BY 1,2;
+SELECT table_schema, table_name, column_name, data_type, is_nullable
+ FROM information_schema.columns WHERE table_schema IN ('public','core','hub','ams')
+ ORDER BY table_schema, table_name, ordinal_position;
+SELECT format('SELECT %L AS history, installed_rank, version, description, type, script, checksum, success FROM %I.%I ORDER BY installed_rank',
+              schemaname || '.' || tablename, schemaname, tablename)
+ FROM pg_tables WHERE tablename = 'flyway_schema_history'
+\gexec
+SELECT format('SELECT %L AS table_name, count(*) AS rows FROM %I.%I',
+              schemaname || '.' || tablename, schemaname, tablename)
+ FROM pg_tables WHERE schemaname IN ('public','core','hub','ams')
+\gexec
+COMMIT;
+SQL
+docker exec "$legacy_pg" pg_dump -U postgres --schema-only -d "$legacy_db" \
+  > "$cluster_backup/$legacy_db-schema.sql"
+```
+
+Repeat for every application/identity database. Compare applied Flyway
+versions, script checksums, schemas, PK/FK types, sequences, RLS and row counts
+with the chosen source revision. List legacy printer IDs and each printer's
+history/inventory/maintenance ownership privately. Do not repair/baseline
+Flyway or edit an applied migration to force an upgrade.
+
+Known code constraints: Hub V2 converts job IDs to UUID and preserves numeric
+IDs as `public_id`; V3 assigns legacy catalog data to a reserved default tenant;
+V4 expands printer UUID mappings; V5 refuses null/orphaned job, maintenance and
+statistics mappings. Core V8 requires a matching Hub printer projection for
+existing Core printers. A direct full-chain upgrade of populated legacy data
+is therefore not an automatic tenant conversion. Current deploy creates
+separate empty `edol_devices`, `edol_hub` and `edol_keycloak` databases.
+
+### 2. Back up, rehearse restore, then retire the old runtime
+
+Keep the original deployment operational until an initial backup has been
+restored successfully into a separate, network-isolated PostgreSQL cluster of
+a compatible major version. Restore no application/broker containers there;
+prevent outbound printer, MQTT, Telegram and SMTP access. Verify schema,
+constraints, exact counts and representative history/media references. A
+checksum or `pg_restore --list` alone is not a restore rehearsal.
+
+For the final consistent backup, enter the agreed downtime: stop the exact
+reviewed application/notification/AMS writers first; keep PostgreSQL running
+for logical dumps. Use explicit names from the audit, never a host-wide stop.
+Run this for each selected PostgreSQL container and each reviewed database:
+
+```bash
+# Run only after the reviewed writers have stopped.
+docker exec "$legacy_pg" pg_dumpall -U postgres --globals-only > "$cluster_backup/globals.sql"
+docker exec "$legacy_pg" pg_dump -U postgres -Fc -d "$legacy_db" > "$cluster_backup/$legacy_db.dump"
+docker exec -i "$legacy_pg" pg_restore --list < "$cluster_backup/$legacy_db.dump" \
+  > "$cluster_backup/$legacy_db-toc.txt"
+```
+
+Archive the protected old configuration, source/Compose assets and every
+identified media directory while writers remain stopped. Stop the old
+PostgreSQL container before making any physical volume copy. Retain its
+original named volume as an additional recovery source; never `down -v`,
+`volume prune` or copy a running PostgreSQL data directory as a valid backup.
+Store SHA-256 manifests and a protected copy off this host. Record restore
+results and the final cutoff time. If any dump/media path is missing, stop.
+
+Only after successful audit, final backups and restore rehearsal: remove the
+reviewed legacy containers using their original Compose definition with
+`down` (without `-v`), or explicit reviewed container names. Do not remove Dev,
+nginx, Gitea or unrelated containers. Then archive the directory:
+
+```bash
+test -d /srv/edol && test ! -L /srv/edol
+test ! -e /srv/edol-old
+sudo mv -- /srv/edol /srv/edol-old
+sudo install -d -m 0700 -o "$(id -un)" -g "$(id -gn)" /srv/edol
+install -d -m 0700 /srv/edol/releases /srv/edol/secure
+```
+
+`/srv/edol-old` is a retained original, not the independent backup. Do not
+reuse its PostgreSQL volume, broker state or identity keys for the fresh
+Secure installation. Keep the verified old images and source revision for
+rollback. A fresh installation instead creates these new directories without
+renaming anything.
+
+### 3. Prepare independent production secrets and trust
+
+From a separate checkout of the reviewed EDOL-048 revision:
+
+```bash
+python3 docker/deploy/init_config.py --environment prod --mode secure \
+  --output /srv/edol/secure/instance.json
+```
+
+Edit the 0600 file privately. Reserve unused host ports and a /24 network.
+Defaults are examples: production network `10.253.94.0/24`, Hub/Core/AMS host
+ports `8090/8091/8099`, raw MQTT TLS `18885`, origins
+`https://edol.s-pon.dev` and `https://auth.edol.s-pon.dev`. Keep Dev's 18884.
+Set actual `bind_address`, nginx `proxy_address` and SMTP host/from/user/password,
+AUTH/STARTTLS. Preserve independent generated secrets; never copy Dev keys.
+
+Create fresh production MQTT CA/server trust using the following complete
+block. Change the example private IP in the SAN if `bind_address` differs:
+
+```bash
+set -euo pipefail
+umask 077
+install -d -m 0700 /srv/edol/secure/ca /srv/edol/secure/certs/mqtt
+ca=/srv/edol/secure/ca
+certs=/srv/edol/secure/certs
+test ! -e "$ca/ca-key.pem" && test ! -e "$certs/mqtt/server-key.pem"
+openssl req -x509 -newkey rsa:3072 -nodes -days 3650 -sha256 \
+  -keyout "$ca/ca-key.pem" -out "$ca/ca.pem" -subj '/CN=EDOL production MQTT CA'
+openssl req -new -newkey rsa:2048 -nodes -keyout "$certs/mqtt/server-key.pem" \
+  -out "$ca/server.csr" -subj '/CN=mqtt'
+printf '%s\n' 'subjectAltName=DNS:mqtt,DNS:edol.s-pon.dev,IP:192.168.0.200' \
+  'extendedKeyUsage=serverAuth' > "$ca/server.ext"
+openssl x509 -req -in "$ca/server.csr" -CA "$ca/ca.pem" -CAkey "$ca/ca-key.pem" \
+  -CAcreateserial -out "$certs/mqtt/server.pem" -days 365 -sha256 -extfile "$ca/server.ext"
+install -m 0600 "$ca/ca.pem" "$certs/mqtt/ca.pem"
+export EDOL_STORE_PASSWORD="$(python3 -c 'import json; print(json.load(open("/srv/edol/secure/instance.json"))["secrets"]["truststore"])')"
+export EDOL_STORE_DEFAULT=changeit
+docker run --rm --user "$(id -u):$(id -g)" -e EDOL_STORE_PASSWORD -e EDOL_STORE_DEFAULT \
+  -v "$certs:/export" --entrypoint sh eclipse-temurin:21-jre -ec '
+  test ! -e /export/combined.p12
+  keytool -importkeystore -srckeystore "$JAVA_HOME/lib/security/cacerts" \
+    -srcstorepass:env EDOL_STORE_DEFAULT -destkeystore /export/combined.p12 \
+    -deststoretype PKCS12 -deststorepass:env EDOL_STORE_PASSWORD -noprompt
+  keytool -importcert -alias edol-prod-mqtt -file /export/mqtt/ca.pem \
+    -keystore /export/combined.p12 -storepass:env EDOL_STORE_PASSWORD -noprompt'
+unset EDOL_STORE_PASSWORD EDOL_STORE_DEFAULT
+```
+
+Keep CA signing keys outside the broker mount; back them up offline. Production
+requires certificate/truststore paths inside its instance directory so the
+coordinated instance backup covers its TLS trust. It validates leaf
+expiry/chain, DNS/IP SANs and matching server key before stopping
+services. It does not run Dev certificate signing or regenerate an installed
+identity. Plan certificate renewal before expiry. Firmware trust/enrollment is
+separate: Dev credentials do not authorize production. Never erase NVS or
+reflash automatically during a server deployment.
+
+### 4. Configure ingress and Gitea manually
+
+The owner has created DNS-only records for `edol.s-pon.dev` and
+`auth.edol.s-pon.dev`; verify their actual resolution and certificates during
+setup. Provision public HTTPS certificates through the existing nginx/ACME
+procedure. Back up nginx configuration first and merge
+[production routing](../docker/nginx/prod.conf.template) into the existing
+configuration, including the separate auth server. Resolve template inputs
+and `proxy_address` from the actual nginx network address. Attach nginx to the
+external `edol-reverse-proxy` bridge. Retain Dev routes.
+
+Validate with `docker exec nginx-home nginx -t`, then reload only after success.
+Before deployment, production upstreams can return 502. Expose HTTPS443 and
+raw MQTT TLS TCP18885 only; forward 18885 to the configured host binding.
+Keep PostgreSQL, broker plaintext, Core/AMS private host ports, Keycloak
+management port and internal APIs unavailable from WAN. A DNS-only record
+does not configure NAT, firewall or MQTT TLS. Restrict private host ports and
+the shared proxy bridge to trusted infrastructure.
+
+The template sets enrollment request/body/connection limits at nginx; tune
+from bounded traffic measurements without blocking terminal polling or Agent
+uploads. The application enrollment map cardinality/NVS protection, broader
+DB TLS/secret rotation and external adversarial MQTT ACL validation remain
+separate security acceptance items from the existing backlog. Do not label
+functional Dev testing as acceptance of those production boundaries.
+
+Add dedicated Gitea repository Actions secrets with verified SSH host keys:
+`EDOL_PROD_SSH_HOST`, `EDOL_PROD_SSH_USER`, `EDOL_PROD_SSH_PORT`,
+`EDOL_PROD_SSH_KEY`, `EDOL_PROD_SSH_KNOWN_HOSTS`. Their meaning and trusted
+host-key verification are identical to Dev's SSH table above, but values and
+key are independent. The operator must own `/srv/edol`, have local Docker
+access, Python3.11+/OpenSSL/tar and read access to protected state. Docker access
+is privileged; authorize only trusted reviewed workflow code.
+
+The CI runner needs Java21/Maven, Python, Node, Docker/Testcontainers access,
+OpenSSL, Bash, tar and OpenSSH; the deployment step itself needs no Docker
+socket. Keep existing `SONAR_HOST_IP` (scanner URL) and `SONAR_TOKEN` secrets.
+The scanner waits for its own Quality Gate and fails on error or timeout;
+manual polling of an arbitrary `report-task.txt` is retired. Results are in
+the CI/Sonar UI; CI no longer posts PR comments with a separate Gitea token.
+Fork PRs without Sonar secrets cannot complete the required gate: review them
+in a trusted branch before merge, never grant deployment secrets to untrusted
+fork code. Require the `build` job in branch protection and disable direct
+pushes/bypasses to `main`. Confirm the actual status-context name in Gitea.
+
+### 5. Render, review, merge and observe deployment
+
+Before merging, from the separate setup checkout:
+
+```bash
+revision="$(git rev-parse HEAD)"
+python3 docker/deploy/dev_deploy.py render --mode secure \
+  --config /srv/edol/secure/instance.json --revision "$revision"
+docker compose -f /srv/edol/secure/state/compose.json config --quiet
+```
+
+Review the diff and tests, push EDOL-048, open the PR to main, wait for tests
+and Sonar, fix actionable failures and require a fresh green run. Merge only
+after the server/backup/ingress/SSH prerequisites above are complete. Each
+push to main triggers `CI`; `prod-deploy` is a dependent job in the **same**
+workflow so it cannot race an unrelated successful CI run. It checks out the
+exact resulting main SHA and transfers only allowlisted source paths. Dev
+remains manually triggered. CI has no production SSH step on a PR.
+
+For an independent installation without Gitea, use the same reviewed source
+and run the supported deployment directly on the Linux host:
+
+```bash
+python3 docker/deploy/dev_deploy.py deploy-prod --mode secure \
+  --config /srv/edol/secure/instance.json --revision "$(git rev-parse HEAD)" \
+  --source-generation "$(git rev-list --count HEAD)"
+```
+
+The production lock `/srv/edol/.prod-deploy.lock` covers render and deployment;
+concurrent invocations fail closed. A full-history commit-count marker rejects
+older queued revisions or different revisions with the same count, including
+after a partially failed attempt. Use a full checkout (no shallow clone) and
+never rewrite production history or delete this marker to bypass a failure.
+Freeze merges during cutover. If a newer
+merge arrives during a deploy, inspect results and rerun the newest main CI
+rather than starting a parallel manual rollout. Retain all source releases.
+
+Deployment builds/pulls before stopping production writers, starts/verifies
+its dedicated PostgreSQL container/volume, backs up globals and every existing
+managed database plus instance state/keys/media, then provisions and migrates.
+Backups are 0700 directories with 0600 files under `/srv/edol/backups`;
+`complete.json` contains SHA-256 hashes and the target revision. Its absence
+means an incomplete backup. Verify free disk space beforehand; backup failure
+prevents migration. Backups contain secrets: encrypt/off-host-copy them through
+the operator's backup system, never upload to Actions. No automatic retention
+or backup deletion runs. First launch can contain only globals and empty state
+because application databases do not exist yet. The separate legacy backup is
+still required. A successful automated backup is not a full restore rehearsal.
+
+Core/Hub/AMS HTTP checks and dependency healthchecks must pass; Notify reports
+process liveness only. `state/deployed.json` records the successful SHA, and
+`compose.previous.json` retains the prior Compose definition on an update.
+Check it against the merged SHA. Inspect safe service status locally; do not
+paste expanded Compose, full environments or credential-bearing logs.
+
+### 6. Register only the target owner and printer
+
+Verify public HTTPS/OIDC redirect hostnames, registration, verification email
+and login. Register one real user and add the intended printer; create no
+inventory or historical jobs yet. Keep DIRECT/AGENT connections disabled and
+do not pair devices until the import snapshot has been captured. If pairing
+requires an enabled AGENT later, do that only at the device acceptance step.
+Confirm the new Hub OWNER membership and its tenant, and the matching Core
+and Hub printer UUID/tenant through authorized read-only inspection. Record
+explicit source-printer -> target-printer mapping and tenant IDs privately.
+A healthy empty dashboard is acceptance of startup, not of restored history.
+
+### 7. Prepare a reviewed data import after identities exist
+
+Do not restore the legacy full dump over the new databases. Keep new users,
+OIDC subjects/issuers, memberships, tenant, printer projection, service roles,
+Flyway history, Agent/terminal authority and Keycloak untouched. Take a new
+coordinated target backup before any import or device enablement.
+
+Restore the legacy dump into an isolated staging database. Design the actual
+transformation from the audited schema, not from assumptions about main's
+migration number. If versioned conversion is needed, run it only in staging
+and stop at Hub V4 until printer UUID mappings have been populated before V5.
+Core V8 cannot backfill from a Hub schema in a different database; importing
+legacy Core wholesale into the new split databases is not supported.
+
+Prepare explicit table/column allowlists and FK/sequence handling for vendor,
+material, filament/spool, print-job/allocation, maintenance and statistics
+records. Preserve technical IDs where compatible, map numeric legacy job IDs
+to UUIDs while retaining public IDs and remapping children, map all historical
+printer references to the approved target printer, and assign every tenant-owned
+row to the approved target tenant. Inventory/maintenance child ownership must
+remain consistent with parent composite FKs. Resolve colliding display/public
+IDs and sequences explicitly. Never duplicate live runtime/active print state,
+MQTT receipts, credentials or enrollment records as historical data.
+
+Match media/model/snapshot files to transformed references and preserve hashes;
+inspect actual paths before copying. Restore history without triggering event
+replay, Telegram notifications or re-consuming filament. Document expected
+counts, foreign-key checks, quantities and totals before/after. Compute a
+stable mapping and import ledger so retries cannot duplicate history.
+
+Rehearse the entire import into a **copy of the new target**, with no network
+access to printers/bots, then verify rollback from its pre-import backup. Only
+after reviewing the transformation SQL/tool, source/target mapping and result
+should an authorized maintenance operation stop production writers and apply
+it transactionally. Do not disable forced RLS or constraints to make it pass.
+Exact import code is prepared after the live audit and new IDs are available;
+this deployment intentionally cannot guess ownership or import a dump.
+
+### 8. Acceptance and recovery gates
+
+Verify exact source/import counts, no orphan/cross-tenant rows, UUID mappings,
+sequences, quantities/totals, historical job detail, spool history, maintenance,
+and media downloads. Validate under the real tenant's runtime role as well as
+administrative integrity checks: admin visibility does not prove RLS. Confirm
+another tenant cannot access imported objects using a separately approved
+isolation check. Then enable/pair devices and test the chosen bounded runtime
+flows; record production outcomes separately from Dev acceptance.
+
+If build/certificate validation fails before stop, production remains running.
+After stop, a failure leaves the target project stopped with volumes/state and
+backup artifacts retained. Stop the rollout; do not retry with `clean`, Flyway
+`repair`, dropped volumes or an old binary against a newer schema. A failed
+migration is not an automatic binary rollback.
+
+For legacy cutover rollback, stop only the new project, switch ingress back to
+the backed-up old routing, and restore the old Compose/source/images/config
+with its untouched original volumes or the rehearsed backup. Reconcile any
+writes since cutoff before reopening access; retain `/srv/edol-old` and the new
+state. For later updates, recover **the matching database, keys/broker/media
+snapshot and source release together** into a separately reviewed target,
+validate it, then switch ingress. Keep both failed and known-good backups.
+No generic destructive restore command is prescribed before actual volume,
+PostgreSQL version and source identity have been audited.
