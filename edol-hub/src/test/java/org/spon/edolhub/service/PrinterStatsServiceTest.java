@@ -43,7 +43,10 @@ class PrinterStatsServiceTest {
             return new SimpleTransactionStatus();
         });
         ProxyFactory factory = new ProxyFactory(service);
-        factory.addAdvice(new TransactionInterceptor(transactions, new AnnotationTransactionAttributeSource()));
+        TransactionInterceptor interceptor = new TransactionInterceptor();
+        interceptor.setTransactionManager(transactions);
+        interceptor.setTransactionAttributeSource(new AnnotationTransactionAttributeSource());
+        factory.addAdvice(interceptor);
         PrinterStatsService proxy = (PrinterStatsService) factory.getProxy();
 
         assertThat(proxy.getStats().getTotalJobs()).isZero();
