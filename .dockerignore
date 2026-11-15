@@ -15,6 +15,7 @@ tools
 **/state
 **/__pycache__
 **/*.pyc
+**/.flattened-pom.xml
 *.tar.gz
 models
 camera_snapshots

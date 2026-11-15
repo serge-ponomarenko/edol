@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.spon</groupId>
         <artifactId>edol</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>edol-core-api</artifactId>
@@ -13,9 +13,6 @@
     <name>edol-core-api</name>
     <url>http://maven.apache.org</url>
 
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
 
     <dependencies>
         <dependency>

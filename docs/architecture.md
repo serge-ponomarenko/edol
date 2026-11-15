@@ -4,6 +4,11 @@
 
 EDOL is a Java 21, Spring Boot 4 Maven reactor with four services, PostgreSQL and MQTT. The Compose definitions use Mosquitto. The root `pom.xml` is the build entry point; Docker Compose is the local/self-hosted runtime composition.
 
+The server reactor shares the root `${revision}` version. After verification and
+the Quality Gate, main-push CI creates an annotated version tag and publishes
+service images plus a release with digests when that version is not yet tagged. Publication is separate from the
+existing main-push source deployment. See [release operations](operations.md#release-versioning).
+
 | Module | Responsibility | Main boundaries |
 | --- | --- | --- |
 | `edol-core-api` | Shared printer-state and AMS DTOs. | Consumed by all services; changes are cross-service API changes. |

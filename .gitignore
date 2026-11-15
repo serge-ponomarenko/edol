@@ -15,3 +15,6 @@
 
 /edol-core/edol-core.iml
 /edol-hub/edol-hub.iml
+
+# Generated resolved Maven coordinates.
+**/.flattened-pom.xml

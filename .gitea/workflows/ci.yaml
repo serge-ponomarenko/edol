@@ -31,6 +31,10 @@ jobs:
           key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             maven-${{ runner.os }}-
+      - name: Validate version and release notes
+        env:
+          RELEASE_REF: ${{ gitea.ref }}
+        run: python3 .gitea/scripts/release.py check
       - name: Deployment and realm checks
         run: |
           python3 -B -m unittest discover -s docker/deploy/tests
@@ -81,3 +85,27 @@ jobs:
           EDOL_PROD_SSH_KNOWN_HOSTS: ${{ secrets.EDOL_PROD_SSH_KNOWN_HOSTS }}
           EDOL_SOURCE_SHA: ${{ gitea.sha }}
         run: bash docker/deploy/dispatch.sh secure prod
+
+  release:
+    needs: build
+    if: gitea.event_name == 'push' && gitea.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ gitea.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build and publish versioned images and release
+        env:
+          RELEASE_REF: ${{ gitea.ref }}
+          RELEASE_SERVER: ${{ gitea.server_url }}
+          RELEASE_REPOSITORY: ${{ gitea.repository }}
+          REGISTRY_USER: ${{ secrets.EDOL_REGISTRY_USER }}
+          REGISTRY_TOKEN: ${{ secrets.EDOL_REGISTRY_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.EDOL_RELEASE_TOKEN }}
+        run: python3 .gitea/scripts/release.py release-main

@@ -32,6 +32,14 @@
 - Before handoff, analyze every generated or modified supported source file with the read-only SonarQube MCP once the implementation is stable. Fix actionable findings; do not suppress findings merely to pass verification. Report and explain any false positive, MCP-analysis artifact, or finding explicitly deferred by the user. Respect requests limited to reporting or explicitly excluding fixes.
 - Before finishing, decide whether a documented architectural fact changed. Update `docs/architecture.md` or an ADR only when it did, then check the documentation against code.
 
+## Versioning and Releases
+
+- EDOL server modules share the root `pom.xml` revision property. Child parents use `${revision}`; module-specific versions are not supported. Keep shared dependency versions in root dependencyManagement and declare each module's actual dependencies locally.
+- Before a meaningful change is committed, the main agent maintains concise user-facing entries under `CHANGELOG.md` Unreleased (Added, Changed, Fixed, Security, Deprecated, Removed as relevant). Group related work; do not copy every commit subject. Documentation-only or test-only changes may need no entry; explain that decision in the handoff. Never edit a published release section.
+- A normal commit request authorizes one local commit, not a version bump, release, merge, tag or push. The commit agent verifies changelog readiness and returns missing substantive entries to the main agent; it does not invent release notes.
+- For an explicit release preparation request, choose or confirm the SemVer version from the intended compatibility impact, then run `py -B .gitea/scripts/prepare_release.py X.Y.Z`. This prepares only root revision and a dated changelog section; review and verify the diff before the separately authorized commit/merge. For the initial prepared 1.0.0, do not prepare a second section.
+- After an authorized merge/push to main, passing CI creates an annotated tag and publishes Docker images plus a Gitea Release only when the root version has no existing tag. Ordinary main commits at an already published version do not publish another release; an existing tag with a missing Release or draft fails for operator inspection. Do not manually tag the feature branch or create a Release first. Follow docs/operations.md for publication failures; never move a release tag or blindly rerun a partial publication.
+
 ## Deferred Work
 
 - Do not leave source-code TODO comments for deferred work. Maintain postponed cross-cutting work in the authorized Home MCP Obsidian EDOL backlog (`projects/edol/work/EDOL-048/backlog.md`), recording intended outcomes and safety constraints. Follow `edol-knowledge-management`; if Obsidian is unavailable, report the missing write and give a concise in-conversation handoff, never an ad hoc Git TODO.

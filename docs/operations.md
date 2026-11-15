@@ -979,6 +979,91 @@ snapshot and source release together** into a separately reviewed target,
 validate it, then switch ingress. Keep both failed and known-good backups.
 No generic destructive restore command is prescribed before actual volume,
 PostgreSQL version and source identity have been audited.
+## Release versioning
+
+EDOL server modules share one SemVer version. The root POM defines
+`<revision>1.0.0</revision>` and `<version>${revision}</version>`; child parent
+references use `${revision}` and inherit the project version. Dependency versions
+are centralized in root dependencyManagement; modules still declare the libraries
+that they use. Shared API dependencies obtain `${project.version}` from root
+management. This uses [Maven CI friendly versions](https://maven.apache.org/guides/mini/guide-maven-ci-friendly.html).
+Build from the reactor root (`mvn -pl <module> -am ...` for a subset).
+The inherited Flatten plugin resolves CI friendly coordinates in generated
+`.flattened-pom.xml` files for install/deploy without rewriting source POMs.
+Generated POMs are ignored by Git and the Docker context.
+Agent firmware remains separately versioned.
+
+Use PATCH for compatible fixes, MINOR for compatible features, and MAJOR for
+breaking API, MQTT or configuration changes or mandatory manual upgrade steps.
+Release candidates use X.Y.Z-rc.N. The version is chosen as a release decision,
+not inferred from every commit. Ordinary development keeps the current revision
+and adds user-facing changes under CHANGELOG.md Unreleased. Development builds
+are identified by their commit; they are not republished as release images.
+
+### Preparing a release
+
+The initial 1.0.0 is already prepared. For a subsequent release, first curate the
+Unreleased bullets, then run from the repository root on the working branch:
+
+```powershell
+py -B .gitea/scripts/prepare_release.py 1.0.1
+py -B .gitea/scripts/release.py check
+```
+
+The first command changes only root revision and moves Unreleased into a new
+dated section. It refuses an empty changelog, an existing section or a version
+that is not newer. It does not commit, tag, push or publish. Review the diff,
+run appropriate verification, commit and merge through the normal approved PR
+process. Change the example version according to compatibility impact. Each
+meaningful commit should have a suitable Unreleased entry; no version bump is
+required for a normal commit. The main agent prepares changelog entries; the
+commit agent checks them before creating its separately authorized local commit.
+
+### Automatic Gitea publication
+
+Configure Actions secrets EDOL_REGISTRY_USER, EDOL_REGISTRY_TOKEN (package
+read/write), and EDOL_RELEASE_TOKEN (repository write, including tags/releases).
+The registry is the HTTPS Gitea server host; packages belong to the repository
+owner. The runner needs Docker with registry access, Java 21, Python and the
+existing Sonar secrets. Protect v* tags and allow the release token's account to
+create them. No credentials belong in Git. See the
+[Gitea container registry documentation](https://docs.gitea.com/usage/packages/container/).
+
+A main push runs version/changelog checks, the full reactor verify and Sonar
+Quality Gate. After those pass, the release job checks for v<revision>:
+
+- If the tag exists and its Release is published, it skips publication, including
+  when that tag belongs to an earlier main commit. Ordinary commits do not
+  silently rewrite a release. A missing Release or existing draft fails the job
+  and requires inspection instead of reporting success.
+- If absent, it creates an annotated tag on the verified checkout commit, creates
+  a draft Release, builds/pushes Core/Hub/Notify/AMS images and publishes the
+  Release with changelog notes and exact image digests.
+
+There is no separate tag-push workflow, so automatic tag creation cannot start a
+second competing publication. Do not create a tag or Release manually first.
+The first successful main CI with the prepared 1.0.0 creates v1.0.0 automatically.
+No manual git tag/push commands are needed.
+
+Images use `<gitea-host>/<owner>/edol-<service>:<version>` and
+`:sha-<full-commit-sha>`, with OCI version/revision/source labels. No floating
+latest tag is published. Pin recorded digests when consuming images; registry
+tags alone are not immutable. A published version is never rebuilt.
+
+Publication is not atomic. Failure after tagging can leave a tag, draft and some
+images. A repeated main run fails for an existing tag with a missing or draft
+Release. Inspect the failed job, draft and packages before
+recovery. Never delete/move the tag or blindly overwrite images. Choose a new
+patch version if artifacts must change. A reviewed operator recovery may invoke
+`release.py publish` only on the original tagged checkout, with RELEASE_REF set
+to that exact tag and the same required credentials, after resolving any existing
+draft/package conflicts. The script refuses a duplicate Release creation.
+
+Existing main-push production deployment and Dev source builds retain their
+behavior; they do not automatically consume registry images. Thus an ordinary
+main push can still deploy production even when no new release is published.
+Release publication does not establish runtime acceptance. Production and release
+jobs independently depend on the successful build job.
 
 ## Production backup diagnostics
 

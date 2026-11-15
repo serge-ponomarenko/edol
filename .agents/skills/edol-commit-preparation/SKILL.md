@@ -10,6 +10,10 @@ Use this skill when the user asks to prepare an EDOL commit. Follow
 
 1. Read the current branch, `git status`, the focused diff and recent relevant
    commit subjects. Preserve unrelated working-tree changes.
+   Check changelog readiness against the Versioning and Releases rules in
+   `AGENTS.md`. Report missing meaningful Unreleased entries to the main agent;
+   do not infer a release request from an ordinary commit. Root revision changes
+   require a prepared dated release section. Never tag or publish from this skill.
 2. Derive the ticket prefix from explicit user context or the branch. If the
    subtask number is not unambiguous, present a candidate and ask the user to
    confirm it before a commit is requested.
@@ -36,7 +40,7 @@ Use this skill when the user asks to prepare an EDOL commit. Follow
    amending. Amend it only with the user's explicit approval.
 7. Report the proposed message, affected paths, relevant test command and any
    unverified runtime boundary. Commit only after the user explicitly asks for
-   it and confirms the intended staged files and message.
+   it; the commit executor infers the completed stage as specified in AGENTS.md.
 
 ## PowerShell Message Handoff
 

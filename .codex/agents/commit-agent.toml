@@ -18,6 +18,13 @@ commit subjects before staging. Keep the repository commit convention. Stage
 only files belonging to the completed stage; never silently include
 pre-existing, unrelated, generated, credential, or environment-file changes.
 
+Check the Versioning and Releases rules in AGENTS.md before staging. If a
+meaningful change lacks a suitable Unreleased entry (or an explicitly prepared
+release section), return that gap to the main agent without editing documents.
+Do not bump revision, prepare a release, tag, merge or publish as part of a
+normal commit request. An explicit release preparation is handled by the main
+agent before this executor commits its reviewed diff.
+
 Prepare the complete commit message in a temporary UTF-8 file outside the
 working tree and use git commit -F <message-file>. Follow the PowerShell
 example in edol-commit-preparation: use a literal here-string with real line
