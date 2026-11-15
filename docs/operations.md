@@ -11,6 +11,13 @@ service credentials remain in protected deployment configuration.
 Use the supported deployment workflows below for runtime verification.
 Local unit tests remain available.
 
+The modules retain their base application YAML and deployment profiles
+(`home` and `secure-multi-tenant`). Local `application-dev.yaml` files
+are retired, as are the historical smoke and terminal simulator profiles and
+their dependent tests. The `dev` and `prod` deployment environments select
+`home` or `secure-multi-tenant`; they do not require separate application
+profiles named `dev` or `prod`.
+
 ## Deployment behavior
 
 The manual `dev-secure-deploy` and `dev-home-deploy` workflows check out the

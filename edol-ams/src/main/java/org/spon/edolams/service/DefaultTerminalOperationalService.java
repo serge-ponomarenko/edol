@@ -4,17 +4,11 @@ import org.spon.edolams.controller.AmsStatusController;
 import org.spon.edolams.controller.SpoolController;
 import org.spon.edolams.model.AmsStatus;
 import org.spon.edolams.model.Spool;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 /** Production operational path backed by Core and Hub. */
 @Service
-@ConditionalOnProperty(
-        name = "edol-ams.terminal-simulator.enabled",
-        havingValue = "false",
-        matchIfMissing = true
-)
 public class DefaultTerminalOperationalService implements TerminalOperationalService {
 
     private final AmsStatusController statusController;
