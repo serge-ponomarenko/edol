@@ -33,7 +33,7 @@ public class SecurityConfig {
 
     @Bean
     @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "home")
-    public SecurityFilterChain homeSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain homeSecurityFilterChain(HttpSecurity http) {
         http
                 .csrf(AbstractHttpConfigurer::disable) // disable for simplicity
                 .authorizeHttpRequests(auth -> auth
@@ -55,7 +55,7 @@ public class SecurityConfig {
             HttpSecurity http,
             CoreTenantContextFilter coreTenantContextFilter,
             ObjectProvider<CoreLegacyCompatibilityFilter> legacyCompatibilityFilter
-    ) throws Exception {
+    ) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth

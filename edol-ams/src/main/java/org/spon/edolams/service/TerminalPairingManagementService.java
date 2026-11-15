@@ -56,6 +56,10 @@ public class TerminalPairingManagementService {
 
     @Transactional
     public CreatedPairing createPairing(UUID printerId) {
+        return createPairingWithinTransaction(printerId);
+    }
+
+    private CreatedPairing createPairingWithinTransaction(UUID printerId) {
         UUID tenantId = tenantContext.currentTenantId();
         Instant now = clock.instant();
         terminalRepository.findFirstByTenantIdAndAllowedPrinterIdAndLifecycleStateInOrderByCreatedAtDescIdDesc(
@@ -119,7 +123,7 @@ public class TerminalPairingManagementService {
             pairingRepository.transitionPendingPairing(replacedTerminal.getId(), PairingState.REVOKED);
         }
         replacedTerminal.setLifecycleState(TerminalLifecycle.REPLACED);
-        CreatedPairing replacement = createPairing(printerId);
+        CreatedPairing replacement = createPairingWithinTransaction(printerId);
         replacedTerminal.setReplacedByTerminalId(replacement.terminalId());
         return replacement;
     }
@@ -127,7 +131,7 @@ public class TerminalPairingManagementService {
     @Transactional
     public CreatedPairing rotate(UUID printerId) {
         retireLiveTerminal(printerId, TerminalLifecycle.REVOKED);
-        return createPairing(printerId);
+        return createPairingWithinTransaction(printerId);
     }
 
     @Transactional(readOnly = true)

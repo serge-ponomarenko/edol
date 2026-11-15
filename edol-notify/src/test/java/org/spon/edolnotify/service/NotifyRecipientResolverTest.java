@@ -31,7 +31,8 @@ class NotifyRecipientResolverTest {
                 new NotifyRecipientProperties(List.of()), new NotifyTenantContext(), 0);
         ReflectionTestUtils.setField(resolver, "telegramEnabled", false);
         resolver.validateMappings();
-        assertThatThrownBy(() -> resolver.openForEvent(UUID.randomUUID()))
+        UUID unknownTenant = UUID.randomUUID();
+        assertThatThrownBy(() -> resolver.openForEvent(unknownTenant))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> resolver.openForChat(0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> resolver.openForChat(123)).isInstanceOf(IllegalArgumentException.class);

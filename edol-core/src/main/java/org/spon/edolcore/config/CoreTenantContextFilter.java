@@ -49,8 +49,8 @@ public class CoreTenantContextFilter extends OncePerRequestFilter {
         }
 
         if (!trustedServiceClientIds.contains(jwtAuthentication.getToken().getClaimAsString("azp"))
-                || !authentication.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("SCOPE_tenant.context"))) {
+                || authentication.getAuthorities().stream()
+                .noneMatch(authority -> authority.getAuthority().equals("SCOPE_tenant.context"))) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Hub tenant context is not authorized");
             return;
         }

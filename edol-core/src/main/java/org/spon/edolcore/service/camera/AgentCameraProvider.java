@@ -3,6 +3,7 @@ package org.spon.edolcore.service.camera;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import org.spon.edolcore.service.agent.command.AgentCommandGateway;
+import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -14,7 +15,7 @@ class AgentCameraProvider
     private final AgentCommandGateway commands;
 
     @Override
-    public byte[] capture(UUID printerId) {
+    public byte @Nullable [] capture(UUID printerId) {
         commands.uploadSnapshot(printerId);
         // Asynchronous HTTPS upload stores the frame; the background capture must not overwrite it.
         return null;

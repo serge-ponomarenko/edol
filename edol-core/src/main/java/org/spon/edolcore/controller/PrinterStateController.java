@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.spon.edol.model.PrinterState;
 import org.spon.edol.deployment.DeploymentMode;
 import org.spon.edolcore.service.printer.management.PrinterManagementService;
+import org.spon.edolcore.persistence.printer.Printer;
 import org.spon.edolcore.service.PrinterStateService;
 import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityProvider;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,7 +35,7 @@ public class PrinterStateController {
             return printerStateService.getAllStates();
         }
         Set<UUID> visiblePrinters = printerManagementService.getPrinters().stream()
-                .map(printer -> printer.getId())
+                .map(Printer::getId)
                 .collect(Collectors.toSet());
         return printerStateService.getAllStates().stream()
                 .filter(state -> visiblePrinters.contains(state.getPrinterId()))

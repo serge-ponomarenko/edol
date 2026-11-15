@@ -18,7 +18,7 @@ public final class BoundedUpload {
         int count;
         while ((count = input.read(buffer)) != -1) {
             if (count > limit - written) {
-                throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Upload size limit exceeded");
+                throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "Upload size limit exceeded");
             }
             output.write(buffer, 0, count);
             written += count;

@@ -90,13 +90,15 @@ class ModelFileStorageTest {
         Path outside = Files.createDirectories(temporary.resolve("outside"));
         UploadFixtures.directoryLink(root.resolve(printer.toString()), outside);
         var storage = storage(UploadFixtures.limits());
-        assertThatThrownBy(() -> storage.store(printer, "part.3mf", InputStream.nullInputStream()))
+        var input = InputStream.nullInputStream();
+        assertThatThrownBy(() -> storage.store(printer, "part.3mf", input))
                 .isInstanceOf(ResponseStatusException.class);
         assertThat(outside.resolve("part.3mf")).doesNotExist();
         UUID otherPrinter = UUID.randomUUID();
         Path directory = Files.createDirectories(root.resolve(otherPrinter.toString()));
         UploadFixtures.directoryLink(directory.resolve("metadata"), outside);
-        assertThatThrownBy(() -> storage.safeDirectory(directory.resolve("metadata")))
+        Path metadataDirectory = directory.resolve("metadata");
+        assertThatThrownBy(() -> storage.safeDirectory(metadataDirectory))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -138,7 +140,8 @@ class ModelFileStorageTest {
         assertThat(Files.readString(output.resolve("project_settings.config"))).isEqualTo("{}");
         assertThat(output.resolve("unrelated.txt")).doesNotExist();
         byte[] traversal = UploadFixtures.model(Map.of("../escaped.txt", new byte[0]));
-        assertThatThrownBy(() -> storage.store(printer, "part.3mf", new ByteArrayInputStream(traversal)))
+        var traversalInput = new ByteArrayInputStream(traversal);
+        assertThatThrownBy(() -> storage.store(printer, "part.3mf", traversalInput))
                 .isInstanceOf(ResponseStatusException.class);
         assertNoStagingFiles(output);
     }
@@ -148,11 +151,14 @@ class ModelFileStorageTest {
         var limits = new UploadProperties(100_000, 8192, 4096, 16384, 2, 1000);
         var storage = storage(limits);
         byte[] excessive = UploadFixtures.model(Map.of("other.txt", new byte[0]));
-        assertThatThrownBy(() -> storage.store(printer, "part.3mf", new ByteArrayInputStream(excessive)))
+        var excessiveInput = new ByteArrayInputStream(excessive);
+        assertThatThrownBy(() -> storage.store(printer, "part.3mf", excessiveInput))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         error -> assertThat(error.getStatusCode().value()).isEqualTo(413));
         byte[] colliding = UploadFixtures.model(Map.of("_RELS/.RELS", new byte[0]));
-        assertThatThrownBy(() -> storage(UploadFixtures.limits()).store(printer, "part.3mf", new ByteArrayInputStream(colliding)))
+        var defaultStorage = storage(UploadFixtures.limits());
+        var collidingInput = new ByteArrayInputStream(colliding);
+        assertThatThrownBy(() -> defaultStorage.store(printer, "part.3mf", collidingInput))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -160,7 +166,9 @@ class ModelFileStorageTest {
     void refusesRootLinksAndLinksIntoAnotherPrinterEvenInsideTheStorageRoot() throws Exception {
         Path actual = Files.createDirectories(temporary.resolve("actual-models"));
         UploadFixtures.directoryLink(temporary.resolve("models"), actual);
-        assertThatThrownBy(() -> storage(UploadFixtures.limits()).safeDirectory(temporary.resolve("models")))
+        var linkedStorage = storage(UploadFixtures.limits());
+        Path linkedRoot = temporary.resolve("models");
+        assertThatThrownBy(() -> linkedStorage.safeDirectory(linkedRoot))
                 .isInstanceOf(ResponseStatusException.class);
         Path secondRoot = Files.createDirectories(temporary.resolve("second-models"));
         Path otherPrinter = Files.createDirectory(secondRoot.resolve(UUID.randomUUID().toString()));
@@ -168,7 +176,8 @@ class ModelFileStorageTest {
         UploadFixtures.directoryLink(link, otherPrinter);
         var limits = UploadFixtures.limits();
         var storage = new ModelFileStorage(limits, new ModelArchiveValidator(limits), secondRoot);
-        assertThatThrownBy(() -> storage.store(printer, "part.3mf", InputStream.nullInputStream()))
+        var input = InputStream.nullInputStream();
+        assertThatThrownBy(() -> storage.store(printer, "part.3mf", input))
                 .isInstanceOf(ResponseStatusException.class);
         assertThat(otherPrinter.resolve("part.3mf")).doesNotExist();
     }

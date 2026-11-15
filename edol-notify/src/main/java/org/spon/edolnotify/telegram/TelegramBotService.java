@@ -8,7 +8,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -20,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.lang.annotation.Annotation;
 import java.util.Set;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -38,26 +38,25 @@ public class TelegramBotService {
     private final CommandHandler commandHandler;
     private final CallbackHandler callbackHandler;
 
-    @Autowired(required = false)
-    private TenantTelegramBotRegistry tenantBots;
+    private final Optional<TenantTelegramBotRegistry> tenantBots;
 
     @PostConstruct
     void validateConfiguration() {
-        if (tenantBots == null && telegramServiceEnable && (botToken == null || botToken.isBlank())) {
+        if (tenantBots.isEmpty() && telegramServiceEnable && (botToken == null || botToken.isBlank())) {
             throw new IllegalStateException("Enabled Telegram requires a bot token");
         }
     }
 
     public BotContext getContext() {
-        if (tenantBots != null) {
-            return tenantBots.context();
+        if (tenantBots.isPresent()) {
+            return tenantBots.get().context();
         }
         return bot == null ? null : bot.context;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onAppReady() {
-        if (tenantBots != null || !telegramServiceEnable) {
+        if (tenantBots.isPresent() || !telegramServiceEnable) {
             return;
         }
 
@@ -74,7 +73,7 @@ public class TelegramBotService {
 
     @Scheduled(fixedDelay = 60000)
     public void ensureBotRunning() {
-        if (tenantBots != null || !telegramServiceEnable) {
+        if (tenantBots.isPresent() || !telegramServiceEnable) {
             return;
         }
 

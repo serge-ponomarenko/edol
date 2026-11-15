@@ -3,9 +3,6 @@ package org.spon.edolcore.config;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.spon.edolcore.controller.SecureAgentController;
-import org.spon.edolcore.service.agent.pairing.AgentCredentialCodec;
-import org.spon.edolcore.service.agent.pairing.AgentEnrollmentLimiter;
-import org.spon.edolcore.service.agent.pairing.AgentPairingProperties;
 import org.spon.edolcore.service.agent.pairing.AgentPairingService;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.spon.edolcore.service.tenant.CoreTenantContext;
@@ -65,7 +62,7 @@ class SecureAgentHttpTest {
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.secret").value("synthetic"));
         mvc.perform(post("/api/agent/v1/enroll").secure(true).contentType("application/json")
-                        .content(" ".repeat(257))).andExpect(status().isPayloadTooLarge());
+                        .content(" ".repeat(257))).andExpect(status().is(413));
         mvc.perform(post("/api/agent/v1/enroll").secure(true).contentType("application/json").content("not-json"))
                 .andExpect(status().isBadRequest());
     }

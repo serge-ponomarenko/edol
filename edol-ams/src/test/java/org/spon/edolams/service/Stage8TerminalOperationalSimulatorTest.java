@@ -59,11 +59,13 @@ class Stage8TerminalOperationalSimulatorTest {
     void deniesATerminalOutsideTheFixtureTenantOrPrinter() {
         Stage8TerminalOperationalSimulator simulator = simulator();
 
-        assertThatThrownBy(() -> simulator.state(terminal(UUID.randomUUID(), PRINTER_ID)))
+        var foreignTenantTerminal = terminal(UUID.randomUUID(), PRINTER_ID);
+        var foreignPrinterTerminal = terminal(TENANT_ID, UUID.randomUUID());
+        assertThatThrownBy(() -> simulator.state(foreignTenantTerminal))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode().value())
                 .isEqualTo(403);
-        assertThatThrownBy(() -> simulator.findSpool(terminal(TENANT_ID, UUID.randomUUID()), 800001L))
+        assertThatThrownBy(() -> simulator.findSpool(foreignPrinterTerminal, 800001L))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(error -> ((ResponseStatusException) error).getStatusCode().value())
                 .isEqualTo(403);

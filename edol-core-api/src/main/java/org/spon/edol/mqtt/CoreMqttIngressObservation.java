@@ -13,12 +13,10 @@ public final class CoreMqttIngressObservation {
     private long processingFailures;
 
     public synchronized void validated(int version, boolean legacyEventPresent) {
-        if (version == 2) {
-            validatedV2++;
-        } else if (version == 3) {
-            validatedV3++;
-        } else {
-            throw new IllegalArgumentException("Only validated Core MQTT versions can be counted");
+        switch (version) {
+            case 2 -> validatedV2++;
+            case 3 -> validatedV3++;
+            default -> throw new IllegalArgumentException("Only validated Core MQTT versions can be counted");
         }
         if (legacyEventPresent) {
             withLegacyEvent++;

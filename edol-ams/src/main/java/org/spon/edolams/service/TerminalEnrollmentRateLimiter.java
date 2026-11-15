@@ -1,6 +1,7 @@
 package org.spon.edolams.service;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.time.Clock;
@@ -19,6 +20,7 @@ public class TerminalEnrollmentRateLimiter {
     private final Map<String, FailureWindow> failures = new ConcurrentHashMap<>();
     private final Clock clock;
 
+    @Autowired
     TerminalEnrollmentRateLimiter() {
         this(Clock.systemUTC());
     }

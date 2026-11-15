@@ -60,7 +60,8 @@ class TerminalManagementApiControllerTest {
         org.mockito.Mockito.doThrow(new AccessDeniedException("owner required"))
                 .when(ownerAuthorizationService).requireCurrentOwner();
 
-        assertThatThrownBy(() -> controller().revoke(PRINTER_ID))
+        var controller = controller();
+        assertThatThrownBy(() -> controller.revoke(PRINTER_ID))
                 .isInstanceOf(AccessDeniedException.class);
 
         verify(printerAccessService, never()).getPrinter(PRINTER_ID);
@@ -90,7 +91,8 @@ class TerminalManagementApiControllerTest {
         when(printerAccessService.getPrinter(PRINTER_ID))
                 .thenThrow(new IllegalArgumentException("Printer is not available to the current tenant"));
 
-        assertThatThrownBy(() -> controller().status(PRINTER_ID))
+        var controller = controller();
+        assertThatThrownBy(() -> controller.status(PRINTER_ID))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(exception -> ((ResponseStatusException) exception).getStatusCode().value())
                 .isEqualTo(404);
@@ -102,7 +104,8 @@ class TerminalManagementApiControllerTest {
         when(terminalManagementClient.createPairing(PRINTER_ID))
                 .thenThrow(new AmsTerminalManagementConflictException("already active"));
 
-        assertThatThrownBy(() -> controller().createPairing(PRINTER_ID))
+        var controller = controller();
+        assertThatThrownBy(() -> controller.createPairing(PRINTER_ID))
                 .isInstanceOf(AmsTerminalManagementConflictException.class);
         assertThat(controller().conflict().getStatusCode().value()).isEqualTo(409);
     }

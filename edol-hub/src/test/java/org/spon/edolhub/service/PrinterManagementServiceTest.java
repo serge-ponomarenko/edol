@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.spon.edolhub.model.dto.PrinterForm;
 import org.springframework.http.HttpMethod;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.web.client.RestClient;
 
 import java.util.UUID;
@@ -36,7 +37,7 @@ class PrinterManagementServiceTest {
                 .andExpect(method(HttpMethod.PATCH)).andRespond(withSuccess());
         server.expect(requestTo("https://core.example/api/printers/" + printerId + "/connection"))
                 .andExpect(method(HttpMethod.PATCH))
-                .andExpect(content().json("{\"accessCode\":" + expectedJson + "}", false))
+                .andExpect(content().json("{\"accessCode\":" + expectedJson + "}", JsonCompareMode.LENIENT))
                 .andRespond(withSuccess());
 
         service.updatePrinter(printerId, form);

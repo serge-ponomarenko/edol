@@ -20,6 +20,11 @@ import java.util.List;
 import java.util.UUID;
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.FileSystems;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +67,18 @@ class TelegramMessageControllerTest {
         doAnswer(invocation -> {
             File file = invocation.getArgument(1);
             temporary.set(file);
+            var posix = Files.getFileAttributeView(file.toPath(), PosixFileAttributeView.class);
+            if (posix != null) {
+                assertThat(posix.readAttributes().permissions())
+                        .isEqualTo(PosixFilePermissions.fromString("rw-------"));
+            } else {
+                var acl = Files.getFileAttributeView(file.toPath(), AclFileAttributeView.class);
+                assertThat(acl.getAcl()).hasSize(1);
+                assertThat(acl.getAcl().getFirst().type()).isEqualTo(AclEntryType.ALLOW);
+                var processUser = FileSystems.getDefault().getUserPrincipalLookupService()
+                        .lookupPrincipalByName(System.getProperty("user.name"));
+                assertThat(acl.getAcl().getFirst().principal()).isEqualTo(processUser);
+            }
             assertThat(Files.readAllBytes(file.toPath())).containsExactly(image);
             return photoRequest;
         }).when(context).sendPhoto(eq(101L), any(File.class));

@@ -19,7 +19,7 @@ public class SecurityConfig {
 
     @Bean
     @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "home")
-    SecurityFilterChain homeSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain homeSecurityFilterChain(HttpSecurity http) {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
@@ -27,7 +27,7 @@ public class SecurityConfig {
 
     @Bean
     @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "secure-multi-tenant")
-    SecurityFilterChain secureSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain secureSecurityFilterChain(HttpSecurity http) {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health").permitAll()

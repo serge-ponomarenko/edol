@@ -35,6 +35,7 @@ public class SecureAgentTelemetryHandler {
     public void handle(Message<?> message) {
         try {
             String topic = (String) message.getHeaders().get("mqtt_receivedTopic");
+            if (topic == null) throw new IllegalArgumentException("Missing agent report topic");
             var binding = mqtt.ingress(AgentMqttTopics.ingressId(topic));
             if (Boolean.TRUE.equals(message.getHeaders().get("mqtt_receivedRetained"))) {
                 throw new IllegalArgumentException("Retained agent report rejected");

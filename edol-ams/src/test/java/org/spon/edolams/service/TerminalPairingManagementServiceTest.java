@@ -203,7 +203,8 @@ class TerminalPairingManagementServiceTest {
 
         AmsTenantContext tenantContext = new AmsTenantContext();
         try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
-            assertThatThrownBy(() -> service(tenantContext, now).createPairing(PRINTER_ID))
+            var pairingService = service(tenantContext, now);
+            assertThatThrownBy(() -> pairingService.createPairing(PRINTER_ID))
                     .isInstanceOf(TerminalLifecycleConflictException.class);
         }
     }
@@ -218,7 +219,8 @@ class TerminalPairingManagementServiceTest {
 
         AmsTenantContext tenantContext = new AmsTenantContext();
         try (AmsTenantContext.Scope ignored = tenantContext.open(TENANT_ID)) {
-            assertThatThrownBy(() -> service(tenantContext).createPairing(PRINTER_ID))
+            var pairingService = service(tenantContext);
+            assertThatThrownBy(() -> pairingService.createPairing(PRINTER_ID))
                     .isInstanceOf(TerminalLifecycleConflictException.class)
                     .hasMessageContaining("already being created");
         }

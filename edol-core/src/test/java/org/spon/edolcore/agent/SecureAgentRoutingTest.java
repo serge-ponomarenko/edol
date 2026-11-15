@@ -1,7 +1,6 @@
 package org.spon.edolcore.agent;
 
 import org.junit.jupiter.api.Test;
-import org.spon.edolcore.model.dto.AgentHeartbeatDto;
 import org.spon.edolcore.service.agent.AgentStateService;
 import org.spon.edolcore.service.agent.event.AgentEventConsumer;
 import org.spon.edolcore.service.agent.mqtt.AgentMqttService;

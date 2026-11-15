@@ -32,7 +32,7 @@ public class SecurityConfig {
 
     @Bean
     @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "home")
-    SecurityFilterChain homeSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain homeSecurityFilterChain(HttpSecurity http) {
         http.csrf(AbstractHttpConfigurer::disable)
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
@@ -46,7 +46,7 @@ public class SecurityConfig {
             ClientRegistrationRepository clientRegistrationRepository,
             HttpSessionOAuth2AuthorizedClientRepository authorizedClientRepository,
             OAuth2AuthorizationRequestResolver authorizationRequestResolver
-    ) throws Exception {
+    ) {
         OidcClientInitiatedLogoutSuccessHandler logoutHandler =
                 new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
         logoutHandler.setPostLogoutRedirectUri("{baseUrl}/");

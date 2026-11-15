@@ -59,7 +59,8 @@ class TerminalAuthenticationServiceTest {
         when(jdbcTemplate.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TerminalAuthenticationService.AuthenticatedTerminal>>any(), eq(TERMINAL_ID))).thenReturn(List.of(stored));
         when(credentialCodec.matchesTerminalCredential(stored.credentialDigest(), 1, SECRET)).thenReturn(false);
 
-        assertThatThrownBy(() -> service().authenticate("EDOL-Terminal " + TERMINAL_ID + "." + SECRET))
+        var service = service();
+        assertThatThrownBy(() -> service.authenticate("EDOL-Terminal " + TERMINAL_ID + "." + SECRET))
                 .isInstanceOf(InvalidTerminalCredentialException.class);
 
         verify(jdbcTemplate, never()).query(
@@ -73,7 +74,8 @@ class TerminalAuthenticationServiceTest {
     void rejectsARevokedTerminalWithoutRecordingAConnection() {
         when(jdbcTemplate.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TerminalAuthenticationService.AuthenticatedTerminal>>any(), eq(TERMINAL_ID))).thenReturn(List.of());
 
-        assertThatThrownBy(() -> service().authenticate("EDOL-Terminal " + TERMINAL_ID + "." + SECRET))
+        var service = service();
+        assertThatThrownBy(() -> service.authenticate("EDOL-Terminal " + TERMINAL_ID + "." + SECRET))
                 .isInstanceOf(InvalidTerminalCredentialException.class);
 
         verify(jdbcTemplate, never()).query(

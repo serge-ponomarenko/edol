@@ -84,7 +84,7 @@ class AgentUploadControllerTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(post("/api/agent/upload").header("X-Agent-Id", "synthetic-agent")
                         .param("fileName", "part.3mf").contentType(MediaType.APPLICATION_OCTET_STREAM).content(new byte[100_001]))
-                .andExpect(status().isPayloadTooLarge());
+                .andExpect(status().is(413));
         assertThat(Files.readString(previous)).isEqualTo("previous-model");
         verifyNoInteractions(events, snapshots);
     }
@@ -97,7 +97,7 @@ class AgentUploadControllerTest {
                 .andExpect(status().isUnsupportedMediaType());
         mvc.perform(post("/api/agent/camera/snapshot").header("X-Agent-Id", "synthetic-agent")
                         .contentType(MediaType.IMAGE_JPEG).content(new byte[8193]))
-                .andExpect(status().isPayloadTooLarge());
+                .andExpect(status().is(413));
         verifyNoInteractions(events, snapshots);
     }
 

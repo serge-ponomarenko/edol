@@ -20,6 +20,10 @@ public class PrinterStatsService {
 
     @Transactional(readOnly = true)
     public PrinterStats getStats(UUID printerId) {
+        return loadStats(printerId);
+    }
+
+    private PrinterStats loadStats(UUID printerId) {
         Printer printer = printerAccessService.getPrinter(printerId);
         PrinterStats stats = repository.findByPrinterId(printerId)
                 .orElseGet(() -> zeroStats(printer));
@@ -30,7 +34,7 @@ public class PrinterStatsService {
 
     @Transactional(readOnly = true)
     public PrinterStats getStats() {
-        return getStats(printerAccessService.getDefaultPrinter().getId());
+        return loadStats(printerAccessService.getDefaultPrinter().getId());
     }
 
     public void initializeStats(Printer printer) {
@@ -56,8 +60,9 @@ public class PrinterStatsService {
         return stats;
     }
 
+    @Transactional(readOnly = true)
     public int getTotalPrinterHours(UUID printerId) {
-        PrinterStats stats = getStats(printerId);
+        PrinterStats stats = loadStats(printerId);
 
         return (int) (stats.getTotalPrintSeconds() / 3600);
     }
@@ -103,13 +108,15 @@ public class PrinterStatsService {
         repository.save(stats);
     }
 
+    @Transactional(readOnly = true)
     public double getTotalPrinterHoursDouble(UUID printerId) {
-        return getStats(printerId).getTotalPrintSeconds() / 3600.0;
+        return loadStats(printerId).getTotalPrintSeconds() / 3600.0;
     }
 
+    @Transactional(readOnly = true)
     public String getFormattedPrinterTime(UUID printerId) {
 
-        long seconds = getStats(printerId).getTotalPrintSeconds();
+        long seconds = loadStats(printerId).getTotalPrintSeconds();
 
         long hours = seconds / 3600;
         long minutes = (seconds % 3600) / 60;

@@ -30,7 +30,7 @@ public class ModelArchiveValidator {
 
     public void validate(ZipFile zip) throws IOException {
         if (zip.size() > properties.archiveMaxEntries()) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Archive entry limit exceeded");
+            throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "Archive entry limit exceeded");
         }
         if (zip.getEntry(CONTENT_TYPES) == null || zip.getEntry(RELATIONSHIPS) == null) {
             throw invalidArchive();
@@ -55,7 +55,7 @@ public class ModelArchiveValidator {
 
     public long copyEntry(ZipFile zip, ZipEntry entry, OutputStream output, long limit) throws IOException {
         if (entry.getSize() > limit) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Metadata size limit exceeded");
+            throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "Metadata size limit exceeded");
         }
         try (var input = new CheckedInputStream(zip.getInputStream(entry), new CRC32())) {
             long bytes = BoundedUpload.copy(input, output, limit);

@@ -25,7 +25,8 @@ class AmsPrinterTenantResolverTest {
 
         AtomicBoolean downstreamWorkRan = new AtomicBoolean();
 
-        assertThatThrownBy(() -> resolver.withPrinter(UUID.randomUUID(), () -> {
+        UUID unknownPrinter = UUID.randomUUID();
+        assertThatThrownBy(() -> resolver.withPrinter(unknownPrinter, () -> {
             downstreamWorkRan.set(true);
         }))
                 .isInstanceOf(UnmappedAmsPrinterException.class);
@@ -37,7 +38,8 @@ class AmsPrinterTenantResolverTest {
         UUID printerId = UUID.randomUUID();
         AmsPrinterTenantResolver resolver = resolver(new AmsTenantContext(), printerId, UUID.randomUUID());
 
-        assertThatThrownBy(() -> resolver.openForEnvelope(printerId, UUID.randomUUID()))
+        UUID foreignTenant = UUID.randomUUID();
+        assertThatThrownBy(() -> resolver.openForEnvelope(printerId, foreignTenant))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -53,9 +55,11 @@ class AmsPrinterTenantResolverTest {
         context.refresh();
         AmsPrinterTenantResolver resolver = context.getBean(AmsPrinterTenantResolver.class);
         AtomicBoolean workRan = new AtomicBoolean();
-        assertThatThrownBy(() -> resolver.withPrinter(UUID.randomUUID(), () -> workRan.set(true)))
+        UUID unknownPrinter = UUID.randomUUID();
+        UUID unknownTenant = UUID.randomUUID();
+        assertThatThrownBy(() -> resolver.withPrinter(unknownPrinter, () -> workRan.set(true)))
                 .isInstanceOf(UnmappedAmsPrinterException.class);
-        assertThatThrownBy(() -> resolver.openForEnvelope(UUID.randomUUID(), UUID.randomUUID()))
+        assertThatThrownBy(() -> resolver.openForEnvelope(unknownPrinter, unknownTenant))
                 .isInstanceOf(UnmappedAmsPrinterException.class);
         assertThat(workRan).isFalse();
         context.close();

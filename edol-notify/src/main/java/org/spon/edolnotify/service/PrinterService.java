@@ -2,6 +2,7 @@ package org.spon.edolnotify.service;
 
 import org.spon.edol.model.PrinterState;
 import org.spon.edolnotify.model.PrinterSummary;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
@@ -49,7 +50,7 @@ public class PrinterService {
         return states == null ? List.of() : Arrays.asList(states);
     }
 
-    public byte[] getStatusImage(UUID printerId) {
+    public byte @Nullable [] getStatusImage(UUID printerId) {
         try {
             return snapshotClient.get()
                     .uri("/api/printers/{printerId}/camera/status-image/content", printerId)

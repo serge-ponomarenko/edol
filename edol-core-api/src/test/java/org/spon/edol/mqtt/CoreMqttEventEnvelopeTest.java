@@ -22,15 +22,18 @@ class CoreMqttEventEnvelopeTest {
 
     @Test
     void requiresTheLegacyMarkerForV2AndRejectsContradictoryMarkersForEitherVersion() {
-        assertThrows(IllegalArgumentException.class, () -> envelope(2).validate(null));
-        assertThrows(IllegalArgumentException.class, () -> envelope(2).validate("printer.offline"));
-        assertThrows(IllegalArgumentException.class, () -> envelope(3).validate("printer.offline"));
+        var v2 = envelope(2);
+        var v3 = envelope(3);
+        assertThrows(IllegalArgumentException.class, () -> v2.validate(null));
+        assertThrows(IllegalArgumentException.class, () -> v2.validate("printer.offline"));
+        assertThrows(IllegalArgumentException.class, () -> v3.validate("printer.offline"));
     }
 
     @ParameterizedTest
     @ValueSource(ints = {-1, 0, 1, 4, Integer.MAX_VALUE})
     void rejectsUnsupportedVersions(int version) {
-        assertThrows(IllegalArgumentException.class, () -> envelope(version).validate("printer.online"));
+        var invalid = envelope(version);
+        assertThrows(IllegalArgumentException.class, () -> invalid.validate("printer.online"));
     }
 
     @Test

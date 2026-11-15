@@ -14,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyStore;
 import java.util.Base64;
-import java.util.Map;
 import java.util.UUID;
 
 /** A fresh single broker using the production policy generator and TLS configuration. */
@@ -85,7 +84,7 @@ public final class MqttBrokerFixture implements AutoCloseable {
     }
     public SSLSocketFactory sockets() { return sockets; }
     public Path trustStore() { return directory.resolve(TRUST_STORE); }
-    public void restart() throws Exception {
+    public void restart() {
         container.getDockerClient().restartContainerCmd(container.getContainerId()).exec();
         org.awaitility.Awaitility.await().atMost(30, java.util.concurrent.TimeUnit.SECONDS).ignoreExceptions().until(() -> {
             try (var socket = new java.net.Socket()) {

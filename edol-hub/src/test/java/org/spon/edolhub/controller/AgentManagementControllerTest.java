@@ -44,7 +44,9 @@ class AgentManagementControllerTest {
     @Test
     void ownerDenialPrecedesPrinterLookupAndRemoteCalls() {
         doThrow(new AccessDeniedException("Owner required")).when(owners).requireCurrentOwner();
-        assertThatThrownBy(() -> controller.pair(printer, new ExtendedModelMap(), new MockHttpServletResponse()))
+        var model = new ExtendedModelMap();
+        var response = new MockHttpServletResponse();
+        assertThatThrownBy(() -> controller.pair(printer, model, response))
                 .isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(printers, agents);
     }
@@ -55,7 +57,9 @@ class AgentManagementControllerTest {
         assertThatThrownBy(() -> controller.rotate(printer, new ExtendedModelMap(), new MockHttpServletResponse()))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         error -> assertThat(error.getStatusCode().value()).isEqualTo(404));
-        assertThatThrownBy(() -> controller.revoke(printer, new ExtendedModelMap(), new MockHttpServletResponse()))
+        var model = new ExtendedModelMap();
+        var response = new MockHttpServletResponse();
+        assertThatThrownBy(() -> controller.revoke(printer, model, response))
                 .isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(agents);
     }
@@ -87,7 +91,8 @@ class AgentManagementControllerTest {
         assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
         verify(agents, never()).pair(any(), anyBoolean());
         when(printers.getPrinter(printer)).thenThrow(new IllegalArgumentException("Foreign printer"));
-        assertThatThrownBy(() -> controller.status(printer, new MockHttpServletResponse()))
+        var foreignResponse = new MockHttpServletResponse();
+        assertThatThrownBy(() -> controller.status(printer, foreignResponse))
                 .isInstanceOf(ResponseStatusException.class);
         verify(agents, times(1)).status(printer);
     }

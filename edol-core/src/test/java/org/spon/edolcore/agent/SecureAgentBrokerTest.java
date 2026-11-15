@@ -1,7 +1,6 @@
 package org.spon.edolcore.agent;
 
 import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.junit.jupiter.api.Test;
 import org.spon.edolcore.service.agent.mqtt.*;

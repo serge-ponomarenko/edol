@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -53,7 +52,7 @@ class CoreIntegrationEventPublisherTest {
         assertThat(json.path("payload").path("sessionId").asText()).isEqualTo("session");
         assertThat(json.path("event").asText()).isEqualTo("print.metadata.loaded");
         assertThat(json.path("fileName").asText()).isEqualTo("model.3mf");
-        assertThat(message.getValue().getHeaders().get("mqtt_qos")).isEqualTo(1);
+        assertThat(message.getValue().getHeaders()).containsEntry("mqtt_qos", 1);
     }
 
     @Test

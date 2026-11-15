@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.Map;
 import java.util.UUID;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 
 /** Secure readers accept additive v2 and envelope-only v3; the producer still publishes v2. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -24,7 +25,7 @@ public record CoreMqttEventEnvelope(
             throw new IllegalArgumentException("Unsupported or incomplete Core MQTT envelope");
         }
         // Parsing validates the timestamp; rejection is driven by the parsing exception.
-        Instant.parse(timestamp);
+        DateTimeFormatter.ISO_INSTANT.parse(timestamp, Instant::from);
         if ((schemaVersion == 2 || legacyEvent != null) && !eventType.equals(legacyEvent)) {
             throw new IllegalArgumentException("Core MQTT legacy and envelope event types disagree");
         }

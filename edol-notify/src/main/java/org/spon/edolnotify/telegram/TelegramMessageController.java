@@ -17,6 +17,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Files;
+import java.nio.file.FileSystems;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -95,7 +102,7 @@ public class TelegramMessageController {
                                  InlineKeyboardMarkup keyboard) {
         Path temporary;
         try {
-            temporary = Files.createTempFile("edol-notify-snapshot-", ".jpg");
+            temporary = createSnapshotFile();
         } catch (IOException exception) {
             return false;
         }
@@ -116,6 +123,28 @@ public class TelegramMessageController {
                 log.warn("Unable to remove temporary Telegram snapshot");
             }
         }
+    }
+
+    static Path createSnapshotFile() throws IOException {
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            return Files.createTempFile("edol-notify-snapshot-", ".jpg",
+                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        }
+        var owner = FileSystems.getDefault().getUserPrincipalLookupService()
+                .lookupPrincipalByName(System.getProperty("user.name"));
+        List<AclEntry> permissions = List.of(AclEntry.newBuilder().setType(AclEntryType.ALLOW)
+                .setPrincipal(owner).setPermissions(EnumSet.allOf(AclEntryPermission.class)).build());
+        return Files.createTempFile("edol-notify-snapshot-", ".jpg", new FileAttribute<List<AclEntry>>() {
+            @Override
+            public String name() {
+                return "acl:acl";
+            }
+
+            @Override
+            public List<AclEntry> value() {
+                return permissions;
+            }
+        });
     }
 
     public void sendStatusPrinterSelection(BotContext context, long chatId) {

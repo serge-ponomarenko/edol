@@ -55,7 +55,8 @@ class DirectMqttTenantCallbackTest {
     @Test
     void rejectsAnUnknownRuntimeInsteadOfGuessingATenant() {
         var connection = connection(new SecureCoreRuntimeTenantExecutor(tenants, registry));
-        assertThatThrownBy(() -> connection.messageArrived("device/synthetic/report", new MqttMessage()))
+        var message = new MqttMessage();
+        assertThatThrownBy(() -> connection.messageArrived("device/synthetic/report", message))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(telemetry, connectivity);
         assertThat(tenants.hasCurrentTenant()).isFalse();

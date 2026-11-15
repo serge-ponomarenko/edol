@@ -47,7 +47,8 @@ class DashboardCommandRoutingTest {
         var agent = mock(AgentPrinterCommandPublisher.class);
         UUID id = UUID.randomUUID();
         when(printers.getPrinter(id)).thenThrow(new IllegalArgumentException("Unavailable"));
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> gateway(printers, bambu, agent).pause(id))
+        var gateway = gateway(printers, bambu, agent);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> gateway.pause(id))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(bambu, agent);
     }

@@ -51,7 +51,8 @@ class TerminalOperationalControllerTest {
     void exposesRejectedTerminalCredentialsAsUnauthorized() {
         when(authenticationService.authenticate(AUTHORIZATION)).thenThrow(new InvalidTerminalCredentialException());
 
-        assertThatThrownBy(() -> controller().state(AUTHORIZATION))
+        var controller = controller();
+        assertThatThrownBy(() -> controller.state(AUTHORIZATION))
                 .isInstanceOf(InvalidTerminalCredentialException.class);
         var response = controller().invalidCredential();
 

@@ -1,6 +1,5 @@
 package org.spon.edolhub.controller;
 
-import jakarta.validation.constraints.NotNull;
 import org.spon.edolhub.service.AmsTerminalManagementClient;
 import org.spon.edolhub.service.AmsTerminalManagementConflictException;
 import org.spon.edolhub.service.PrinterAccessService;

@@ -10,7 +10,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Primary;
 
-import javax.sql.DataSource;
 
 @Configuration
 @ConditionalOnProperty(name = "edol.deployment.mode", havingValue = "secure-multi-tenant")

@@ -86,14 +86,15 @@ public class TerminalAuthenticationService {
             if (this == other) {
                 return true;
             }
-            if (!(other instanceof AuthenticatedTerminal terminal)) {
+            if (!(other instanceof AuthenticatedTerminal(var otherTerminalId, var otherTenantId,
+                    var otherPrinterId, var otherDigest, var otherKeyVersion))) {
                 return false;
             }
-            return credentialKeyVersion == terminal.credentialKeyVersion
-                    && terminalId.equals(terminal.terminalId)
-                    && tenantId.equals(terminal.tenantId)
-                    && printerId.equals(terminal.printerId)
-                    && Arrays.equals(credentialDigest, terminal.credentialDigest);
+            return credentialKeyVersion == otherKeyVersion
+                    && terminalId.equals(otherTerminalId)
+                    && tenantId.equals(otherTenantId)
+                    && printerId.equals(otherPrinterId)
+                    && Arrays.equals(credentialDigest, otherDigest);
         }
 
         @Override

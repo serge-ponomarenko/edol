@@ -31,7 +31,7 @@ public class AgentPairingService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Agent already has a live pairing or enrollment");
         }
         retire(printerId);
-        requireMqttRetired(printerId);
+        checkMqttRetired(printerId);
         UUID agentId = UUID.randomUUID();
         String code = codec.newCode();
         Instant expiry = jdbc.queryForObject("""
@@ -50,6 +50,10 @@ public class AgentPairingService {
 
     @Transactional(readOnly = true)
     public void requireMqttRetired(UUID printerId) {
+        checkMqttRetired(printerId);
+    }
+
+    private void checkMqttRetired(UUID printerId) {
         if (Boolean.TRUE.equals(jdbc.queryForObject("""
                 select exists(select 1 from core.agent_mqtt_authorities
                     where printer_id = ? and tenant_id = ? and state = 'REVOKE_PENDING')

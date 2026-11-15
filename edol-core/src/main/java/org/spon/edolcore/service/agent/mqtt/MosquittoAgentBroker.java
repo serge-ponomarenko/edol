@@ -76,32 +76,32 @@ public final class MosquittoAgentBroker implements AgentBroker {
         String correlation = UUID.randomUUID().toString();
         var input = new java.util.HashMap<>(command);
         input.put("correlationData", correlation);
-        MqttClient client = null;
-        try {
-            client = new MqttClient(url, "core-agent-control-" + UUID.randomUUID(), new MemoryPersistence());
-            client.setTimeToWait(10000);
-            MqttConnectOptions options = new MqttConnectOptions();
-            options.setUserName(properties.adminUsername());
-            options.setPassword(properties.adminPassword().toCharArray());
-            options.setHttpsHostnameVerificationEnabled(true);
-            options.setConnectionTimeout(10);
-            options.setCleanSession(true);
-            if (sockets != null) options.setSocketFactory(sockets);
-            client.connect(options);
-            CompletableFuture<JsonNode> response = new CompletableFuture<>();
-            client.subscribe(CONTROL + "/response", 1, (topic, message) ->
-                    completeResponse(response, message.getPayload(), correlation, command.get(COMMAND)));
-            client.publish(CONTROL, mapper.writeValueAsString(Map.of("commands", List.of(input)))
-                    .getBytes(StandardCharsets.UTF_8), 1, false);
-            return response.get(10, TimeUnit.SECONDS);
+        try (MqttClient client = new MqttClient(url, "core-agent-control-" + UUID.randomUUID(), new MemoryPersistence())) {
+            try {
+                client.setTimeToWait(10000);
+                MqttConnectOptions options = new MqttConnectOptions();
+                options.setUserName(properties.adminUsername());
+                options.setPassword(properties.adminPassword().toCharArray());
+                options.setHttpsHostnameVerificationEnabled(true);
+                options.setConnectionTimeout(10);
+                options.setCleanSession(true);
+                if (sockets != null) options.setSocketFactory(sockets);
+                client.connect(options);
+                CompletableFuture<JsonNode> response = new CompletableFuture<>();
+                client.subscribe(CONTROL + "/response", 1, (topic, message) ->
+                        completeResponse(response, message.getPayload(), correlation, command.get(COMMAND)));
+                client.publish(CONTROL, mapper.writeValueAsString(Map.of("commands", List.of(input)))
+                        .getBytes(StandardCharsets.UTF_8), 1, false);
+                return response.get(10, TimeUnit.SECONDS);
+            } finally {
+                disconnect(client);
+            }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw unavailable();
         } catch (Exception exception) {
             // Never attach broker payloads, passwords or raw responses to an exception.
             throw unavailable();
-        } finally {
-            close(client);
         }
     }
 
@@ -117,11 +117,9 @@ public final class MosquittoAgentBroker implements AgentBroker {
         }
     }
 
-    private static void close(MqttClient client) {
-        if (client == null) return;
+    private static void disconnect(MqttClient client) {
         try {
             if (client.isConnected()) client.disconnect();
-            client.close();
         } catch (org.eclipse.paho.client.mqttv3.MqttException ignored) {
             // Request already has its outcome.
         }

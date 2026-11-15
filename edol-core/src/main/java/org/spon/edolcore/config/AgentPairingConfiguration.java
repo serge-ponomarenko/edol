@@ -41,7 +41,7 @@ public class AgentPairingConfiguration {
     @Bean
     @Order(1)
     SecurityFilterChain agentSecurityFilterChain(HttpSecurity http, AgentPairingService service,
-                                                CoreTenantContext tenants) throws Exception {
+                                                CoreTenantContext tenants) {
         return http.securityMatcher("/api/agent/v1/**")
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
