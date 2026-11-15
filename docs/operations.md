@@ -1,5 +1,16 @@
 # EDOL Operations
 
+## Configuration ownership
+
+Root environment files and the standalone local dev smoke wrapper are retired.
+Deployments read the protected operator-owned `instance.json` and generate
+`state/compose.json`, including application properties in
+`SPRING_APPLICATION_JSON`. Root environment files are excluded from deployment
+archives. Tenant-managed settings remain in the database; infrastructure and
+service credentials remain in protected deployment configuration.
+Use the supported deployment workflows below for runtime verification.
+Local unit tests remain available.
+
 ## Deployment behavior
 
 The manual `dev-secure-deploy` and `dev-home-deploy` workflows check out the

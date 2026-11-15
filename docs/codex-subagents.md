@@ -20,7 +20,7 @@ main agent.
 | Role | Model and effort | Scope and routing | Tools and skills | Escalate when |
 | --- | --- | --- | --- | --- |
 | `commit-agent` | `gpt-6-luna`, low | After a completed coherent stage, every explicit request to commit, including `закоміть це`, authorizes it to identify the stage, stage only its files, create one local commit, and report the hash and residue. | Git CLI; `edol-commit-preparation`. | The completed-stage scope is ambiguous; unrelated changes cannot be separated; a reset, stash, amend, push, or design decision would be needed. |
-| `test-agent` | `gpt-6-luna`, medium | Request to run, select, or report targeted verification. It chooses the smallest meaningful check and classifies failure evidence. | Maven; `edol-remote-docker-verification`; `edol-local-runtime-verification` only when a smoke check is explicit. | A failure needs substantial debugging or code change; a migration, security, cross-module, or external-state decision is involved. |
+| `test-agent` | `gpt-6-luna`, medium | Request to run, select, or report targeted verification. It chooses the smallest meaningful check and classifies failure evidence. | Maven; `edol-remote-docker-verification`. | A failure needs substantial debugging or code change; a migration, security, cross-module, or external-state decision is involved. |
 | `db-inspect-agent` | `gpt-6-luna`, low | Need for current local PostgreSQL schema, constraint, data-shape, index, or Flyway evidence during analysis. It returns facts only. | Existing `edol-postgres` MCP, registered only in this role; `docs/ai-workflow.md`. | No local read-only profile exists; evidence conflicts with assumptions; the request needs migration design, DDL/DML, remediation, security, or deployment work. |
 
 `gpt-6-luna` is selected from the locally available model catalog because it
@@ -52,8 +52,8 @@ verifiable evidence. Keep a deterministic operation as a script, reusable
 procedure as a skill, stable project knowledge as documentation, and external
 system access as an MCP integration. Current examples are:
 
-- The remote Docker tunnel and local runtime smoke check remain scripts inside
-  their verification skills because lifecycle and cleanup are deterministic.
+- The remote Docker tunnel remains a script inside
+  its verification skill because lifecycle and cleanup are deterministic.
 - SonarQube remains a read-only MCP integration; it does not need a separate
   agent.
 - Repository searches remain with the main agent because spawning a child costs

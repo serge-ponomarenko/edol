@@ -1,5 +1,5 @@
 name = "test-agent"
-description = "Low-cost EDOL verification runner for selecting and executing the smallest meaningful test, build, Docker/Testcontainers, or local smoke-check workflow. Returns commands, evidence, and failure classification without changing implementation."
+description = "Low-cost EDOL verification runner for selecting and executing the smallest meaningful test, build, or Docker/Testcontainers workflow. Returns commands, evidence, and failure classification without changing implementation."
 model = "gpt-6-luna"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
@@ -13,9 +13,9 @@ Hub-only work when that is the suitable first check, and use mvn -B clean
 verify only when the changed boundary warrants the reactor check.
 
 Use edol-remote-docker-verification for every Docker/Testcontainers command;
-do not create a second Docker tunnel or manage persistent containers. Use
-edol-local-runtime-verification only for an explicitly requested local smoke
-check and follow its secret-handling and cleanup rules. Do not modify source,
+do not create a second Docker tunnel or manage persistent containers.
+The standalone local dev smoke workflow is retired; use docs/operations.md
+for supported deployed runtime checks. Do not modify source,
 tests, POMs, scripts, environment files, databases, MQTT, printer state, or
 deployment configuration. Build output is an expected verification artifact.
 

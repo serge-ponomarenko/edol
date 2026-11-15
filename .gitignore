@@ -8,13 +8,8 @@
 
 /*/target/
 
-/.env_secret
-/.env_edol_core_secret
-/.env_edol_hub_secret
-/.env_edol_ams_secret
-/.env_edol_notify_secret
-
-/.env_edol_hub_smoke
+# Root environment files are retired; keep local secrets out of Git.
+/.env*
 
 /*/src/main/resources/application-dev.yaml
 

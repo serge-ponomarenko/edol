@@ -8,9 +8,15 @@
 - `edol-runtime-contract` for Core runtime, MQTT, or cross-service printer-state contracts.
 - `edol-schema-change` for JPA and Flyway changes.
 - `edol-commit-preparation` for reviewing a change and preparing a repository-style commit message without committing it.
-- `edol-local-runtime-verification` for starting one EDOL module in the isolated local `dev` environment and checking bounded runtime readiness.
 - `edol-remote-docker-verification` for Docker/Testcontainers verification from Windows through the temporary remote Docker tunnel.
 - `edol-knowledge-management` for scoped EDOL Obsidian context, backlog, evidence, handoffs, and documentation ownership.
+
+## Runtime verification
+
+The standalone local dev smoke workflow and root environment files are retired.
+Use the supported deployments in [operations](operations.md) for runtime checks.
+Local Maven unit tests remain available; Docker/Testcontainers checks use
+`edol-remote-docker-verification`.
 
 ## MCP Status
 
