@@ -1,0 +1,18 @@
+<div th:fragment="settingsNav(id, name, activeTab)" xmlns:th="http://www.thymeleaf.org">
+    <div class="mb-3">
+        <a th:href="@{/printers/{id}(id=${id})}" class="text-secondary">← Back to overview</a>
+        <h1 class="mt-2 mb-1">Printer settings</h1>
+        <p class="text-secondary" th:text="${name}">Printer</p>
+    </div>
+    <nav class="nav nav-tabs mb-4" aria-label="Printer settings">
+        <a class="nav-link" th:classappend="${activeTab == 'general'} ? 'active'"
+           th:attr="aria-current=${activeTab == 'general' ? 'page' : null}"
+           th:href="@{/printers/{id}/edit(id=${id})}">General</a>
+        <a class="nav-link" th:classappend="${activeTab == 'connection'} ? 'active'"
+           th:attr="aria-current=${activeTab == 'connection' ? 'page' : null}"
+           th:href="@{/printers/{id}/settings/connection(id=${id})}">Connection</a>
+        <a class="nav-link" th:classappend="${activeTab == 'maintenance'} ? 'active'"
+           th:attr="aria-current=${activeTab == 'maintenance' ? 'page' : null}"
+           th:href="@{/printers/{id}/maintenance/config(id=${id})}">Maintenance</a>
+    </nav>
+</div>

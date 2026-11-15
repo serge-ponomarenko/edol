@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
     <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
@@ -9,7 +9,7 @@
     <title>Dashboard • Edol Hub</title>
 
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.52.0/dist/tabler-icons.min.css" rel="stylesheet" integrity="sha384-mwnzcqY8cv5426J0tglf5b/kfJNlRoajDjr7SIH7okVM3zG61jPtbbVZTegGc8vl" crossorigin="anonymous">
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -267,7 +267,16 @@
                             <div class="card mb-3">
 
                                 <div class="card-header">
-                                    Printer Status
+                                    <h2 class="card-title">Printer Status</h2>
+                                    <div class="card-actions">
+                                        <a class="btn btn-icon btn-ghost-secondary" title="Printer settings" aria-label="Printer settings"
+                                           th:href="@{/printers/{id}/edit(id=${printerId})}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M9 4l1-2h4l1 2 2 1 2-.2 2 3.4-1.2 1.8v2l1.2 1.8-2 3.4-2-.2-2 1-1 2h-4l-1-2-2-1-2 .2-2-3.4L4.2 12v-2L3 8.2l2-3.4L7 5z"/>
+                                                <circle cx="12" cy="11" r="3"/>
+                                            </svg>
+                                        </a>
+                                    </div>
                                 </div>
 
                                 <div class="card-body">

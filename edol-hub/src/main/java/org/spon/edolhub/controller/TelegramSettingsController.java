@@ -25,7 +25,7 @@ public class TelegramSettingsController {
         this.settings = settings;
     }
 
-    @GetMapping("/settings/telegram")
+    @GetMapping({"/settings", "/settings/telegram"})
     public String page(Model model, HttpServletResponse response) {
         owners.requireCurrentOwner();
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");

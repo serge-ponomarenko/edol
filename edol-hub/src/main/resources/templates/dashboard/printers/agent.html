@@ -35,7 +35,7 @@
     <form method="post" th:action="@{/printers/{id}/agent/revoke(id=${agentPrinterId})}">
         <button class="btn btn-outline-danger mb-3" type="submit">Revoke agent</button>
     </form>
-    <a th:href="@{/printers/{id}/edit(id=${agentPrinterId})}">Back to printer</a>
+    <a th:href="@{/printers/{id}/settings/connection(id=${agentPrinterId})}">Back to connection settings</a>
 </main>
 <script>
     const refreshButton = document.getElementById('refresh-agent-status');

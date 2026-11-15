@@ -115,6 +115,68 @@ public class PrinterManagementController {
         return "dashboard/printers/form";
     }
 
+    @GetMapping("/{printerId}/settings/connection")
+    public String connectionSettings(@PathVariable UUID printerId, Model model, HttpServletResponse response) {
+        model.addAttribute("connectionSettings", true);
+        return editForm(printerId, model, response);
+    }
+
+    @PostMapping("/{printerId}/settings/general")
+    public String saveGeneralSettings(@PathVariable UUID printerId, @ModelAttribute PrinterForm submitted,
+                                      RedirectAttributes redirectAttributes) {
+        return saveSettings(printerId, submitted, false, redirectAttributes);
+    }
+
+    @PostMapping("/{printerId}/settings/connection")
+    public String saveConnectionSettings(@PathVariable UUID printerId, @ModelAttribute PrinterForm submitted,
+                                         RedirectAttributes redirectAttributes) {
+        return saveSettings(printerId, submitted, true, redirectAttributes);
+    }
+
+    private String saveSettings(UUID printerId, PrinterForm submitted, boolean connectionSettings,
+                                RedirectAttributes redirectAttributes) {
+        printerAccessService.getPrinter(printerId);
+        try {
+            CorePrinterConnectionDto connection = connectionOrEmpty(printerId);
+            // Use the current server values for fields absent from this tab's form.
+            PrinterForm current = PrinterForm.from(printerManagementService.getPrinter(printerId), connection);
+            if (connectionSettings) {
+                current.setConnectionMode(submitted.getConnectionMode());
+                current.setCameraProvider(submitted.getCameraProvider());
+                current.setEnabled(submitted.isEnabled());
+                current.setMqttHost(submitted.getMqttHost());
+                current.setMqttPort(submitted.getMqttPort());
+                current.setFtpHost(submitted.getFtpHost());
+                current.setFtpPort(submitted.getFtpPort());
+                current.setModelDirectory(submitted.getModelDirectory());
+                current.setAccessCode(submitted.getAccessCode());
+                current.setAgentId(submitted.getAgentId());
+            } else {
+                current.setDisplayId(submitted.getDisplayId());
+                current.setName(submitted.getName());
+                current.setDescription(submitted.getDescription());
+                current.setSerialNumber(submitted.getSerialNumber());
+                current.setModel(submitted.getModel());
+            }
+            printerManagementService.updatePrinter(printerId, current);
+            printerCatalogSyncService.synchronize(printerId);
+            redirectAttributes.addFlashAttribute("printerSaved", true);
+        } catch (RuntimeException exception) {
+            reportFailure(exception, "update printer settings", printerId);
+            redirectAttributes.addFlashAttribute(PRINTER_ERROR_ATTRIBUTE,
+                    ManagementFailureMessage.describe(exception, CORE_DEPENDENCY));
+        }
+        return PRINTER_EDIT_REDIRECT + printerId + (connectionSettings ? "/settings/connection" : "/edit");
+    }
+
+    private CorePrinterConnectionDto connectionOrEmpty(UUID printerId) {
+        try {
+            return printerManagementService.getConnection(printerId);
+        } catch (HttpClientErrorException.NotFound exception) {
+            return new CorePrinterConnectionDto(null, null, null, null, null, null);
+        }
+    }
+
     @PostMapping("/{printerId}/terminal/pairings")
     public String createTerminalPairing(@PathVariable UUID printerId, RedirectAttributes redirectAttributes) {
         return pairing(printerId, redirectAttributes, AmsTerminalManagementClient::createPairing);
@@ -260,7 +322,7 @@ public class PrinterManagementController {
     }
 
     private String terminalRedirect(UUID printerId) {
-        return PRINTER_EDIT_REDIRECT + printerId + "/edit";
+        return PRINTER_EDIT_REDIRECT + printerId + "/settings/connection";
     }
 
     private void reportFailure(RuntimeException error, String operation, UUID printerId) {

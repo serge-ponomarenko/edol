@@ -1,7 +1,7 @@
 <div th:fragment="sidebar"
      xmlns:th="http://www.thymeleaf.org">
 
-    <div class="container-fluid">
+    <div class="container-fluid align-items-stretch">
 
         <div class="navbar-brand d-flex align-items-center">
             <a href="/">
@@ -26,190 +26,80 @@
                 </div>
             </div>
 
-            <ul class="navbar-nav pt-lg-3">
-
-                <li class="nav-item px-3 pt-2 text-muted small text-uppercase">Tenant</li>
-
-                <li class="nav-item" th:if="${@environment.getProperty('edol.deployment.mode') == 'secure-multi-tenant'}">
-                    <a class="nav-link" href="/settings/telegram"
-                       th:classappend="${currentPath.equals('/settings/telegram')} ? ' active'">
-                        <span class="nav-link-icon"><i class="ti ti-brand-telegram"></i></span>
-                        <span class="nav-link-title">Telegram Settings</span>
-                    </a>
-                </li>
-
+            <ul class="navbar-nav pt-lg-3 w-100">
+                <li class="nav-item px-3 pt-2 text-secondary small text-uppercase">Printer</li>
                 <li class="nav-item">
-                    <a class="nav-link"
-                       href="/printers"
-                       th:classappend="${currentPath.equals('/') or currentPath.equals('/printers')} ? ' active'">
-
-                            <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                <i class="ti ti-home"></i>
-                            </span>
-                        <span class="nav-link-title">
-                                Printers
-                            </span>
+                    <a class="nav-link" th:if="${printerId != null}" th:href="@{/printers/{id}(id=${printerId})}"
+                       th:classappend="${currentPath.equals('/printers/' + printerId)} ? 'active'">
+                        <span class="nav-link-icon"><i class="ti ti-activity" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Overview</span>
                     </a>
-                </li>
-
-                <li class="nav-item px-3 pt-3 text-muted small text-uppercase">Inventory</li>
-
-                <li class="nav-item">
-                    <a class="nav-link"
-                       href="/filament-spools"
-                       th:classappend="${currentPath.contains('/filament-spools')} ? ' active'">
-
-                            <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                <i class="ti ti-sport-billard"></i>
-                            </span>
-                        <span class="nav-link-title">
-                                Spools
-                            </span>
-                    </a>
-                </li>
-
-                <li class="nav-item px-3 pt-3 text-muted small text-uppercase">Printer</li>
-
-                <li class="nav-item">
-                    <a class="nav-link" th:if="${printerId != null}"
-                       th:href="@{/printers/{id}(id=${printerId})}"
-                       th:classappend="${printerId != null and currentPath.matches('/printers/[^/]+')} ? ' active'">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-activity"></i></span>
-                        <span class="nav-link-title">Printer Status</span>
-                    </a>
-                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true"
-                          title="Select a printer first">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-activity"></i></span>
-                        <span class="nav-link-title">Printer Status</span>
+                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true" title="Select a printer first">
+                        <span class="nav-link-icon"><i class="ti ti-activity" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Overview</span>
                     </span>
                 </li>
-
                 <li class="nav-item">
-                    <a class="nav-link" th:if="${printerId != null}"
-                       th:href="@{/printers/{id}/print-jobs(id=${printerId})}"
-                       th:classappend="${currentPath.contains('/print-jobs')} ? ' active'">
-
-                            <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                <i class="ti ti-printer"></i>
-                            </span>
-                        <span class="nav-link-title">
-                                Print Jobs
-                            </span>
+                    <a class="nav-link" th:if="${printerId != null}" th:href="@{/printers/{id}/print-jobs(id=${printerId})}"
+                       th:classappend="${currentPath.contains('/print-jobs')} ? 'active'">
+                        <span class="nav-link-icon"><i class="ti ti-printer" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Print Jobs</span>
                     </a>
-                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true"
-                          title="Select a printer first">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block">
-                            <i class="ti ti-printer"></i>
-                        </span>
+                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true" title="Select a printer first">
+                        <span class="nav-link-icon"><i class="ti ti-printer" aria-hidden="true"></i></span>
                         <span class="nav-link-title">Print Jobs</span>
                     </span>
                 </li>
-
                 <li class="nav-item">
-                    <a class="nav-link" th:if="${printerId != null}"
-                       th:href="@{/printers/{id}/maintenance(id=${printerId})}"
-                       th:classappend="${currentPath.endsWith('/maintenance')} ? ' active'">
-                            <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                <i class="ti ti-clock-cog"></i>
-                            </span>
-                        <span class="nav-link-title">
-                                Printer Maintenance
-                            </span>
+                    <a class="nav-link" th:if="${printerId != null}" th:href="@{/printers/{id}/maintenance(id=${printerId})}"
+                       th:classappend="${currentPath.endsWith('/maintenance')} ? 'active'">
+                        <span class="nav-link-icon"><i class="ti ti-clock-cog" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Maintenance</span>
                     </a>
-                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true"
-                          title="Select a printer first">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block">
-                            <i class="ti ti-clock-cog"></i>
-                        </span>
-                        <span class="nav-link-title">Printer Maintenance</span>
+                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true" title="Select a printer first">
+                        <span class="nav-link-icon"><i class="ti ti-clock-cog" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Maintenance</span>
                     </span>
                 </li>
-
+                <li class="nav-item px-3 pt-3 text-secondary small text-uppercase">Inventory</li>
                 <li class="nav-item">
-                    <a class="nav-link" th:if="${printerId != null}"
-                       th:href="@{/printers/{id}/maintenance/config(id=${printerId})}"
-                       th:classappend="${currentPath.contains('/maintenance/config')} ? ' active'">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-device-ipad-cog"></i></span>
-                        <span class="nav-link-title">Maintenance Definitions</span>
+                    <a class="nav-link" href="/filament-spools" th:classappend="${currentPath.contains('/filament-spools')} ? 'active'">
+                        <span class="nav-link-icon"><i class="ti ti-sport-billard" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Spools</span>
                     </a>
-                    <span class="nav-link disabled" th:unless="${printerId != null}" aria-disabled="true"
-                          title="Select a printer first">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-device-ipad-cog"></i></span>
-                        <span class="nav-link-title">Maintenance Definitions</span>
-                    </span>
                 </li>
-
-                <li class="nav-item"
-                    th:with="
-                        isFilaments=${currentPath.contains('/filaments')},
-                        isVendors=${currentPath.contains('/vendors')},
-                        isMaterials=${currentPath.contains('/materials')},
-                        isConfigActive=${isFilaments or isVendors or isMaterials}
-                    ">
-
-                    <button class="nav-link d-flex justify-content-between align-items-center w-100"
-                       data-bs-toggle="collapse"
-                       data-bs-target="#configMenu"
-                       type="button"
-                       th:attr="aria-expanded=${isConfigActive}">
-
-                            <span>
-                                <i class="ti ti-settings me-2"></i>
-                                Inventory Configuration
-                            </span>
-
-                        <i class="ti ti-chevron-down"></i>
+                <li class="nav-item" th:with="catalogActive=${currentPath.contains('/filaments') or currentPath.contains('/vendors') or currentPath.contains('/materials')}">
+                    <button class="nav-link w-100 border-0 bg-transparent text-start" type="button"
+                            style="color: var(--tblr-navbar-color); font: inherit;"
+                            data-bs-toggle="collapse" data-bs-target="#catalogMenu" aria-controls="catalogMenu"
+                            th:attr="aria-expanded=${catalogActive}">
+                        <span class="nav-link-icon"><i class="ti ti-books" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Catalogs</span>
+                        <i class="ti ti-chevron-down ms-auto" aria-hidden="true"></i>
                     </button>
-
-                    <div class="collapse"
-                         id="configMenu"
-                         th:classappend="${isConfigActive} ? ' show'">
-
-                        <ul class="nav nav-sm flex-column ms-3">
-
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   href="/filaments"
-                                   th:classappend="${isFilaments} ? ' active'">
-                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                            <i class="ti ti-brand-bunpo"></i>
-                                        </span>
-                                    <span class="nav-link-title">
-                                            Filaments
-                                        </span>
-                                </a>
-                            </li>
-
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   href="/vendors"
-                                   th:classappend="${isVendors} ? ' active'">
-                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                            <i class="ti ti-building-factory"></i>
-                                        </span>
-                                    <span class="nav-link-title">
-                                            Vendors
-                                        </span>
-                                </a>
-                            </li>
-
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   href="/materials"
-                                   th:classappend="${isMaterials} ? ' active'">
-                                        <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                            <i class="ti ti-flask"></i>
-                                        </span>
-                                    <span class="nav-link-title">
-                                            Materials
-                                        </span>
-                                </a>
-                            </li>
-
+                    <div class="collapse" id="catalogMenu" th:classappend="${catalogActive} ? 'show'">
+                        <ul class="navbar-nav ps-3">
+                            <li class="nav-item"><a class="nav-link" href="/filaments"
+                                th:classappend="${currentPath.contains('/filaments')} ? 'active'"><span class="nav-link-title">Filaments</span></a></li>
+                            <li class="nav-item"><a class="nav-link" href="/vendors"
+                                th:classappend="${currentPath.contains('/vendors')} ? 'active'"><span class="nav-link-title">Vendors</span></a></li>
+                            <li class="nav-item"><a class="nav-link" href="/materials"
+                                th:classappend="${currentPath.contains('/materials')} ? 'active'"><span class="nav-link-title">Materials</span></a></li>
                         </ul>
                     </div>
                 </li>
-
+                <li class="nav-item border-top mt-4 pt-2">
+                    <a class="nav-link" href="/printers" th:classappend="${currentPath.equals('/printers') or currentPath.equals('/printers/new') or currentPath.endsWith('/edit') or currentPath.contains('/settings/connection') or currentPath.contains('/maintenance/config')} ? 'active'">
+                        <span class="nav-link-icon"><i class="ti ti-devices" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Printers</span>
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${@environment.getProperty('edol.deployment.mode') == 'secure-multi-tenant'}">
+                    <a class="nav-link" href="/settings" th:classappend="${currentPath.startsWith('/settings')} ? 'active'">
+                        <span class="nav-link-icon"><i class="ti ti-settings" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">Settings</span>
+                    </a>
+                </li>
             </ul>
 
         </div>

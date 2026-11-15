@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AgentManagementPageTest {
     @Test
-    void rendersOwnerNavigationFromTheActualPrinterEditPage() throws Exception {
+    void rendersOwnerNavigationOnConnectionSettings() throws Exception {
         try (var context = new AnnotationConfigWebApplicationContext()) {
             context.setServletContext(new MockServletContext());
             TestPropertyValues.of("edol.deployment.mode=secure-multi-tenant", "edol-hub.agent.enabled=true").applyTo(context);
@@ -42,7 +42,7 @@ class AgentManagementPageTest {
                     printer, "P1", "Printer", null, null, "BAMBU_P1S", "AGENT", "LEGACY", false));
             when(management.getConnection(printer)).thenReturn(new org.spon.edolhub.model.dto.CorePrinterConnectionDto(
                     null, null, null, null, null, null));
-            MockMvcBuilders.webAppContextSetup(context).build().perform(get("/printers/" + printer + "/edit")
+            MockMvcBuilders.webAppContextSetup(context).build().perform(get("/printers/" + printer + "/settings/connection")
                             .flashAttr("printers", java.util.List.of()).flashAttr("currentPath", "/printers/" + printer + "/edit"))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("Manage printer agent")))
@@ -51,6 +51,32 @@ class AgentManagementPageTest {
                     .andExpect(content().string(containsString("const secureDeployment = true")));
         }
     }
+    @Test
+    void rendersGeneralSettingsWithoutConnectionInputsAndKeepsMaintenanceInTabs() throws Exception {
+        try (var context = new AnnotationConfigWebApplicationContext()) {
+            context.setServletContext(new MockServletContext());
+            TestPropertyValues.of("edol.deployment.mode=secure-multi-tenant").applyTo(context);
+            context.register(WebConfig.class);
+            context.refresh();
+            UUID printer = UUID.randomUUID();
+            var management = context.getBean(PrinterManagementService.class);
+            when(management.getPrinter(printer)).thenReturn(new org.spon.edolhub.model.dto.CorePrinterDto(
+                    printer, "P1", "My printer", null, null, "BAMBU_P1S", "DIRECT", "LEGACY", true));
+            when(management.getConnection(printer)).thenReturn(new org.spon.edolhub.model.dto.CorePrinterConnectionDto(
+                    "printer.local", 8883, "printer.local", 990, "/", null));
+            MockMvcBuilders.webAppContextSetup(context).build().perform(get("/printers/" + printer + "/edit")
+                            .flashAttr("printers", java.util.List.of()).flashAttr("currentPath", "/printers/" + printer + "/edit"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Printer settings")))
+                    .andExpect(content().string(containsString("My printer")))
+                    .andExpect(content().string(containsString("/settings/general")))
+                    .andExpect(content().string(containsString("/maintenance/config")))
+                    .andExpect(content().string(not(containsString("id=\"mqttHost\""))))
+                    .andExpect(content().string(not(containsString("Inventory Configuration"))))
+                    .andExpect(content().string(not(containsString("Maintenance Definitions"))));
+        }
+    }
+
     @Test
     void rendersTheActualTemplateAndDoesNotRedisplayThePairingCodeOnGet() throws Exception {
         try (var context = new AnnotationConfigWebApplicationContext()) {
@@ -72,10 +98,55 @@ class AgentManagementPageTest {
         }
     }
 
+    @Test
+    void rendersWorkspaceSettingsAndMaintenanceScheduleInTheirOwnContexts() throws Exception {
+        try (var context = new AnnotationConfigWebApplicationContext()) {
+            context.setServletContext(new MockServletContext());
+            TestPropertyValues.of("edol.deployment.mode=secure-multi-tenant").applyTo(context);
+            context.register(WebConfig.class);
+            context.refresh();
+            when(context.getBean(org.spon.edolhub.service.TenantTelegramSettingsService.class).status())
+                    .thenReturn(new org.spon.edolhub.service.TenantTelegramSettingsService.Status(false, null, false, true));
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            mvc.perform(get("/settings").flashAttr("printers", java.util.List.of()).flashAttr("currentPath", "/settings"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Settings for this workspace")))
+                    .andExpect(content().string(containsString("action=\"/settings/telegram\"")))
+                    .andExpect(content().string(containsString("Saved tokens are never displayed")))
+                    .andExpect(header().string("Cache-Control", "no-store"));
+            UUID printer = UUID.randomUUID();
+            mvc.perform(get("/printers/" + printer + "/maintenance/config")
+                            .flashAttr("printers", java.util.List.of()).flashAttr("currentPath", "/printers/" + printer + "/maintenance/config"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Maintenance schedule")))
+                    .andExpect(content().string(containsString("Add maintenance task")))
+                    .andExpect(content().string(containsString("/printers/" + printer + "/settings/connection")));
+        }
+    }
+
+    @Test
+    void overviewLinksDirectlyToSelectedPrinterSettings() throws Exception {
+        try (var context = new AnnotationConfigWebApplicationContext()) {
+            context.setServletContext(new MockServletContext());
+            context.register(WebConfig.class);
+            context.refresh();
+            UUID printer = UUID.randomUUID();
+            MockMvcBuilders.webAppContextSetup(context).build().perform(get("/printers/" + printer)
+                            .flashAttr("currentPath", "/printers/" + printer))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("aria-label=\"Printer settings\"")))
+                    .andExpect(content().string(containsString("href=\"/printers/" + printer + "/edit\"")));
+        }
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     @EnableWebMvc
-    @Import({AgentManagementController.class, PrinterManagementController.class})
+    @Import({AgentManagementController.class, PrinterManagementController.class, TelegramSettingsController.class, MaintenanceConfigController.class, DashboardController.class})
     static class WebConfig {
+        @Bean org.spon.edolhub.service.PrinterService printerService() { return mock(org.spon.edolhub.service.PrinterService.class); }
+        @Bean org.spon.edolhub.repository.MaintenanceDefinitionRepository definitions() { return mock(org.spon.edolhub.repository.MaintenanceDefinitionRepository.class); }
+        @Bean org.spon.edolhub.service.PrinterStatsService stats() { return mock(org.spon.edolhub.service.PrinterStatsService.class); }
+        @Bean org.spon.edolhub.service.TenantTelegramSettingsService telegram() { return mock(org.spon.edolhub.service.TenantTelegramSettingsService.class); }
         @Bean CoreAgentManagementClient agents() { return mock(CoreAgentManagementClient.class); }
         @Bean PrinterAccessService printers() { return mock(PrinterAccessService.class); }
         @Bean TenantOwnerAuthorizationService owners() { return mock(TenantOwnerAuthorizationService.class); }

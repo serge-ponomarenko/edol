@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
 
     <title>Printer Maintenance • Edol Hub</title>
 
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.52.0/dist/tabler-icons.min.css" rel="stylesheet" integrity="sha384-mwnzcqY8cv5426J0tglf5b/kfJNlRoajDjr7SIH7okVM3zG61jPtbbVZTegGc8vl" crossorigin="anonymous">
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -50,6 +50,10 @@
     <div class="page-wrapper">
         <div class="page-body">
             <div class="container-xl mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="mb-0">Maintenance</h1>
+                    <a class="btn btn-outline-primary" th:href="@{/printers/{id}/maintenance/config(id=${printerId})}">Configure schedule</a>
+                </div>
 
                 <div class="row row-cards mb-3">
 

@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Printer • Edol Hub</title>
     <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.7.0/dist/css/tabler.min.css" rel="stylesheet"
           integrity="sha384-/ZecLhD4wkLsbjdJWUEWeSZJJSEQ3XCPdtLmmm6SW128l+eSNplV12po3tSK7pdy" crossorigin="anonymous">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.52.0/dist/tabler-icons.min.css" rel="stylesheet" integrity="sha384-mwnzcqY8cv5426J0tglf5b/kfJNlRoajDjr7SIH7okVM3zG61jPtbbVZTegGc8vl" crossorigin="anonymous">
     <link href="/favicon.svg" rel="icon" type="image/svg+xml">
 </head>
 <body class="layout-fluid">
@@ -16,24 +19,29 @@
     <div class="page-wrapper">
         <div class="page-body">
             <div class="container-xl mt-4">
+                <div th:if="${!newPrinterForm}" th:insert="~{dashboard/printers/settings-nav :: settingsNav(${editingPrinterId}, ${printerForm.name}, ${connectionSettings == true ? 'connection' : 'general'})}"></div>
                 <div class="card">
-                    <div class="card-header"><h3 class="card-title" th:text="${newPrinterForm} ? 'Add Printer' : 'Edit Printer'">Printer</h3></div>
+                    <div class="card-header"><h3 class="card-title" th:text="${newPrinterForm ? 'Add Printer' : (connectionSettings == true ? 'Connection' : 'General')}">Printer</h3></div>
                     <div class="alert alert-danger m-3" role="alert" th:if="${printerError}" th:text="${printerError}"></div>
                     <div class="card-body">
-                        <form method="post" th:action="${newPrinterForm} ? @{/printers} : @{/printers/{printerId}(printerId=${editingPrinterId})}"
+                        <output class="alert alert-success d-block" th:if="${printerSaved}">Printer settings saved.</output>
+                        <form method="post" data-settings-form th:action="${newPrinterForm} ? @{/printers} : (${connectionSettings == true} ? @{/printers/{id}/settings/connection(id=${editingPrinterId})} : @{/printers/{id}/settings/general(id=${editingPrinterId})})"
                               th:object="${printerForm}">
-                            <div class="row row-cards">
+                            <div class="row row-cards" th:if="${newPrinterForm or connectionSettings != true}">
                                 <div class="col-md-6"><label class="form-label" for="displayId">Display ID</label><input id="displayId" class="form-control" required th:field="*{displayId}"></div>
                                 <div class="col-md-6"><label class="form-label" for="name">Name</label><input id="name" class="form-control" required th:field="*{name}"></div>
                                 <div class="col-12"><label class="form-label" for="description">Description</label><textarea id="description" class="form-control" rows="2" th:field="*{description}"></textarea></div>
                                 <div class="col-md-6"><label class="form-label" for="serialNumber">Serial Number</label><input id="serialNumber" class="form-control" th:field="*{serialNumber}"></div>
                                 <div class="col-md-2"><label class="form-label" for="model">Model</label><select id="model" class="form-select" th:field="*{model}"><option th:each="model : ${models}" th:value="${model}" th:text="${model}"></option></select></div>
+                            </div>
+                            <th:block th:if="${newPrinterForm or connectionSettings == true}">
+                            <hr th:if="${newPrinterForm}">
+                            <h4 th:if="${newPrinterForm}">Connection</h4>
+                            <div class="row row-cards mb-4">
                                 <div class="col-md-2"><label class="form-label" for="connectionMode">Connection</label><select id="connectionMode" class="form-select" th:field="*{connectionMode}"><option th:each="mode : ${connectionModes}" th:value="${mode}" th:text="${mode}"></option></select></div>
                                 <div class="col-md-2"><label class="form-label" for="cameraProvider">Camera</label><select id="cameraProvider" class="form-select" th:field="*{cameraProvider}"><option th:each="provider : ${cameraProviders}" th:value="${provider}" th:text="${provider}"></option></select></div>
                                 <div class="col-12"><label class="form-check"><input class="form-check-input" th:field="*{enabled}" type="checkbox"><span class="form-check-label">Enabled</span></label></div>
                             </div>
-                            <hr>
-                            <h4>Connection</h4>
                             <p id="secureAgentConnectionNote" th:attr="hidden=${secureDeployment != true or printerForm.connectionMode != 'AGENT' ? 'hidden' : null}">Configure printer LAN access in the Agent setup portal. EDOL assigns its identity during pairing; no Agent ID is entered here.</p>
                             <div class="row row-cards" id="printerConnectionFields" th:attr="hidden=${secureDeployment == true and printerForm.connectionMode == 'AGENT' ? 'hidden' : null}">
                                 <div class="col-md-4"><label class="form-label" for="mqttHost">MQTT Host</label><input id="mqttHost" class="form-control" th:field="*{mqttHost}"></div>
@@ -44,8 +52,10 @@
                                 <div class="col-md-4"><label class="form-label" for="accessCode">Access Code</label><input id="accessCode" class="form-control" autocomplete="new-password" placeholder="Leave blank to keep current value" th:field="*{accessCode}" type="password"></div>
                                 <div class="col-md-4"><label class="form-label" for="agentId">Agent ID</label><input id="agentId" class="form-control" th:field="*{agentId}"></div>
                             </div>
-                            <div class="mt-4"><button class="btn btn-primary" type="submit">Save</button><a class="btn btn-secondary" href="/printers">Cancel</a></div>
+                            </th:block>
+                            <div class="mt-4"><button class="btn btn-primary" type="submit">Save changes</button><a class="btn btn-secondary" th:href="${newPrinterForm} ? @{/printers} : @{/printers/{id}(id=${editingPrinterId})}">Cancel</a></div>
                         </form>
+                        <th:block th:if="${connectionSettings == true}">
                         <p class="alert alert-warning mt-4" th:if="${agentManagementNotice}" th:text="${agentManagementNotice}"></p>
                         <section class="mt-4" th:if="${!newPrinterForm and agentManagementAvailable == true}">
                             <a class="btn btn-outline-primary" th:href="@{/printers/{id}/agent(id=${editingPrinterId})}">Manage printer agent</a>
@@ -93,7 +103,7 @@
                             </div>
 
                             <div class="d-flex flex-wrap gap-2">
-                                <a class="btn btn-outline-secondary" th:href="@{/printers/{printerId}/edit(printerId=${editingPrinterId})}">
+                                <a class="btn btn-outline-secondary" th:href="@{/printers/{printerId}/settings/connection(printerId=${editingPrinterId})}">
                                     Refresh terminal status
                                 </a>
                                 <form method="post" th:action="@{/printers/{printerId}/terminal/pairings(printerId=${editingPrinterId})}" th:if="${terminalStatusUnavailable != true and (terminalStatus == null or terminalPairingExpired or terminalStatus.lifecycleState == 'RESET')}">
@@ -116,6 +126,7 @@
                                 </form>
                             </div>
                         </section>
+                        </th:block>
                     </div>
                 </div>
             </div>
@@ -130,8 +141,10 @@
         document.getElementById('printerConnectionFields').hidden = pairedAgent;
         document.getElementById('secureAgentConnectionNote').hidden = !pairedAgent;
     }
-    connectionMode.addEventListener('change', updateConnectionFields);
-    updateConnectionFields();
+    if (connectionMode) {
+        connectionMode.addEventListener('change', updateConnectionFields);
+        updateConnectionFields();
+    }
     const pairingCode = document.getElementById('terminalPairingCode');
     const countdown = document.getElementById('terminalPairingCountdown');
     const copyButton = document.getElementById('copyTerminalPairingCode');
@@ -170,5 +183,6 @@
         timer = setInterval(updateCountdown, 1000);
     }
 </script>
+<script src="/js/settings-forms.js" defer></script>
 </body>
 </html>

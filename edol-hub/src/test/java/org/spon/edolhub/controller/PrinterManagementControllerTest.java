@@ -75,6 +75,56 @@ class PrinterManagementControllerTest {
     }
 
     @Test
+    void generalSettingsPreserveConnectionAndIgnoreFieldsFromOtherTabs() {
+        stubCurrentSettings();
+        PrinterForm submitted = new PrinterForm();
+        submitted.setDisplayId("P2");
+        submitted.setName("Renamed printer");
+        submitted.setModel("BAMBU_P1S");
+        submitted.setConnectionMode("AGENT");
+        submitted.setMqttHost("unwanted-host");
+
+        assertThat(controller.saveGeneralSettings(PRINTER_ID, submitted, redirectAttributes))
+                .isEqualTo("redirect:/printers/" + PRINTER_ID + "/edit");
+        var captured = org.mockito.ArgumentCaptor.forClass(PrinterForm.class);
+        verify(printerManagementService).updatePrinter(eq(PRINTER_ID), captured.capture());
+        assertThat(captured.getValue().getName()).isEqualTo("Renamed printer");
+        assertThat(captured.getValue().getConnectionMode()).isEqualTo("DIRECT");
+        assertThat(captured.getValue().isEnabled()).isTrue();
+        assertThat(captured.getValue().getMqttHost()).isEqualTo("printer.local");
+        assertThat(captured.getValue().getAccessCode()).isNull();
+        verify(printerCatalogSyncService).synchronize(PRINTER_ID);
+    }
+
+    @Test
+    void connectionSettingsPreserveGeneralFieldsAndReturnToConnectionTab() {
+        stubCurrentSettings();
+        PrinterForm submitted = new PrinterForm();
+        submitted.setName("Unwanted name");
+        submitted.setConnectionMode("AGENT");
+        submitted.setCameraProvider("RTSPS");
+        submitted.setEnabled(true);
+
+        assertThat(controller.saveConnectionSettings(PRINTER_ID, submitted, redirectAttributes))
+                .isEqualTo("redirect:/printers/" + PRINTER_ID + "/settings/connection");
+        var captured = org.mockito.ArgumentCaptor.forClass(PrinterForm.class);
+        verify(printerManagementService).updatePrinter(eq(PRINTER_ID), captured.capture());
+        assertThat(captured.getValue().getName()).isEqualTo("Original printer");
+        assertThat(captured.getValue().getDisplayId()).isEqualTo("P1");
+        assertThat(captured.getValue().getSerialNumber()).isEqualTo("serial");
+        assertThat(captured.getValue().getConnectionMode()).isEqualTo("AGENT");
+        verify(printerAccessService).getPrinter(PRINTER_ID);
+    }
+
+    private void stubCurrentSettings() {
+        when(printerManagementService.getPrinter(PRINTER_ID)).thenReturn(
+                new org.spon.edolhub.model.dto.CorePrinterDto(PRINTER_ID, "P1", "Original printer", "Description", "serial",
+                        "BAMBU_P1S", "DIRECT", "LEGACY", true));
+        when(printerManagementService.getConnection(PRINTER_ID)).thenReturn(
+                new org.spon.edolhub.model.dto.CorePrinterConnectionDto("printer.local", 8883, "printer.local", 990, "/", null));
+    }
+
+    @Test
     void exposesAgentNavigationAndDisabledPrinterPrerequisiteForAnOwner() {
         var secure = new PrinterManagementController(printerAccessService, printerManagementService,
                 printerCatalogSyncService, ownerAuthorizationService, terminalManagementClientProvider,
@@ -179,7 +229,7 @@ class PrinterManagementControllerTest {
 
         String view = controller.createTerminalPairing(PRINTER_ID, redirectAttributes);
 
-        assertThat(view).isEqualTo("redirect:/printers/" + PRINTER_ID + "/edit");
+        assertThat(view).isEqualTo("redirect:/printers/" + PRINTER_ID + "/settings/connection");
         verify(ownerAuthorizationService).requireCurrentOwner();
         verify(printerAccessService).getPrinter(PRINTER_ID);
         verify(redirectAttributes).addFlashAttribute("terminalPairing", pairing);
