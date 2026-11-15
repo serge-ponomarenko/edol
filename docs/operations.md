@@ -990,3 +990,13 @@ Command arguments, paths, stderr and protected file contents are never printed.
 Any nonzero exit, including tar exit 1, still blocks migrations; a backup is
 complete only when `complete.json` exists. A later successful archive attempt
 does not establish why an earlier capture failed.
+
+Each backup capture writes subprocess stderr directly to an exclusive file named
+`<artifact-filename>.stderr.log` beside the backup artifact (for example,
+`instance.tar.gz.stderr.log`). Files are created with mode `0600` inside the
+protected backup directory and retained on failure or timeout; existing files
+and symlinks are never overwritten. Successful backup manifests include these
+logs. Inspect them only on the operator host as the deployment owner. They may
+contain credentials or private paths: never paste raw contents into Actions,
+issues, or chat. CI continues to print only fixed artifact identifiers and exit
+codes. Failure to create a diagnostic file also blocks backup and migrations.

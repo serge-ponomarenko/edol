@@ -104,7 +104,10 @@ class ProductionDeployment(Deployment):
         try:
             descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(descriptor, "wb") as stream:
-                result = subprocess.run(command, stdout=stream, stderr=subprocess.PIPE, check=False, timeout=600)
+                diagnostic = destination.with_name(destination.name + ".stderr.log")
+                error_descriptor = os.open(diagnostic, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(error_descriptor, "wb") as errors:
+                    result = subprocess.run(command, stdout=stream, stderr=errors, check=False, timeout=600)
         except (OSError, subprocess.TimeoutExpired) as error:
             raise BackupFailure(artifact) from error
         if result.returncode:

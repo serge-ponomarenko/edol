@@ -75,6 +75,36 @@ class ProductionTests(unittest.TestCase):
                 self.assertEqual(failure_summary(caught.exception),
                                  f"Deployment stopped: stage=backup artifact={artifact} exit_code=1")
 
+    def test_capture_retains_private_stderr_without_printing_it(self):
+        import contextlib
+        import io
+        import os
+        import sys
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "instance.tar.gz"
+            command = [sys.executable, "-c",
+                       "import sys; sys.stderr.write('synthetic-secret'); sys.exit(2)"]
+            with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+                with self.assertRaises(BackupFailure):
+                    ProductionDeployment.capture(destination, command)
+            diagnostic = destination.with_name("instance.tar.gz.stderr.log")
+            self.assertEqual(diagnostic.read_bytes(), b"synthetic-secret")
+            if os.name == "posix":
+                self.assertEqual(diagnostic.stat().st_mode & 0o777, 0o600)
+        self.assertNotIn("synthetic-secret", output.getvalue())
+
+    def test_capture_never_overwrites_existing_diagnostic(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "instance.tar.gz"
+            diagnostic = destination.with_name("instance.tar.gz.stderr.log")
+            diagnostic.write_bytes(b"retained")
+            with patch("prod_deploy.subprocess.run") as run:
+                with self.assertRaises(BackupFailure):
+                    ProductionDeployment.capture(destination, ["tar"])
+            run.assert_not_called()
+            self.assertEqual(diagnostic.read_bytes(), b"retained")
+
     def test_backup_timeout_and_os_errors_are_safe(self):
         import subprocess
         for error in (OSError("secret path"), subprocess.TimeoutExpired("secret command", 600)):
