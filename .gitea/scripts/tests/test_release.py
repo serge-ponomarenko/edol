@@ -27,7 +27,10 @@ class ReleaseValidationTest(unittest.TestCase):
         self.version = RELEASE.ET.parse(ROOT / "pom.xml").getroot().findtext(
             "m:properties/m:revision", namespaces=RELEASE.NS)
         shutil.copy(ROOT / "pom.xml", self.root)
-        shutil.copy(ROOT / "CHANGELOG.md", self.root)
+        (self.root / "CHANGELOG.md").write_text(
+            "# Changelog\n\n## [Unreleased]\n\n## [" + self.version
+            + "] - 2026-11-15\n\n### Added\n\n- Released fixture feature.\n",
+            encoding="utf-8")
         for pom in ROOT.glob("edol-*/pom.xml"):
             target = self.root / pom.parent.name
             target.mkdir()
@@ -71,9 +74,11 @@ class ReleaseValidationTest(unittest.TestCase):
 
     def test_prepare_rejects_empty_pending_without_writes(self):
         pom = (self.root / "pom.xml").read_bytes()
+        notes = (self.root / "CHANGELOG.md").read_bytes()
         with self.assertRaisesRegex(ValueError, "Unreleased"):
             prepare_release.prepare(self.root, "999.0.0", "2026-11-15")
         self.assertEqual(pom, (self.root / "pom.xml").read_bytes())
+        self.assertEqual(notes, (self.root / "CHANGELOG.md").read_bytes())
 
     def test_version_order(self):
         self.assertLess(prepare_release.version_key("1.0.0-rc.2"),
