@@ -219,7 +219,8 @@ class Deployment:
         try:
             keycloak_smtp.configure(self.config, self.ip("keycloak"))
         except (OSError, http.client.HTTPException, ValueError, KeyError, TypeError, RuntimeError) as error:
-            raise DeploymentFailure("smtp-config", ("keycloak",)) from error
+            status = error.status if isinstance(error, keycloak_smtp.KeycloakRequestFailure) else None
+            raise DeploymentFailure("smtp-config", ("keycloak",), status=status) from error
 
     def configure_mqtt_certificate(self, activate=False):
         try:
@@ -381,6 +382,8 @@ def validate_local_docker():
 
 
 if __name__ == "__main__":
+    # Production imports this module by name; keep one class identity for safe diagnostics.
+    sys.modules["dev_deploy"] = sys.modules[__name__]
     try:
         main()
     except Exception as error:

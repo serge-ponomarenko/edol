@@ -745,6 +745,27 @@ configuration, including the separate auth server. Resolve template inputs
 and `proxy_address` from the actual nginx network address. Attach nginx to the
 external `edol-reverse-proxy` bridge. Retain Dev routes.
 
+On a shared host, EDOL setup must not implicitly change the host resolver,
+DHCP configuration, router DNS, Docker daemon DNS or another project's network.
+Secure services discover the public HTTPS OIDC issuer during startup. Verify
+resolution and hostname-verified TLS from both the host and the application
+network. If the public address fails from LAN while the private nginx address
+succeeds with the same SNI, investigate routing before changing truststores.
+Keep the public issuer and certificate verification unchanged. A future DNS
+override must be reviewed and scoped to EDOL containers; the current deployment
+configuration does not implement it. Successful startup under a temporary host
+DNS workaround does not prove restart/redeployment readiness after rollback.
+
+Inspect existing ACME services/timers, Compose working directory, certificate
+and webroot mounts before adding renewal automation. Reuse the existing lineage
+and scheduler where applicable. Through the reviewed Certbot container setup,
+run `certbot renew --cert-name <lineage> --dry-run --non-interactive` and verify
+both domain names. A dry run does not replace the active certificate. Inspect
+nginx reload behavior and validate with `nginx -t` before a reviewed reload.
+Changing a shared renewal service affects all its sites and needs an explicit
+scope; EDOL deployment does not own that service. Record timer/service success,
+dry-run success and a future real renewal as separate evidence.
+
 Validate with `docker exec nginx-home nginx -t`, then reload only after success.
 Before deployment, production upstreams can return 502. Expose HTTPS443 and
 raw MQTT TLS TCP18885 only; forward 18885 to the configured host binding.
@@ -879,6 +900,33 @@ inspect actual paths before copying. Restore history without triggering event
 replay, Telegram notifications or re-consuming filament. Document expected
 counts, foreign-key checks, quantities and totals before/after. Compute a
 stable mapping and import ledger so retries cannot duplicate history.
+
+Freeze writers before taking the final target snapshot used for rehearsal.
+An enabled DIRECT connection can create a job even if the owner creates no
+history manually. If the target has changed, abort and rehearse against a fresh
+copy; do not delete the new job to satisfy an empty-table guard. Retain its UUID,
+check legacy UUID/public-ID collisions, and change a display ID only if needed.
+Preserve the new tenant, printer, user, membership, Telegram and receipt rows.
+Include sequence handling and any deliberate statistics replacement in the
+reviewed transformation. Never rerun a committed import as a generic retry.
+
+Compare deterministic exports of every transformed business table after import,
+and separately verify retained live rows and unchanged protected tables. Record
+the SQL hash and a success receipt in protected backup storage. On failure,
+leave writers stopped and inspect redacted error categories and row counts.
+Row rollback does not generally roll back PostgreSQL sequence operations.
+
+Model files are printer-scoped under `models/<printer UUID>/`. Old flat-cache
+models may also exist: inspect both layouts and map only reviewed model files
+to the target printer. Publish copies without replacing existing files, verify
+SHA-256, and record conflicts in a protected manifest. Use the appropriate OS
+identity for container-owned storage instead of broadening directory permissions.
+Do not copy old active-print metadata over the current printer cache. Camera
+snapshots are runtime data with a 24-hour directory cleanup policy when snapshot
+storage is enabled; retain old snapshots in the protected legacy archive rather
+than treating the live snapshot directory as durable history. Historical plate
+images are stored in Hub `print_jobs.plate_image`; copying model files does not
+by itself restore a missing historical preview.
 
 Rehearse the entire import into a **copy of the new target**, with no network
 access to printers/bots, then verify rollback from its pre-import backup. Only

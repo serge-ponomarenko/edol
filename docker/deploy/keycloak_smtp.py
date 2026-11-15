@@ -7,6 +7,12 @@ from urllib.parse import urlencode
 from model import smtp_settings
 
 
+class KeycloakRequestFailure(RuntimeError):
+    def __init__(self, status):
+        super().__init__("Keycloak SMTP configuration request failed")
+        self.status = status
+
+
 def request(address, method, path, body, headers, expected):
     connection = http.client.HTTPConnection(address, 8080, timeout=15)
     try:
@@ -14,7 +20,7 @@ def request(address, method, path, body, headers, expected):
         response = connection.getresponse()
         if response.status != expected:
             # Error bodies can echo credentials or protected configuration.
-            raise RuntimeError("Keycloak SMTP configuration request failed")
+            raise KeycloakRequestFailure(response.status)
         return response.read()
     finally:
         connection.close()

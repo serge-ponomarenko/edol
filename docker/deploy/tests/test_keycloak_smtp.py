@@ -15,6 +15,15 @@ from test_deployment import fixture
 
 
 class KeycloakSmtpTests(unittest.TestCase):
+    def test_keycloak_http_failure_preserves_only_status_in_deployment_summary(self):
+        deployment = dev_deploy.Deployment(fixture(), Path("/state"))
+        with patch.object(deployment, "ip", return_value="keycloak"), \
+                patch("keycloak_smtp.configure", side_effect=keycloak_smtp.KeycloakRequestFailure(403)):
+            with self.assertRaises(dev_deploy.DeploymentFailure) as captured:
+                deployment.configure_smtp()
+        self.assertEqual(dev_deploy.failure_summary(captured.exception),
+                         "Deployment stopped: stage=smtp-config services=keycloak last_http_status=403")
+
     def test_boolean_flags_render_as_keycloak_lowercase_strings(self):
         source = json.loads((dev_deploy.ROOT / "docker/keycloak/realm/edol-realm.json").read_text())
         for value, expected in ((True, "true"), (False, "false"), ("TRUE", "true"), ("false", "false")):
