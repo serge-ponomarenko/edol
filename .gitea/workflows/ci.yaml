@@ -34,6 +34,7 @@ jobs:
       - name: Deployment and realm checks
         run: |
           python3 -B -m unittest discover -s docker/deploy/tests
+          python3 -B -m unittest discover -s .gitea/scripts/tests
           node docker/keycloak/realm/validate-realm-schema.mjs
           bash -n docker/deploy/dispatch.sh
       - name: Require Docker for migration and RLS tests
@@ -41,6 +42,7 @@ jobs:
       - name: Build and test complete reactor
         run: mvn -B clean verify
       - name: SonarQube analysis and required Quality Gate
+        id: sonar
         env:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_IP }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -48,7 +50,16 @@ jobs:
           test -n "$SONAR_HOST_URL" && test -n "$SONAR_TOKEN"
           mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.projectKey=org.spon:edol \
+            -Dsonar.scanner.metadataFilePath="$PWD/target/sonar/report-task.txt" \
             -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=600
+      - name: Publish Sonar Results summary and PR comment
+        if: always() && steps.sonar.outcome != 'skipped'
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_IP }}
+          SONAR_PUBLIC_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.GITEACI_TOKEN }}
+        run: python3 .gitea/scripts/sonar_report.py
 
   prod-deploy:
     needs: build

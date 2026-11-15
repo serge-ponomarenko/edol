@@ -772,8 +772,12 @@ The CI runner needs Java21/Maven, Python, Node, Docker/Testcontainers access,
 OpenSSL, Bash, tar and OpenSSH; the deployment step itself needs no Docker
 socket. Keep existing `SONAR_HOST_IP` (scanner URL) and `SONAR_TOKEN` secrets.
 The scanner waits for its own Quality Gate and fails on error or timeout;
-manual polling of an arbitrary `report-task.txt` is retired. Results are in
-the CI/Sonar UI; CI no longer posts PR comments with a separate Gitea token.
+manual polling of an arbitrary `report-task.txt` is retired. After the scanner,
+including on gate failure, CI publishes a Sonar Results summary and updates
+the marked PR comment using `GITEACI_TOKEN`. Keep `SONAR_HOST_URL` for browser
+links. The report fetches the gate for the exact scanner task/analysis ID;
+missing results are shown as unavailable and never treated as a pass. The
+scanner's required gate remains responsible for blocking deployment.
 Fork PRs without Sonar secrets cannot complete the required gate: review them
 in a trusted branch before merge, never grant deployment secrets to untrusted
 fork code. Require the `build` job in branch protection and disable direct
