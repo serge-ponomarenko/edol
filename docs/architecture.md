@@ -35,6 +35,9 @@ configuration reads use the transactional printer-management service so the
 secure RLS tenant setting is established; network I/O remains outside that
 configuration transaction. Transport connectivity alone is not proof of
 processed telemetry: overview readiness waits for usable printer state.
+DIRECT Bambu MQTT uses clean sessions with in-memory Paho persistence; it does
+not write protocol state under the application working directory. Reconnection
+restores the report subscription rather than replaying an on-disk session.
 
 Live `printing` follows printer G-code PREPARE/RUNNING/PAUSE telemetry,
 independently of model metadata acquisition. Metadata retries restore the

@@ -1087,6 +1087,14 @@ jobs independently depend on the successful build job.
 
 ### Core media ownership
 
+Core's application directory can remain root-owned and non-writable by its
+runtime user. DIRECT printer MQTT explicitly uses in-memory persistence with
+clean sessions, avoiding Paho's default working-directory file store. Printer
+connection failures report the `initialize`, `connect` or `subscribe` stage,
+MQTT reason code and cause type without logging credentials or raw exception
+messages. An immediate initialization failure after a runtime UID change is
+not evidence of a printer/network authentication rejection.
+
 The deployment CLI supplies its effective host UID/GID to Compose. Core runs
 with that identity in both deployment modes and environments, matching the
 operator that archives the instance. Java staging files can retain mode `0600`

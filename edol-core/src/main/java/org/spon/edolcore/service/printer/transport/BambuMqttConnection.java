@@ -3,6 +3,7 @@ package org.spon.edolcore.service.printer.transport;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.*;
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.spon.edolcore.persistence.printer.PrinterConnectionConfiguration;
 import org.spon.edolcore.service.printer.connectivity.PrinterConnectivityStateService;
 import org.spon.edolcore.service.printer.telemetry.BambuTelemetryConsumer;
@@ -44,6 +45,7 @@ public class BambuMqttConnection implements MqttCallback {
     }
 
     public synchronized void connect() {
+        String stage = "initialize";
         try {
             if (client != null && client.isConnected()) {
                 return;
@@ -55,13 +57,15 @@ public class BambuMqttConnection implements MqttCallback {
 
             client = new MqttClient(
                     connectUrl,
-                    mqttConfiguration.clientId()
+                    mqttConfiguration.clientId(),
+                    new MemoryPersistence()
             );
 
             MqttConnectOptions options = new MqttConnectOptions();
             options.setUserName("bblp");
             options.setPassword(configuration.getAccessCode().toCharArray());
             options.setAutomaticReconnect(false);
+            options.setCleanSession(true);
             options.setSocketFactory(SslUtil.createTrustAllSocketFactory());
             options.setKeepAliveInterval(60);
 
@@ -73,8 +77,10 @@ public class BambuMqttConnection implements MqttCallback {
 
             client.setCallback(this);
 
+            stage = "connect";
             client.connect(options);
 
+            stage = "subscribe";
             client.subscribe("device/" + configuration.getPrinter().getSerialNumber() + "/report");
 
             log.atInfo()
@@ -86,7 +92,10 @@ public class BambuMqttConnection implements MqttCallback {
         } catch (Exception e) {
             log.atWarn()
                     .addKeyValue(PRINTER_ID_KEY, printerId)
-                    .log("Printer connection failed: {}", e.getMessage());
+                    .addKeyValue("stage", stage)
+                    .addKeyValue("reasonCode", e instanceof MqttException mqtt ? mqtt.getReasonCode() : null)
+                    .addKeyValue("causeType", e.getCause() == null ? null : e.getCause().getClass().getSimpleName())
+                    .log("Printer connection failed: {}", e.getClass().getSimpleName());
         }
 
     }
