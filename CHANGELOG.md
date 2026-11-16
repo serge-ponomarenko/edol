@@ -9,6 +9,7 @@ Entries describe meaningful changes rather than individual commits.
 
 ### Fixed
 
+- Send CSRF tokens with allocation edits and finalization in secure Hub, and report rejected requests instead of silently leaving allocation unchanged.
 - Keep DIRECT printer MQTT session state in memory so non-root Core does not require a writable application directory; report connection failure stages and reason codes.
 - Run Core with the deployment operator's UID/GID so private models and metadata remain readable by instance backups.
 - Reject secure Dev/production deployments when the configured trusted proxy differs from the running nginx endpoint, before stopping services.

@@ -1,14 +1,19 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
+    <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
 
     <title>Print Job • Edol Hub</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/core@1.7.0/dist/css/tabler.min.css" rel="stylesheet"
+          integrity="sha384-/ZecLhD4wkLsbjdJWUEWeSZJJSEQ3XCPdtLmmm6SW128l+eSNplV12po3tSK7pdy" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css" rel="stylesheet"
+          integrity="sha384-PwEnNZvp50/uDLtKrd1s2D4Xe/y+fCVtEigigjik/PgHlDXUF1uJ32m7guk/XWYV" crossorigin="anonymous">
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 
     <link href="/favicon.svg" rel="icon" type="image/svg+xml">
 
@@ -47,7 +52,7 @@
                             <div class="d-flex align-items-center justify-content-between">
 
                                 <div>
-                                    <h3 id="taskName"></h3>
+                                    <h3 id="taskName">Print job</h3>
 
                                     <div class="text-muted">
                                         Job #<span id="jobId"></span>
@@ -135,12 +140,12 @@
                     </div>
                 </div>
 
-                <label class="form-label">
+                <label class="form-label" for="spoolDropdownButton">
                     Spool
                 </label>
 
                 <div class="dropdown w-100 mb-3">
-                    <button class="btn w-100 text-start dropdown-toggle"
+                    <button class="btn w-100 text-start dropdown-toggle" id="spoolDropdownButton"
                             data-bs-toggle="dropdown"
                             type="button">
                         <span id="selectedSpoolLabel">
@@ -156,7 +161,7 @@
                     </div>
                 </div>
 
-                <label class="form-label">
+                <label class="form-label" for="spoolMutationGrams">
                     Grams
                 </label>
 
@@ -217,12 +222,12 @@
                 <input type="hidden"
                        id="targetFilamentId">
 
-                <label class="form-label">
+                <label class="form-label" for="filamentDropdownButton">
                     Select filament
                 </label>
 
                 <div class="dropdown w-100">
-                    <button class="btn w-100 text-start dropdown-toggle"
+                    <button class="btn w-100 text-start dropdown-toggle" id="filamentDropdownButton"
                             data-bs-toggle="dropdown"
                             type="button">
 
@@ -264,9 +269,26 @@
 </body>
 
 <script th:inline="javascript">
-    const jobId = window.location.pathname.split('/').pop();
+    const jobId = globalThis.location.pathname.split('/').pop();
     const printerId = /*[[${printerId}]]*/ '';
     let currentPreview = null;
+
+    async function allocationRequest(url, options = {}) {
+        const headers = new Headers(options.headers);
+        if (options.method === 'POST') {
+            const csrf = document.querySelector('meta[name="_csrf"]');
+            const header = document.querySelector('meta[name="_csrf_header"]');
+            if (csrf?.content && header?.content) {
+                headers.set(header.content, csrf.content);
+            }
+        }
+
+        const response = await fetch(url, {...options, headers});
+        if (!response.ok || response.redirected) {
+            throw new Error('Allocation request failed');
+        }
+        return response;
+    }
 
     loadAllocation();
 
@@ -354,7 +376,7 @@
 
     async function loadAllocation() {
         const response =
-            await fetch(
+            await allocationRequest(
                 `/api/printers/${printerId}/allocations/job/${jobId}`
             );
 
@@ -454,9 +476,7 @@
                                 openSpoolMutationModal(
                                     'add',
                                     ${group.filamentId},
-                                    ${group.missingGrams > 0
-                    ? group.missingGrams
-                    : 1},
+                                    ${group.missingGrams},
                                     ${group.missingGrams}
                                 )
                             ">
@@ -489,8 +509,9 @@
                 ${warning}
 
                 ${
-            group.status !== 'RESOLVED'
-                ? `
+            group.status === 'RESOLVED'
+                ? ''
+                : `
                 <div class="mt-3">
                     <button
                         class="btn btn-outline-primary"
@@ -505,7 +526,6 @@
 
                 </div>
               `
-                : ''
         }
             </div>
         </div>
@@ -571,14 +591,14 @@
                 return;
             }
 
-            await fetch(
+            await allocationRequest(
                 `/api/printers/${printerId}/allocations/rerun?jobId=${jobId}&filamentId=${filamentId}`,
                 {
                     method: 'POST'
                 }
             );
             await loadAllocation();
-        } catch (e) {
+        } catch {
             alert(
                 'Failed to rerun allocation'
             );
@@ -694,7 +714,7 @@
         mode
     ) {
         const response =
-            await fetch(
+            await allocationRequest(
                 `/api/printers/${printerId}/allocations/spools?filamentId=${filamentId}`
             );
 
@@ -890,7 +910,7 @@
 
         try {
             const response =
-                await fetch(
+                await allocationRequest(
                     endpoint
                     + `?jobId=${jobId}`
                     + `&filamentId=${filamentId}`
@@ -911,7 +931,7 @@
 
             await loadAllocation();
 
-        } catch (e) {
+        } catch {
             alert('Failed to update spool allocation');
         }
     }
@@ -937,7 +957,7 @@
     ) {
 
         const response =
-            await fetch(
+            await allocationRequest(
                 `/api/printers/${printerId}/allocations/filaments?query=`
             );
 
@@ -1120,7 +1140,7 @@
                 return;
             }
 
-            await fetch(
+            await allocationRequest(
                 `/api/printers/${printerId}/allocations/replace-filament`
                 + `?jobId=${jobId}`
                 + `&sourceFilamentId=${sourceFilamentId}`
@@ -1134,7 +1154,7 @@
 
             await loadAllocation();
 
-        } catch (e) {
+        } catch {
 
             alert(
                 'Failed to replace filament'
@@ -1199,11 +1219,8 @@
     }
 
     async function finalizeReconciliation() {
+        const btn = document.getElementById('finalizeBtn');
         try {
-            const btn =
-                document.getElementById(
-                    'finalizeBtn'
-                );
             btn.disabled = true;
             btn.innerHTML = `
                     <span class="spinner-border
@@ -1214,7 +1231,7 @@
                 `;
 
             const response =
-                await fetch(
+                await allocationRequest(
                     `/api/printers/${printerId}/allocations/finalize?jobId=${jobId}`,
                     {
                         method: 'POST'
@@ -1234,20 +1251,19 @@
                 'Reconciliation finalized successfully'
             );
 
-            window.location.href =
+            globalThis.location.href =
                 `/printers/${printerId}/print-jobs`;
 
-            await loadAllocation();
-
-        } catch (e) {
+        } catch {
+            alert(
+                'Failed to finalize reconciliation'
+            );
+        } finally {
             btn.disabled = false;
             btn.innerHTML = `
                 <i class="ti ti-check"></i>
                 Finalize Reconciliation
             `;
-            alert(
-                'Failed to finalize reconciliation'
-            );
         }
     }
 </script>
