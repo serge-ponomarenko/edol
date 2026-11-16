@@ -1085,6 +1085,33 @@ jobs independently depend on the successful build job.
 
 ## Production backup diagnostics
 
+### Core media ownership
+
+The deployment CLI supplies its effective host UID/GID to Compose. Core runs
+with that identity in both deployment modes and environments, matching the
+operator that archives the instance. Java staging files can retain mode `0600`
+after atomic promotion. Do not make model metadata or the instance world-readable
+to fix backup failures, and do not run the deployment CLI through `sudo` to
+work around media ownership.
+
+Existing root-owned media needs one operator-owned migration before deploying
+this change: while Core is stopped and the instance deployment lock is held,
+change ownership only under that instance's `state/models`, `state/snapshots`
+and `state/logs/core` to the deployment UID/GID. Reject links and unexpected
+mounts before walking those trees; retain existing file modes, contents and
+modification times. Do not recursively change the entire instance: database volumes,
+keys and other service storage have separate ownership. Apply the same bounded
+correction to Dev during its own stopped maintenance window.
+
+Verify the complete stopped instance can be archived as the ordinary deployment
+operator before retrying. Deploy a revision containing the Core Compose user
+change; rerunning the previous revision would start a root writer again.
+After deployment, inspect Core's configured numeric user and verify a subsequent
+new model/metadata upload is owned and readable by that same operator. Local
+Compose-model tests do not establish Linux runtime or physical-upload acceptance.
+
+### Protected failure output
+
 Before migrations, backup progress reports fixed artifact identifiers: `globals`,
 `database-list`, `edol_devices`, `edol_hub`, `edol_keycloak`, and `instance`.
 A failed capture reports `stage=backup artifact=<identifier>` and the subprocess

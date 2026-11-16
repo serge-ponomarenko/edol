@@ -290,6 +290,9 @@ def app_container(c, module, port, env, repo, state):
         app["entrypoint"] = ["java", "-Djavax.net.ssl.trustStore=/app/certs/mqtt.p12",
                              "-Djavax.net.ssl.trustStorePassword=" + s["truststore"], "-jar", "/app/app.jar"]
     if module == "core":
+        # Java's private staging files retain their owner after atomic promotion.
+        # The same host operator must be able to archive models and metadata.
+        app["user"] = f"{c.get('uid', 1000)}:{c.get('gid', 1000)}"
         app["volumes"] += [f"{state}/models:/app/models", f"{state}/snapshots:/app/camera_snapshots"]
     if module == "hub":
         if secure:

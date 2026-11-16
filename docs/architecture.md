@@ -326,7 +326,11 @@ Core initializes enabled printer runtimes after application readiness. Hub
 validates the catalog projection and attempts recovery independently per
 enabled printer. Core and Hub validate their ORM schema against Flyway.
 Core, Hub and AMS each own their schema and migrations. Core stores models
-and snapshots on application-owned mounted paths. See [tenant ownership](contracts/tenant-ownership.md)
+and snapshots on application-owned mounted paths. Supported Compose deployments
+run Core with the host deployment operator's numeric UID/GID, also used for
+instance backups. Private staged models and metadata retain that owner after
+atomic promotion; backup access does not require broader file permissions.
+See [tenant ownership](contracts/tenant-ownership.md)
 for isolation and [operations](operations.md) for migration constraints.
 
 Use the [ADR index](adr/README.md) for accepted decisions and

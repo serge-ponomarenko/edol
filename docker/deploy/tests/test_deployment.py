@@ -30,6 +30,20 @@ def fixture(mode="secure", environment="dev"):
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_core_writes_private_media_as_the_backup_operator_in_all_modes(self):
+        for mode in ("home", "secure"):
+            for environment in ("dev", "prod"):
+                with self.subTest(mode=mode, environment=environment):
+                    config = fixture(mode, environment)
+                    config.update(uid=1234, gid=2345)
+                    state = Path("/instance/state")
+                    result = model.compose(config, Path("/source"), state)
+                    core = result["services"]["edolcore"]
+                    self.assertEqual(core["user"], "1234:2345")
+                    self.assertIn(f"{state}/models:/app/models", core["volumes"])
+                    self.assertIn(f"{state}/snapshots:/app/camera_snapshots", core["volumes"])
+                    self.assertIn(f"{state}/logs/core:/app/logs", core["volumes"])
+
     def test_new_configs_validate_and_use_independent_fresh_keys(self):
         for mode in ("home", "secure"):
             first, second = init_config.new_config(mode), init_config.new_config(mode)

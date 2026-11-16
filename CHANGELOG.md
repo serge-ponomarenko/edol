@@ -9,6 +9,7 @@ Entries describe meaningful changes rather than individual commits.
 
 ### Fixed
 
+- Run Core with the deployment operator's UID/GID so private models and metadata remain readable by instance backups.
 - Reject secure Dev/production deployments when the configured trusted proxy differs from the running nginx endpoint, before stopping services.
 - Align Agent upload proxy timeouts in Dev and production for model transfers lasting up to fifteen minutes.
 - Isolate release preparation tests from the repository's current Unreleased entries.
