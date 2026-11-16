@@ -167,8 +167,10 @@ automatic retry or plaintext fallback occurs.
 Secure uploads use `WiFiClientSecure` with the configured CA, host-based
 connection and a synchronized-clock prerequisite. The clock floor is build
 time minus one day; ordinary SNTP supplies time, not an authenticated-time
-guarantee. Connection/read timeouts are bounded per operation, not an overall
-upload deadline. Secure DNS/IPv4 hosts reject schemes, separators and control
+guarantee. Model streaming has a fifteen-minute overall FTPS deadline and a
+ten-second data-idle deadline. HTTP acknowledgement after the body has a
+sixty-second budget; HTTPS connection/read timeouts are bounded separately.
+Secure DNS/IPv4 hosts reject schemes, separators and control
 characters. Existing stored ports remain explicit settings; the secure default
 is 443. Agent identity comes only from the new namespace and is never taken
 from legacy Home `agentId` settings or the snapshot caller argument.

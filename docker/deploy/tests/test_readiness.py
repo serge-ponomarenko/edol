@@ -126,7 +126,7 @@ class ReadinessTests(unittest.TestCase):
             return ""
 
         output = io.StringIO()
-        with patch("dev_deploy.run"), patch("dev_deploy.stop_dev_containers"), \
+        with patch("dev_deploy.run"), patch.object(deployment, "validate_proxy_trust"), patch("dev_deploy.stop_dev_containers"), \
                 patch.object(deployment, "dc", side_effect=compose_command), \
                 patch.object(deployment, "sql"), patch.object(deployment, "guard_database"), \
                 patch.object(deployment, "configure_mqtt_certificate"), \

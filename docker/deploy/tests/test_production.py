@@ -163,7 +163,7 @@ class ProductionTests(unittest.TestCase):
     def test_backup_failure_prevents_sql_and_migration(self):
         with tempfile.TemporaryDirectory() as directory:
             deployment = ProductionDeployment(fixture(environment="prod"), Path(directory))
-            with patch("dev_deploy.run"), patch.object(deployment, "dc"), \
+            with patch("dev_deploy.run"), patch.object(deployment, "validate_proxy_trust"), patch.object(deployment, "dc"), \
                     patch.object(deployment, "configure_mqtt_certificate"), patch.object(deployment, "guard_database"), \
                     patch.object(deployment, "backup", side_effect=RuntimeError("backup failed")), \
                     patch.object(deployment, "sql") as sql, patch.object(deployment, "migrate") as migrate:
@@ -176,7 +176,7 @@ class ProductionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             deployment = ProductionDeployment(fixture(environment="prod"), Path(directory))
             events = []
-            with patch("dev_deploy.run"), patch.object(deployment, "dc"), \
+            with patch("dev_deploy.run"), patch.object(deployment, "validate_proxy_trust"), patch.object(deployment, "dc"), \
                     patch.object(deployment, "configure_mqtt_certificate"), \
                     patch.object(deployment, "stop_instances", side_effect=lambda: events.append("stop")), \
                     patch.object(deployment, "guard_database", side_effect=lambda: events.append("guard")), \

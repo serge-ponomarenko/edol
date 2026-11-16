@@ -124,7 +124,7 @@ class CertificateDeploymentOrderTests(unittest.TestCase):
     def test_stage_failure_does_not_stop_the_existing_dev(self):
         deployment = dev_deploy.Deployment(fixture(), Path("/state"))
         failure = dev_deploy.DeploymentFailure("mqtt-certificate", ("mqtt",))
-        with patch("dev_deploy.run"), patch.object(deployment, "dc"), \
+        with patch("dev_deploy.run"), patch.object(deployment, "validate_proxy_trust"), patch.object(deployment, "dc"), \
                 patch.object(deployment, "configure_mqtt_certificate", side_effect=failure), \
                 patch("dev_deploy.stop_dev_containers") as stop:
             with self.assertRaises(dev_deploy.DeploymentFailure):
@@ -140,7 +140,7 @@ class CertificateDeploymentOrderTests(unittest.TestCase):
             if activate:
                 raise dev_deploy.DeploymentFailure("mqtt-certificate", ("mqtt",))
 
-        with patch("dev_deploy.run"), patch.object(deployment, "dc") as command, \
+        with patch("dev_deploy.run"), patch.object(deployment, "validate_proxy_trust"), patch.object(deployment, "dc") as command, \
                 patch("dev_deploy.stop_dev_containers", side_effect=lambda: events.append("stop")), \
                 patch.object(deployment, "configure_mqtt_certificate", side_effect=certificate):
             with self.assertRaises(dev_deploy.DeploymentFailure):

@@ -9,6 +9,8 @@ Entries describe meaningful changes rather than individual commits.
 
 ### Fixed
 
+- Reject secure Dev/production deployments when the configured trusted proxy differs from the running nginx endpoint, before stopping services.
+- Align Agent upload proxy timeouts in Dev and production for model transfers lasting up to fifteen minutes.
 - Isolate release preparation tests from the repository's current Unreleased entries.
 - Identify failed production backup artifacts and command exit codes without exposing protected diagnostics; failed backups continue to block migrations.
 - Retain production backup stderr in private operator-side files without exposing it in CI logs.

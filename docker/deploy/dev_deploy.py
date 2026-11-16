@@ -30,7 +30,7 @@ class DeploymentFailure(RuntimeError):
     def __init__(self, stage, services, status=None):
         super().__init__("Deployment operation failed")
         stages = {"http-readiness", "compose-up", "compose-build", "compose-config", "compose-pull",
-                  "compose-exec", "compose-ps", "compose-stop", "smtp-config", "mqtt-certificate"}
+                  "compose-exec", "compose-ps", "compose-stop", "smtp-config", "mqtt-certificate", "proxy-trust"}
         self.stage = stage if stage in stages else "deployment"
         self.services = tuple(service for service in services if service in KNOWN_SERVICES)
         self.status = status if isinstance(status, int) and 100 <= status <= 599 else None
@@ -242,10 +242,28 @@ class Deployment:
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             raise DeploymentFailure("mqtt-certificate", ("mqtt",)) from error
 
+    def validate_proxy_trust(self):
+        if self.config["mode"] != "secure":
+            return
+        # Inspect only network metadata; container environments contain secrets.
+        try:
+            network = json.loads(run(["docker", "network", "inspect", "edol-reverse-proxy"]))[0]
+            proxy_name = self.config.get("proxy_container", "nginx-home")
+            proxies = [endpoint for endpoint in network.get("Containers", {}).values()
+                       if endpoint.get("Name") == proxy_name]
+            if len(proxies) != 1 or proxies[0]["IPv4Address"].split("/")[0] != self.config["proxy_address"]:
+                raise ValueError("Proxy address mismatch")
+            info = json.loads(run(["docker", "inspect", "--format", "{{json .State.Running}}", proxy_name]))
+            if info is not True:
+                raise ValueError("Proxy is not running")
+        except (RuntimeError, ValueError, KeyError, IndexError, TypeError) as error:
+            raise DeploymentFailure("proxy-trust", ()) from error
+
     def apply(self, environment="dev"):
         c = self.config
         if c["environment"] != environment or c["project"] != f"edol-{environment}-{c['mode']}":
             raise ValueError("Deployment environment and instance ownership differ")
+        self.validate_proxy_trust()
         run([sys.executable, "-B", "-m", "unittest", "discover", "-s", str(ROOT / "docker/deploy/tests")])
         print("Validating configuration and building the exact supplied source revision", flush=True)
         self.dc("config", "--quiet")
@@ -253,6 +271,7 @@ class Deployment:
         run(["docker", "pull", c["flyway_image"]])
         self.dc("pull", "--ignore-buildable")
         self.configure_mqtt_certificate()
+        self.validate_proxy_trust()
         self.stop_instances()
         try:
             self.configure_mqtt_certificate(activate=True)
@@ -284,6 +303,7 @@ class Deployment:
             info = json.loads(run(["docker", "inspect", self.dc("ps", "-q", "edolnotify").strip()]))[0]
             if not info["State"]["Running"] or info["RestartCount"]:
                 raise RuntimeError("Notify failed its process-liveness check")
+            self.validate_proxy_trust()
             write_private(self.state / "deployed.json", json.dumps({"revision": c["revision"], "mode": c["mode"]}))
             print("Deploy complete. HTTP readiness passed; Notify process liveness only. Physical acceptance remains separate.")
         except BaseException:

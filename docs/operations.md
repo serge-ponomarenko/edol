@@ -89,6 +89,7 @@ Edit the secure file locally with a private editor:
 | `hub_origin` | `https://dev.edol.s-pon.dev`, no trailing slash. |
 | `auth_origin` | `https://auth.dev.edol.s-pon.dev`, no trailing slash. |
 | `proxy_address` | Actual nginx IPv4 on `edol-reverse-proxy`, without CIDR suffix. |
+| `proxy_container` | Optional nginx container name, default `nginx-home`; used to verify the exact endpoint before secure deployment. |
 | `smtp` | Working provider host/port, sender, user/password, auth and STARTTLS. |
 | `keycloak_admin_user` | Technical Keycloak admin, initially `edol-admin`. |
 | `secrets` | Keep generated values; no application owner/printer credentials are needed. |
@@ -198,6 +199,23 @@ docker network inspect edol-reverse-proxy --format '{{range .Containers}}{{print
 
 If missing, provision that external bridge once through nginx's deployment
 setup and attach `nginx-home`. Put its actual IPv4 in `proxy_address`.
+Reserve that address as a static address in nginx's owning Compose definition
+on the external bridge. Both protected Dev and production instance files must
+refer to the same proxy address; never pin nginx by disconnecting a live shared
+proxy without an approved maintenance window. Application addresses are not
+proxy identities. Reinspect the endpoint after recreating nginx or the bridge.
+Secure deployments check the named, running proxy endpoint before building,
+again before stopping services and before recording readiness. A mismatch fails
+with `stage=proxy-trust`, without widening Core's exact-address trust rule.
+After an approved proxy address change, update both protected instance files
+and redeploy each affected installation. Changing JSON alone does not update
+the running Core or Keycloak configuration.
+
+The Agent upload locations in both nginx templates use a 960-second upstream
+response budget, covering a fifteen-minute streamed model transfer plus final
+validation. The 60-second client-body/send timers limit inactivity between I/O
+operations, not total transfer duration. Apply these locations to the existing
+nginx configuration through its owner; deployment does not rewrite shared nginx.
 Back up `/srv/nginx/nginx.conf` privately. Merge
 [dev.conf.template](../docker/nginx/dev.conf.template) into the existing HTTPS
 `dev.edol.s-pon.dev` block, replacing the old `location /` rather than adding a

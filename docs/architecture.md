@@ -122,7 +122,11 @@ Production uses the same model through the `prod-deploy` job after main's
 reactor tests and Sonar Quality Gate succeed. Its host lock, project, private
 network, state, keys and database volume are independent of Dev. Production
 stops only its own writers and takes protected logical database and instance
-backups before provisioning/migrations. It validates operator-provisioned MQTT
+backups before provisioning/migrations. Both secure environments verify the
+named running nginx endpoint against their exact configured proxy address
+before stopping services, preventing proxy-address drift from silently breaking
+Agent HTTPS ingress. The shared nginx owner retains static address and routing
+configuration; application deployment never changes it. Production validates operator-provisioned MQTT
 trust without using Dev's automatic certificate-signing procedure. Failed
 post-stop deployments remain stopped for operator recovery; schema downgrade
 and legacy-data imports are never automatic. See the production runbook in
