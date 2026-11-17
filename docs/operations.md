@@ -105,71 +105,64 @@ is 0644 inside that non-traversable host directory so Keycloak's image UID can
 read its file bind mount; retain the parent permissions. Keep CA private keys
 outside any broker-mounted directory.
 
-### 3. Create fresh MQTT TLS trust
+### 3. Bootstrap public HTTPS and MQTT TLS
 
-Run once while the destinations below do not exist. Use OpenSSL on the host
-and the public JVM roots from the Java runtime image:
+New secure configurations select `mqtt_tls: public`. Both protocols use public
+Let's Encrypt trust; firmware is independent of the instance's private keys.
+The existing host nginx/Certbot setup remains the certificate manager. Configure
+`public_tls.email`, the container-side `public_tls.webroot`,
+`public_tls.certbot_directory` and `public_tls.certbot_config_dir` in the protected instance file. The
+webroot must already be served for HTTP-01 on all configured Hub/auth/MQTT DNS
+names. `mqtt_public_host` defaults to the Hub hostname; `mqtt_public_port`
+defaults to `mqtt_port` and can represent a different external forwarding port.
+Raw MQTT requires direct DNS/TCP routing, not the ordinary Cloudflare HTTP proxy.
 
-```bash
-set -e
-umask 077
-install -d -m 0700 /srv/edol-dev/secure/ca /srv/edol-dev/secure/certs/mqtt
-ca=/srv/edol-dev/secure/ca
-certs=/srv/edol-dev/secure/certs
-test ! -e "$ca/ca-key.pem" && test ! -e "$certs/mqtt/server-key.pem"
-openssl req -x509 -newkey rsa:3072 -nodes -days 3650 -sha256 \
-  -keyout "$ca/ca-key.pem" -out "$ca/ca.pem" -subj '/CN=EDOL dev MQTT CA'
-openssl req -new -newkey rsa:2048 -nodes -keyout "$certs/mqtt/server-key.pem" \
-  -out "$ca/server.csr" -subj '/CN=mqtt'
-printf '%s\n' 'subjectAltName=DNS:mqtt,DNS:dev.edol.s-pon.dev,IP:192.168.0.200' 'extendedKeyUsage=serverAuth' > "$ca/server.ext"
-openssl x509 -req -in "$ca/server.csr" -CA "$ca/ca.pem" -CAkey "$ca/ca-key.pem" \
-  -CAcreateserial -out "$certs/mqtt/server.pem" -days 365 -sha256 -extfile "$ca/server.ext"
-install -m 0600 "$ca/ca.pem" "$certs/mqtt/ca.pem"
-export EDOL_STORE_PASSWORD="$(python3 -c 'import json; print(json.load(open("/srv/edol-dev/secure/instance.json"))["secrets"]["truststore"])')"
-export EDOL_STORE_DEFAULT=changeit
-docker run --rm --user "$(id -u):$(id -g)" -e EDOL_STORE_PASSWORD -e EDOL_STORE_DEFAULT \
-  -v "$certs:/export" --entrypoint sh eclipse-temurin:21-jre -ec '
-  test ! -e /export/combined.p12
-  keytool -importkeystore -srckeystore "$JAVA_HOME/lib/security/cacerts" \
-    -srcstorepass:env EDOL_STORE_DEFAULT -destkeystore /export/combined.p12 \
-    -deststoretype PKCS12 -deststorepass:env EDOL_STORE_PASSWORD -noprompt
-  keytool -importcert -alias edol-dev-mqtt -file /export/mqtt/ca.pem \
-    -keystore /export/combined.p12 -storepass:env EDOL_STORE_PASSWORD -noprompt'
-unset EDOL_STORE_PASSWORD EDOL_STORE_DEFAULT
-```
-
-Adjust the SAN before issuance if the device endpoint differs. Do not regenerate
-trust after devices use it. The broker mounts only `certs/mqtt`, never the CA
-private key. The combined JVM store retains public roots for Keycloak/Telegram
-and adds the public MQTT CA. No printer or device is needed to start the empty
-web environment. Configure device endpoints, trust and pairing later through
-the supported setup flow; deployment changes no firmware, NVS or device trust.
-
-For an existing Secure Dev certificate missing the public DNS SAN, prepare a
-replacement with the existing CA and server key from the reviewed checkout:
+After entering these data, run the automated bootstrap on the Linux host:
 
 ```bash
-python3 docker/deploy/mqtt_certificate.py --config /srv/edol-dev/secure/instance.json
+sudo python3 docker/deploy/public_tls.py bootstrap --config /srv/edol-dev/secure/instance.json
 ```
 
-This stages only `state/mqtt-server.pending.pem` under the shared deployment
-lock; it does not replace the active certificate or restart a service. The
-public hostname is derived from `hub_origin`, so both device transports use
-`dev.edol.s-pon.dev`. The current CA, server key, internal `mqtt`/LAN identities
-and existing DNS/IP SANs are preserved. The CA signing key stays in the
-instance's `ca/ca-key.pem`; it is never mounted into the broker or exported.
+The script uses the existing nginx Compose `certbot` service to obtain public
+certificates for the instance names, preserving existing certificate SANs,
+validates it against the release-owned ISRG roots and installs MQTT files under
+`certs/public-mqtt`. It installs a stable, instance-scoped worker under
+`/usr/local/lib/edol-public-tls` and an instance-specific `ExecStartPost` drop-in on the existing
+`certbot-docker-renew.service`. It creates no second scheduler and preserves
+the existing nginx reload action. Bootstrap validates/reloads nginx after issuance;
+the existing timer starts independent per-instance refresh services; a failed Dev refresh
+does not block Prod refresh. Unchanged certificates do not reload MQTT.
+Refresh failures remain visible in the corresponding edol-public-tls service. The script does not install or change nginx routes, DNS,
+port forwarding or the host Certbot installation. Those existing integration
+prerequisites must be established before first bootstrap; bare-host ingress
+installation is not automated by this command.
 
-On the next `dev-secure-deploy`, certificate staging/validation happens before
-stopping Dev. After stopping, the deployer validates the candidate against the
-same CA/server key and required DNS/IP SANs, keeps a fingerprint-named backup
-of the prior server certificate, and atomically installs only `server.pem`
-before starting services. If the active certificate already validates, it is
-left unchanged and no online CA signing key is required. Invalid/mismatched
-candidates fail closed with `stage=mqtt-certificate services=mqtt`. A stale
-candidate is never silently overwritten; inspect it locally before replacing
-that public certificate file. Home and production do not use this Dev signing
-procedure. Broker authority, PostgreSQL, device identities, CA, private keys,
-JVM truststore and ESP32 NVS are unchanged.
+Existing private-CA instances opt in without rotating secrets or identity seals:
+
+```bash
+python3 docker/deploy/init_config.py --mode secure --environment dev \
+  --output /srv/edol-dev/secure/instance.json --upgrade-public-tls
+```
+
+Enter the ACME data and run bootstrap, then the ordinary deployment. Legacy
+identity fields remain in the config for fingerprint compatibility, while the
+public mode no longer mounts the old JVM truststore. Private CA/key files and
+broker authority are retained. Certificate installation alone does not change
+an old broker's private-certificate mount; deployment switches the mount.
+Subsequent certificate renewal reloads only the named instance broker. Renewal
+must not require a new application release, firmware image or pairing.
+
+Server modules and the broker healthcheck use the certificate DNS hostname,
+resolved by an instance-private Docker alias, with internal port 8883. No
+router hairpin or host-wide DNS change is needed. JVMs use their default public
+roots; the broker healthcheck uses the release-owned ISRG roots.
+
+Redeploy preserves databases, instance secrets and broker authorities. Reinstall
+with those restored preserves pairing. A truly empty database/authority requires
+new pairing through the existing portal, never a firmware rebuild. Firmware
+that trusts only an old private CA cannot gain public roots remotely: confirm
+its existing public trust or perform an explicitly authorized one-time firmware
+migration before switching. Normal future renewals do not have that limitation.
 
 ### External MQTT access
 
@@ -501,13 +494,13 @@ location in `docker/nginx/dev.conf.template`. The MQTT endpoint uses the
 externally routed TLS listener with a matching DNS SAN, not the Cloudflare HTTP
 proxy or a Docker-only service name.
 
-The Agent's `EDOL_AGENT_ROOT_CA_FILE` must contain public trust anchors for
-**both** endpoints. Keep the instance's MQTT CA from
-`/srv/edol-dev/secure/certs/mqtt/ca.pem`; add the HTTPS issuer's trusted root
-certificates (ISRG Root X1/X2 for the current Let's Encrypt chain). Preserve
-existing anchors still needed by the device. Never substitute the HTTPS leaf
-certificate for a CA or include private keys in the firmware bundle. Updating
-the JVM truststore alone does not update the ESP32 trust bundle.
+Public-TLS Agent releases use the `lolin_d32_secure_public` environment and
+release-owned ISRG Root X1/X2 anchors for verified HTTPS and MQTT. Normal
+builds need no instance CA input. The setup portal discovers MQTT hostname and
+external port from `GET /api/agent/v1/configuration` over verified HTTPS before
+sending a pairing code. Configure only the EDOL HTTPS host/port, Wi-Fi and
+printer settings. Legacy private-CA firmware/setup fields do not provide this
+discovery flow; preserve its NVS and explicitly review migration separately.
 
 Use the Agent repository's current isolated build procedure and corrected
 date-enforcing SDK; its `docs/dynamic-tls-experiment.md` describes the required
@@ -729,46 +722,20 @@ ports `8090/8091/8099`, raw MQTT TLS `18885`, origins
 Set actual `bind_address`, nginx `proxy_address` and SMTP host/from/user/password,
 AUTH/STARTTLS. Preserve independent generated secrets; never copy Dev keys.
 
-Create fresh production MQTT CA/server trust using the following complete
-block. Change the example private IP in the SAN if `bind_address` differs:
+New production configs also select public TLS. Enter the actual origins,
+SMTP, ACME email and existing challenge webroot, then run the same automated
+bootstrap with the production config:
 
 ```bash
-set -euo pipefail
-umask 077
-install -d -m 0700 /srv/edol/secure/ca /srv/edol/secure/certs/mqtt
-ca=/srv/edol/secure/ca
-certs=/srv/edol/secure/certs
-test ! -e "$ca/ca-key.pem" && test ! -e "$certs/mqtt/server-key.pem"
-openssl req -x509 -newkey rsa:3072 -nodes -days 3650 -sha256 \
-  -keyout "$ca/ca-key.pem" -out "$ca/ca.pem" -subj '/CN=EDOL production MQTT CA'
-openssl req -new -newkey rsa:2048 -nodes -keyout "$certs/mqtt/server-key.pem" \
-  -out "$ca/server.csr" -subj '/CN=mqtt'
-printf '%s\n' 'subjectAltName=DNS:mqtt,DNS:edol.s-pon.dev,IP:192.168.0.200' \
-  'extendedKeyUsage=serverAuth' > "$ca/server.ext"
-openssl x509 -req -in "$ca/server.csr" -CA "$ca/ca.pem" -CAkey "$ca/ca-key.pem" \
-  -CAcreateserial -out "$certs/mqtt/server.pem" -days 365 -sha256 -extfile "$ca/server.ext"
-install -m 0600 "$ca/ca.pem" "$certs/mqtt/ca.pem"
-export EDOL_STORE_PASSWORD="$(python3 -c 'import json; print(json.load(open("/srv/edol/secure/instance.json"))["secrets"]["truststore"])')"
-export EDOL_STORE_DEFAULT=changeit
-docker run --rm --user "$(id -u):$(id -g)" -e EDOL_STORE_PASSWORD -e EDOL_STORE_DEFAULT \
-  -v "$certs:/export" --entrypoint sh eclipse-temurin:21-jre -ec '
-  test ! -e /export/combined.p12
-  keytool -importkeystore -srckeystore "$JAVA_HOME/lib/security/cacerts" \
-    -srcstorepass:env EDOL_STORE_DEFAULT -destkeystore /export/combined.p12 \
-    -deststoretype PKCS12 -deststorepass:env EDOL_STORE_PASSWORD -noprompt
-  keytool -importcert -alias edol-prod-mqtt -file /export/mqtt/ca.pem \
-    -keystore /export/combined.p12 -storepass:env EDOL_STORE_PASSWORD -noprompt'
-unset EDOL_STORE_PASSWORD EDOL_STORE_DEFAULT
+sudo python3 docker/deploy/public_tls.py bootstrap --config /srv/edol/secure/instance.json
 ```
 
-Keep CA signing keys outside the broker mount; back them up offline. Production
-requires certificate/truststore paths inside its instance directory so the
-coordinated instance backup covers its TLS trust. It validates leaf
-expiry/chain, DNS/IP SANs and matching server key before stopping
-services. It does not run Dev certificate signing or regenerate an installed
-identity. Plan certificate renewal before expiry. Firmware trust/enrollment is
-separate: Dev credentials do not authorize production. Never erase NVS or
-reflash automatically during a server deployment.
+For an existing instance, first run `init_config.py --upgrade-public-tls` with
+`--environment prod`, preserving the original config and secrets. Follow the
+[public TLS procedure](#3-bootstrap-public-https-and-mqtt-tls); do not generate
+another private MQTT CA or combined JVM truststore. Production deployment
+validates the installed public chain, hostname, expiry and key before stopping
+services. The existing coordinated production backup remains required.
 
 ### 4. Configure ingress and Gitea manually
 

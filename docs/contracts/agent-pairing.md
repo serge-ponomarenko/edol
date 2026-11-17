@@ -147,9 +147,21 @@ remote path/link defenses do not provide a privileged-local-process boundary.
 
 ## Firmware identity and transport
 
-`lolin_d32` is the default Home build. `lolin_d32_secure` selects secure
-firmware and requires `EDOL_AGENT_ROOT_CA_FILE`, a public CA bundle supplied
-through a validated build-local header. Home retains its `edol_config` settings.
+`lolin_d32` is the default Home build. `lolin_d32_secure_public` is the public-TLS
+release build, using the pinned date-enforcing SDK guard and release-owned ISRG
+Root X1/X2. No instance CA input is required. Explicit lab overrides still use
+`EDOL_AGENT_ROOT_CA_FILE`. Home retains its `edol_config` settings.
+
+Before enrollment, the secure setup portal fetches public deployment metadata
+from `GET /api/agent/v1/configuration` over verified HTTPS, without credentials.
+The response contains `version: 1`, `mqttProtocol: "3.1.1"`, `mqttTls: true`,
+`mqttHost` and the external `mqttPort`. This exact GET alone is exempt from
+Agent authentication; TLS, no-store and spoofed-identity-header rejection still
+apply. Discovery is opt-in through `edol-core.agent.discovery.enabled` and
+requires explicit host/port configuration. Home exposes no discovery controller.
+The firmware rejects redirects, unsupported versions/protocols, plaintext MQTT,
+invalid hosts/ports and responses over 1024 bytes before saving MQTT settings.
+It never transmits the pairing code to an unverified endpoint.
 
 The secure setup page accepts the one-time code through the existing setup AP
 and DNS portal. Save & Reboot uses Wi-Fi, synchronized time and verified TLS

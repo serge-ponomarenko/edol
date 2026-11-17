@@ -6,6 +6,7 @@ import ipaddress
 import json
 import re
 from urllib.parse import urlsplit
+import public_tls
 
 
 SERVICES = {
@@ -33,6 +34,11 @@ def validate(config):
             u = urlsplit(config[key])
             if u.scheme != "https" or not u.hostname or u.path or u.query or u.fragment or u.username:
                 raise ValueError("Secure origins must be exact HTTPS origins")
+        if config.get("mqtt_tls", "private") not in ("public", "private"):
+            raise ValueError("Unknown MQTT TLS mode")
+        if public_tls.enabled(config):
+            public_tls.host(config)
+            public_tls.port(config)
     validate_secrets(config)
     return config
 
@@ -179,6 +185,11 @@ def infrastructure(c, repo, state):
     for name, offset in (("postgres", 10), ("mqtt", 11), ("keycloak", 12)):
         if name in services:
             services[name].setdefault("networks", {})["private"] = {"ipv4_address": str(subnet[offset])}
+    if public_tls.enabled(c):
+        services["mqtt"]["volumes"] = [
+            volume for volume in services["mqtt"]["volumes"] if not volume.endswith(":/mosquitto/certs:ro")]
+        services["mqtt"]["volumes"].append(f"{public_tls.directory(c)}:/mosquitto/certs:ro")
+        services["mqtt"]["networks"]["private"]["aliases"] = [public_tls.host(c)]
     return services
 
 
@@ -192,6 +203,12 @@ def common_app(c, module, port):
         "edol-core.url": "http://edolcore:8080", "edol-hub.url": "http://edolhub:8090",
         "edol-ams.url": "http://edolams:8099", "logging.file.name": f"/app/logs/{module}.log",
     }
+    if public_tls.enabled(c):
+        props["mqttServer.url"] = f"ssl://{public_tls.host(c)}:8883"
+        if module == "core":
+            props.update({"edol-core.agent.discovery.enabled": True,
+                          "edol-core.agent.discovery.mqtt-host": public_tls.host(c),
+                          "edol-core.agent.discovery.mqtt-port": public_tls.port(c)})
     env = {"TZ": "Europe/Kyiv", "SPRING_PROFILES_ACTIVE": mode if secure else "home",
            "SERVER_PORT": str(port or 8080), "POSTGRES_DB": "edol_devices", "POSTGRES_USER": "home",
            "POSTGRES_PASSWORD": s.get("home", ""),
@@ -285,7 +302,7 @@ def app_container(c, module, port, env, repo, state):
            "image": c["project"] + "-" + module + ":" + c["revision"], "environment": env,
            "volumes": [f"{state}/logs/{module}:/app/logs"],
            "networks": {"private": {"ipv4_address": str(subnet[{"core": 4, "hub": 5, "ams": 6, "notify": 7}[module]])}}}
-    if secure:
+    if secure and not public_tls.enabled(c):
         app["volumes"].append(f"{c['mqtt_truststore']}:/app/certs/mqtt.p12:ro")
         app["entrypoint"] = ["java", "-Djavax.net.ssl.trustStore=/app/certs/mqtt.p12",
                              "-Djavax.net.ssl.trustStorePassword=" + s["truststore"], "-jar", "/app/app.jar"]

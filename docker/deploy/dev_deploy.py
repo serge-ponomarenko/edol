@@ -15,6 +15,7 @@ import time
 import database
 import keycloak_smtp
 import mqtt_certificate
+import public_tls
 from model import AMS_READINESS_HEADERS, SERVICES, compose, realm, validate
 
 
@@ -114,9 +115,7 @@ def prepare(config, state):
             passwords = {"core-events": "core", "hub-events": "hub", "notify-events": "notify", "ams-events": "ams",
                          "core-agent-control": "control", "core-agent-ingress": "ingress", "core-agent-commands": "command"}
             write_private(authority, json.dumps(dynsec.build_config({u: config["secrets"]["mqtt_" + k] for u, k in passwords.items()})))
-        health_options = ["-h mqtt", "-p 8883", "--cafile /mosquitto/certs/ca.pem", "-u hub-events",
-                          "-P " + config["secrets"]["mqtt_hub"], "-t edolcore/#", "-i " + config["project"] + "-health"]
-        write_private(state / "mqtt-health.conf", "\n".join(health_options) + "\n")
+        write_mqtt_health(config, state)
     model = compose(config, ROOT, state)
     destination = state / COMPOSE_FILE
     # Compose also interpolates dollar signs inside JSON strings. Preserve literal secrets.
@@ -124,7 +123,19 @@ def prepare(config, state):
     return model
 
 
+
+def write_mqtt_health(config, state):
+    health_host = public_tls.host(config) if public_tls.enabled(config) else "mqtt"
+    health_roots = "roots.pem" if public_tls.enabled(config) else "ca.pem"
+    health_options = ["-h " + health_host, "-p 8883", "--cafile /mosquitto/certs/" + health_roots, "-u hub-events",
+                      "-P " + config["secrets"]["mqtt_hub"], "-t edolcore/#", "-i " + config["project"] + "-health"]
+    write_private(state / "mqtt-health.conf", "\n".join(health_options) + "\n")
+
+
 def validate_certificates(config):
+    if public_tls.enabled(config):
+        public_tls.validate_installed(config)
+        return
     if config["mode"] == "secure":
         for path in (Path(config["mqtt_cert_dir"]) / "server.pem", Path(config["mqtt_cert_dir"]) / "server-key.pem",
                      Path(config["mqtt_cert_dir"]) / "ca.pem",
@@ -237,6 +248,10 @@ class Deployment:
 
     def configure_mqtt_certificate(self, activate=False):
         try:
+            if public_tls.enabled(self.config):
+                if not activate:
+                    public_tls.validate_installed(self.config)
+                return
             operation = mqtt_certificate.activate if activate else mqtt_certificate.stage
             operation(self.config, self.state)
         except (OSError, ValueError, subprocess.SubprocessError) as error:

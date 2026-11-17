@@ -116,9 +116,17 @@ deployment, including API key changes; startup realm import remains create-only
 and other realm settings are preserved. Home and secure state remain separate;
 Home creates no OIDC users or memberships.
 
+New secure configurations use public MQTT TLS. The existing host Certbot
+lifecycle obtains and renews the certificate; an instance-scoped hook installs
+it and reloads the broker. Internal service connections use the certificate DNS
+name via a private Docker alias and default JVM public trust. A non-secret,
+verified HTTPS discovery response supplies external MQTT settings to universal
+Agent firmware. Credentials, ACLs and persisted tenant/printer binding remain
+unchanged. Legacy private-CA configs remain supported until an explicit upgrade.
+
 Secure Dev devices use the public Hub DNS name for HTTPS (443) and raw MQTT
 TLS (18884); DNS-only routing and external TCP forwarding are operator-owned.
-Deployment stages a missing MQTT DNS SAN certificate using the existing CA
+In legacy private-CA mode, deployment stages a missing MQTT DNS SAN certificate using the existing CA
 and server key, then installs it only after stopping Dev, retaining authority
 and a previous-certificate backup. It does not rotate device identities or CA.
 Production uses the same model through the `prod-deploy` job after main's

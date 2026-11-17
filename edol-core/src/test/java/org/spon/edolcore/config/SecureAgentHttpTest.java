@@ -3,6 +3,7 @@ package org.spon.edolcore.config;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.spon.edolcore.controller.SecureAgentController;
+import org.spon.edolcore.controller.AgentDiscoveryController;
 import org.spon.edolcore.service.agent.pairing.AgentPairingService;
 import org.spon.edolcore.service.camera.CameraSnapshotStore;
 import org.spon.edolcore.service.tenant.CoreTenantContext;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class SecureAgentHttpTest {
@@ -42,6 +44,8 @@ class SecureAgentHttpTest {
         context.setServletContext(new MockServletContext());
         String key = java.util.Base64.getEncoder().encodeToString(new byte[32]);
         TestPropertyValues.of("edol.deployment.mode=secure-multi-tenant", "edol-core.agent.enabled=true",
+                "edol-core.agent.discovery.enabled=true", "edol-core.agent.discovery.mqtt-host=edol.example.org",
+                "edol-core.agent.discovery.mqtt-port=18885",
                 "camera.store-snapshots=false", "camera.snapshot-dir=target/unused-agent-http-snapshots",
                 "edol-core.agent.pairing-keys[1]=" + key, "edol-core.agent.credential-keys[1]=" + key).applyTo(context);
         context.register(WebConfig.class);
@@ -108,9 +112,28 @@ class SecureAgentHttpTest {
                 context.getBean(CameraSnapshotStore.class));
     }
 
+    @Test
+    void discoveryRequiresHttpsButNoIdentityAndDoesNotExposeSecrets() throws Exception {
+        start();
+        mvc.perform(get("/api/agent/v1/configuration")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/agent/v1/configuration").secure(true))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.mqttHost").value("edol.example.org"))
+                .andExpect(jsonPath("$.mqttPort").value(18885))
+                .andExpect(jsonPath("$.mqttTls").value(true))
+                .andExpect(jsonPath("$.mqttProtocol").value("3.1.1"))
+                .andExpect(jsonPath("$.secret").doesNotExist());
+        mvc.perform(get("/api/agent/v1/configuration").secure(true).header("X-Agent-Id", "spoof"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/agent/v1/configuration/other").secure(true))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(context.getBean(AgentPairingService.class));
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     @EnableWebMvc @EnableWebSecurity
-    @Import({AgentPairingConfiguration.class, SecureAgentController.class, CoreTenantContext.class})
+    @Import({AgentPairingConfiguration.class, SecureAgentController.class, AgentDiscoveryController.class, CoreTenantContext.class})
     static class WebConfig {
         @Bean @Primary AgentPairingService agents() { return mock(AgentPairingService.class); }
         @Bean org.springframework.jdbc.core.JdbcTemplate jdbc() { return mock(org.springframework.jdbc.core.JdbcTemplate.class); }

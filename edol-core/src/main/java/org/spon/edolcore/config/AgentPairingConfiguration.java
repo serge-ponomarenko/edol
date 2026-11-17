@@ -47,6 +47,7 @@ public class AgentPairingConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/agent/v1/configuration").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/agent/v1/enroll").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 "/api/agent/v1/upload", "/api/agent/v1/camera/snapshot",

@@ -7,6 +7,10 @@ Entries describe meaningful changes rather than individual commits.
 
 ## [Unreleased]
 
+### Added
+
+- Public MQTT TLS deployment option with Certbot renewal integration and verified HTTPS discovery of Agent connection settings; new secure instance configurations select public TLS without changing existing broker identities.
+
 ### Fixed
 
 - Send CSRF tokens with allocation edits and finalization in secure Hub, and report rejected requests instead of silently leaving allocation unchanged.

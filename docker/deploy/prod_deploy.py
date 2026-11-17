@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 from dev_deploy import BackupFailure, Deployment, DeploymentFailure, write_private
 import mqtt_certificate
+import public_tls
 
 
 def validate_generation(state, generation, revision):
@@ -38,6 +39,9 @@ class ProductionDeployment(Deployment):
         self.dc("stop", *services)
 
     def configure_mqtt_certificate(self, activate=False):
+        if public_tls.enabled(self.config):
+            super().configure_mqtt_certificate(activate)
+            return
         if self.config["mode"] != "secure" or activate:
             return
         # Production validates operator-provisioned trust; it never signs or rotates it.

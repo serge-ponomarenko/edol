@@ -37,8 +37,11 @@ final class AgentCredentialFilter extends OncePerRequestFilter {
             response.setStatus(400);
             return;
         }
-        if ("POST".equals(request.getMethod())
-                && request.getRequestURI().equals(request.getContextPath() + "/api/agent/v1/enroll")) {
+        boolean enrollment = "POST".equals(request.getMethod())
+                && request.getRequestURI().equals(request.getContextPath() + "/api/agent/v1/enroll");
+        boolean discovery = "GET".equals(request.getMethod())
+                && request.getRequestURI().equals(request.getContextPath() + "/api/agent/v1/configuration");
+        if (enrollment || discovery) {
             chain.doFilter(request, response);
             return;
         }

@@ -124,7 +124,7 @@ database volumes or broker authority. See [operations](../operations.md) for
 empty first initialization and data-preserving redeploys; no generic Compose base or
 secure broker override is required.
 
-Secure Dev uses the public Hub hostname for both Core HTTPS and raw MQTT TLS
+Legacy private-CA Secure Dev uses the public Hub hostname for both Core HTTPS and raw MQTT TLS
 (separate ports 443 and 18884). The broker certificate must validate the public
 DNS name, the internal `mqtt` name and the configured LAN bind IP. Certificate
 preparation retains the existing CA/server key and broker/device authority;
@@ -151,3 +151,20 @@ requires reviewing its saved destinations because it can resume legacy traffic.
 Retire broker authorities while broker control is available before disabling
 the MQTT component. A disabled feature alone does not close existing sockets;
 an unfinished disconnection must remain explicitly pending.
+
+## Public TLS deployment
+
+New secure instance configurations select `mqtt_tls: public`; existing
+private-CA configs remain explicit legacy configurations until upgraded.
+Public mode obtains/installs a Let's Encrypt chain through the existing host
+Certbot lifecycle. It uses the Hub DNS name by default for Agent HTTPS and raw
+MQTT on separate external ports. Services use that certificate DNS name on an
+instance-private Docker alias and internal port 8883; they no longer require a
+private MQTT CA in a custom JVM truststore. Broker credentials and ACLs remain
+unchanged. The Agent discovery response supplies the external MQTT endpoint.
+
+Certificates renew independently of application releases. A release-owned
+public root set in Agent permits leaf/key replacement and reinstallations
+without rebuilding firmware. Restored identity data preserves pairing; lost
+server identity data requires new pairing, not reflashing. Firmware supporting
+only an installation's private CA needs a separately authorized migration.
